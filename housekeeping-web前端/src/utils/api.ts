@@ -1,5 +1,5 @@
 // API工具类
-const API_BASE_URL = 'http://localhost:8082/api'
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL as string) || 'http://localhost:8082/api'
 
 // 获取存储的token
 const getToken = () => {
@@ -41,11 +41,15 @@ const request = async (url: string, options: RequestInit = {}) => {
     }
     
     const data = await response.json()
-    
+
     if (!response.ok) {
       throw new Error(data.message || '请求失败')
     }
-    
+
+    if (data && typeof data === 'object' && 'code' in data && data.code !== 200) {
+      throw new Error(data.message || '请求失败')
+    }
+
     return data
   } catch (error) {
     console.error('API请求错误:', error)
@@ -138,14 +142,25 @@ export const providerAPI = {
 
 // 服务API
 export const serviceAPI = {
-  // 获取服务列表
+  // 获取热门服务列表
+  getPopularServices: (page = 1, size = 10) => {
+    return request(`/service/public/popular?page=${page}&size=${size}`)
+  },
+
+  // 兼容旧方法名称
   getServices: (page = 1, size = 10) => {
     return request(`/service/public/popular?page=${page}&size=${size}`)
   },
-  
+
+  // 根据分类获取服务
+  getServicesByCategory: (categoryId: number, page = 1, size = 10) => {
+    return request(`/service/public/category/${categoryId}?page=${page}&size=${size}`)
+  },
+
   // 搜索服务
   searchServices: (keyword: string, page = 1, size = 10) => {
-    return request(`/service/public/search?keyword=${keyword}&page=${page}&size=${size}`)
+    const encodedKeyword = encodeURIComponent(keyword)
+    return request(`/service/public/search?keyword=${encodedKeyword}&page=${page}&size=${size}`)
   },
   
   // 获取服务详情
@@ -179,6 +194,14 @@ export const serviceAPI = {
     return request(`/service/${id}`, {
       method: 'DELETE'
     })
+  }
+}
+
+// 服务分类API
+export const categoryAPI = {
+  // 获取公开的分类列表
+  getPublicCategories: () => {
+    return request('/category/public/list')
   }
 }
 

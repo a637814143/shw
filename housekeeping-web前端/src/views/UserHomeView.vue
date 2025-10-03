@@ -12,7 +12,7 @@
               <img v-if="userAvatar" :src="userAvatar" alt="头像" class="avatar-image">
               <div v-else class="avatar-placeholder">🐻</div>
             </div>
-            <span class="username">小张</span>
+            <span class="username">{{ userInfo.username }}</span>
             <div class="dropdown-arrow" :class="{ active: showUserDropdown }">▼</div>
           </div>
           
@@ -152,65 +152,78 @@
       <div v-if="activeMenu === 'services'" class="content-section">
         <!-- 服务分类导航 -->
         <div class="service-categories">
-          <div 
-            v-for="category in serviceCategories" 
+          <div
+            v-for="category in serviceCategories"
             :key="category.id"
-            class="category-item" 
+            class="category-item"
             :class="{ active: activeCategory === category.id }"
             @click="selectCategory(category.id)"
           >
             {{ category.name }}
           </div>
         </div>
-        
+
+        <div v-if="categoryErrorMessage" class="service-status error-message">{{ categoryErrorMessage }}</div>
+        <div v-else-if="isCategoryLoading" class="service-status loading-message">分类加载中...</div>
+
         <!-- 搜索栏 -->
         <div class="search-bar">
-          <input 
-            type="text" 
-            placeholder="请输入服务名称搜索" 
+          <input
+            type="text"
+            placeholder="请输入服务名称搜索"
             class="search-input"
             v-model="serviceSearchKeyword"
-            @keyup.enter="searchServices"
-            @input="searchServices"
+            @keyup.enter.prevent="searchServices()"
+            @input="handleServiceSearchInput"
           >
-          <button class="search-btn" @click="searchServices">搜索</button>
+          <button class="search-btn" @click="searchServices()">搜索</button>
           <button v-if="serviceSearchKeyword" class="clear-btn" @click="clearServiceSearch">清空</button>
         </div>
-        
-        <!-- 服务卡片网格 -->
-        <div class="services-grid">
-          <div v-for="service in filteredServices" :key="service.id" class="service-card">
-            <div class="card-decorations">
-              <div class="red-triangle top-left"></div>
-              <div class="red-triangle top-right"></div>
-            </div>
-            <div class="service-title-bar">
-              <span class="service-title">{{ service.name }}</span>
-            </div>
-            <div class="service-subtitle">极速上门 品质服务</div>
-            <div class="service-description">{{ service.description }}</div>
-            <div class="service-footer">
-              <div class="service-price">¥{{ service.price }}/{{ service.unit }}</div>
-              <div class="service-booked">已约{{ service.booked }}次</div>
+
+        <div v-if="serviceErrorMessage" class="service-status error-message">{{ serviceErrorMessage }}</div>
+        <div v-else-if="isServiceLoading" class="service-status loading-message">服务加载中...</div>
+        <div v-else>
+          <div class="services-grid" v-if="filteredServices.length > 0">
+            <div v-for="service in filteredServices" :key="service.id" class="service-card">
+              <div class="card-decorations">
+                <div class="red-triangle top-left"></div>
+                <div class="red-triangle top-right"></div>
+              </div>
+              <div class="service-title-bar">
+                <span class="service-title">{{ service.name }}</span>
+              </div>
+              <div class="service-subtitle">极速上门 品质服务</div>
+              <div class="service-description">{{ service.description }}</div>
+              <div class="service-footer">
+                <div class="service-price">¥{{ service.price }}/{{ service.unit }}</div>
+                <div class="service-booked">已约{{ service.booked }}次</div>
+              </div>
             </div>
           </div>
+
+          <div v-else class="no-results">
+            <div class="no-results-icon">🔍</div>
+            <div class="no-results-text">未找到相关服务</div>
+            <div class="no-results-hint">请尝试其他关键词或清空搜索条件</div>
+          </div>
         </div>
-        
-        <!-- 无搜索结果提示 -->
-        <div v-if="filteredServices.length === 0" class="no-results">
-          <div class="no-results-icon">🔍</div>
-          <div class="no-results-text">未找到相关服务</div>
-          <div class="no-results-hint">请尝试其他关键词或清空搜索条件</div>
-        </div>
-        
+
         <!-- 分页 -->
         <div class="pagination">
-          <div class="pagination-info">共{{ filteredServices.length }}条</div>
+          <div class="pagination-info">共{{ servicePageInfo.total }}条</div>
           <div class="pagination-controls">
-            <button class="page-btn">‹</button>
-            <button class="page-btn active">1</button>
-            <button class="page-btn">2</button>
-            <button class="page-btn">›</button>
+            <button
+              class="page-btn"
+              :disabled="servicePageInfo.current <= 1"
+              @click="changeServicePage(servicePageInfo.current - 1)"
+            >‹</button>
+            <button class="page-btn active">{{ servicePageInfo.current }}</button>
+            <button
+              class="page-btn"
+              :disabled="servicePageInfo.pages === 0 || servicePageInfo.current >= servicePageInfo.pages"
+              @click="changeServicePage(servicePageInfo.current + 1)"
+            >›</button>
+            <span class="page-summary">共{{ servicePageInfo.pages }}页</span>
           </div>
         </div>
       </div>
@@ -838,8 +851,33 @@
   </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { categoryAPI, serviceAPI, userAPI, removeToken, getToken } from '@/utils/api'
+
+interface ServiceCategoryOption {
+  id: string
+  name: string
+}
+
+interface ServiceCard {
+  id: number
+  name: string
+  description: string
+  price: number
+  unit: string
+  booked: number
+  categoryId: number | null
+}
+
+type ServiceQueryMode = 'popular' | 'category' | 'search'
+
+interface ServicePageInfo {
+  total: number
+  current: number
+  size: number
+  pages: number
+}
 
 const router = useRouter()
 
@@ -849,38 +887,107 @@ const userInfo = ref({
   role: 'user'
 })
 
-// 从localStorage获取用户信息
-const getUserInfo = () => {
+const userAvatar = ref('')
+
+const personalInfoForm = ref({
+  avatar: '',
+  username: '',
+  name: '',
+  phone: '',
+  email: '',
+  balance: '0.00'
+})
+
+const currentBalance = ref(0)
+
+const initializeUser = (): boolean => {
+  const token = getToken()
+  if (!token) {
+    router.replace('/login')
+    return false
+  }
+
   const storedUserInfo = localStorage.getItem('userInfo')
-  if (storedUserInfo) {
-    try {
-      const user = JSON.parse(storedUserInfo)
-      userInfo.value = {
-        username: user.username,
-        role: user.role
-      }
-    } catch (error) {
-      console.error('获取用户信息失败:', error)
-      // 如果获取失败，跳转到登录页
-      router.push('/login')
+  if (!storedUserInfo) {
+    router.replace('/login')
+    return false
+  }
+
+  try {
+    const parsed = JSON.parse(storedUserInfo)
+    if (parsed.role !== 'user') {
+      router.replace('/login')
+      return false
     }
-  } else {
-    // 如果没有用户信息，跳转到登录页
-    router.push('/login')
+
+    const storedUserData = parsed.userData || {}
+    const displayName = storedUserData.realName || parsed.username || '用户'
+
+    userInfo.value = {
+      username: displayName,
+      role: parsed.role
+    }
+
+    if (storedUserData.avatar) {
+      userAvatar.value = storedUserData.avatar
+    }
+
+    const balanceValue = Number(storedUserData.balance ?? 0)
+    currentBalance.value = Number.isNaN(balanceValue) ? 0 : balanceValue
+
+    personalInfoForm.value = {
+      avatar: storedUserData.avatar || '',
+      username: storedUserData.username || parsed.username || '',
+      name: displayName,
+      phone: storedUserData.phone || '',
+      email: storedUserData.email || '',
+      balance: Number.isNaN(balanceValue) ? '0.00' : balanceValue.toFixed(2)
+    }
+
+    return true
+  } catch (error) {
+    console.error('解析用户信息失败:', error)
+    localStorage.removeItem('userInfo')
+    router.replace('/login')
+    return false
   }
 }
 
-// 组件挂载时获取用户信息
-getUserInfo()
+const fetchUserProfile = async () => {
+  try {
+    const response = await userAPI.getUserInfo()
+    if (response?.data) {
+      const user = response.data
+      const displayName = user.realName || user.username || userInfo.value.username
+
+      userInfo.value.username = displayName
+
+      personalInfoForm.value = {
+        avatar: user.avatar || '',
+        username: user.username || '',
+        name: displayName,
+        phone: user.phone || '',
+        email: user.email || '',
+        balance: Number(user.balance ?? 0).toFixed(2)
+      }
+
+      const balanceValue = Number(user.balance ?? 0)
+      currentBalance.value = Number.isNaN(balanceValue) ? 0 : balanceValue
+
+      if (user.avatar) {
+        userAvatar.value = user.avatar
+      }
+    }
+  } catch (error) {
+    console.error('加载用户信息失败:', error)
+  }
+}
 
 // 当前激活的菜单
 const activeMenu = ref('home')
 
 // 用户下拉菜单显示状态
 const showUserDropdown = ref(false)
-
-// 用户头像
-const userAvatar = ref('')
 
 // 修改密码相关
 const showChangePasswordModal = ref(false)
@@ -897,21 +1004,12 @@ const passwordErrors = ref({
 
 // 个人信息相关
 const showPersonalInfoModal = ref(false)
-const personalInfoForm = ref({
-  avatar: '',
-  username: 'aaa',
-  name: '小张',
-  phone: '13988776655',
-  email: 'aaa@xm.com',
-  balance: '1812.1'
-})
 
 // 头像输入框引用
 const avatarInput = ref<HTMLInputElement | null>(null)
 
 // 充值记录相关
 const showRechargeRecordModal = ref(false)
-const currentBalance = ref(812.1)
 const currentPage = ref(1)
 const pageSize = ref(5)
 
@@ -1033,137 +1131,215 @@ const reviewsSearchKeyword = ref('')
 // 服务搜索关键词
 const serviceSearchKeyword = ref('')
 
-// 服务数据
-const allServices = ref([
-  {
-    id: 1,
-    name: '沙发保养·清洁',
-    description: '沙发保养清洁【包含皮革养护】',
-    price: 50,
-    unit: '次',
-    booked: 2,
-    category: 'sofa'
-  },
-  {
-    id: 2,
-    name: '地板打蜡·10平米',
-    description: '地板打蜡10平米',
-    price: 66,
-    unit: '10平米',
-    booked: 4,
-    category: 'floor'
-  },
-  {
-    id: 3,
-    name: '长期保洁·服务',
-    description: '全屋清洁【大扫除】',
-    price: 599,
-    unit: '次',
-    booked: 0,
-    category: 'longterm'
-  },
-  {
-    id: 4,
-    name: '日常保洁·4小时',
-    description: '4小时全屋日常保洁【中等户型推荐】',
-    price: 80,
-    unit: '次',
-    booked: 1,
-    category: 'daily'
-  },
-  {
-    id: 5,
-    name: '擦玻璃·服务',
-    description: '专业擦玻璃服务【内外双面】',
-    price: 12,
-    unit: '平米',
-    booked: 3,
-    category: 'window'
-  },
-  {
-    id: 6,
-    name: '深度保洁·5小时',
-    description: '深度保洁5小时【全屋大扫除】',
-    price: 120,
-    unit: '次',
-    booked: 0,
-    category: 'deep'
-  },
-  {
-    id: 7,
-    name: '新居开荒·1平米',
-    description: '新房精细开荒1平米【包运送垃圾/包验收】',
-    price: 8.8,
-    unit: '平米',
-    booked: 5,
-    category: 'newhome'
-  },
-  {
-    id: 8,
-    name: '厨房保养·清洁',
-    description: '厨房深度清洁保养',
-    price: 60,
-    unit: '次',
-    booked: 2,
-    category: 'kitchen'
-  },
-  {
-    id: 9,
-    name: '卫生间保养·清洁',
-    description: '卫生间深度清洁保养',
-    price: 45,
-    unit: '次',
-    booked: 1,
-    category: 'bathroom'
-  },
-  {
-    id: 10,
-    name: '日常保洁·2小时',
-    description: '2小时日常保洁【小户型推荐】',
-    price: 50,
-    unit: '次',
-    booked: 3,
-    category: 'daily'
-  },
-  {
-    id: 11,
-    name: '深度保洁·3小时',
-    description: '深度保洁3小时【全屋大扫除】',
-    price: 80,
-    unit: '次',
-    booked: 1,
-    category: 'deep'
-  },
-  {
-    id: 12,
-    name: '新居开荒·2平米',
-    description: '新房精细开荒2平米【包运送垃圾/包验收】',
-    price: 15.8,
-    unit: '平米',
-    booked: 2,
-    category: 'newhome'
+const servicePageSize = 12
+
+const filteredServices = ref<ServiceCard[]>([])
+const servicePageInfo = ref<ServicePageInfo>({
+  total: 0,
+  current: 1,
+  size: servicePageSize,
+  pages: 0
+})
+
+const serviceCategories = ref<ServiceCategoryOption[]>([{ id: 'all', name: '全部' }])
+const activeCategory = ref<string>('all')
+const isCategoryLoading = ref(false)
+const categoryErrorMessage = ref('')
+const isServiceLoading = ref(false)
+const serviceErrorMessage = ref('')
+const lastServiceQuery = ref<{ mode: ServiceQueryMode; categoryId?: string; keyword?: string }>({ mode: 'popular' })
+let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+const mapServiceRecord = (record: any): ServiceCard => ({
+  id: Number(record?.id ?? 0),
+  name: record?.name || '未命名服务',
+  description: record?.description || record?.content || '暂无描述',
+  price: Number(record?.price ?? 0),
+  unit: record?.unit || '次',
+  booked: Number(record?.bookingCount ?? record?.booked ?? 0),
+  categoryId: typeof record?.categoryId === 'number'
+    ? record.categoryId
+    : record?.categoryId
+      ? Number(record.categoryId)
+      : null
+})
+
+const loadServices = async (
+  fetcher: () => Promise<any>,
+  mode: ServiceQueryMode,
+  payload: { categoryId?: string; keyword?: string } = {},
+  page = 1
+) => {
+  isServiceLoading.value = true
+  serviceErrorMessage.value = ''
+  try {
+    const response = await fetcher()
+    const pageData = response?.data
+    const records = Array.isArray(pageData?.records)
+      ? pageData.records
+      : Array.isArray(pageData)
+        ? pageData
+        : []
+
+    filteredServices.value = records.map(mapServiceRecord)
+
+    const total = typeof pageData?.total === 'number' ? pageData.total : filteredServices.value.length
+    const size = typeof pageData?.size === 'number' ? pageData.size : servicePageSize
+    const pages =
+      typeof pageData?.pages === 'number'
+        ? pageData.pages
+        : total > 0
+          ? Math.ceil(total / size)
+          : 0
+
+    servicePageInfo.value = {
+      total,
+      current: page,
+      size,
+      pages
+    }
+
+    lastServiceQuery.value = { mode, ...payload }
+  } catch (error: any) {
+    console.error('加载服务失败:', error)
+    serviceErrorMessage.value = error?.message || '服务加载失败'
+    filteredServices.value = []
+    servicePageInfo.value = {
+      total: 0,
+      current: 1,
+      size: servicePageSize,
+      pages: 0
+    }
+  } finally {
+    isServiceLoading.value = false
   }
-])
+}
 
-// 过滤后的服务数据
-const filteredServices = ref([...allServices.value])
+const fetchPopularServices = async (page = 1) => {
+  await loadServices(
+    () => serviceAPI.getPopularServices(page, servicePageSize),
+    'popular',
+    {},
+    page
+  )
+}
 
-// 服务分类
-const serviceCategories = ref([
-  { id: 'all', name: '全部' },
-  { id: 'daily', name: '日常保洁' },
-  { id: 'window', name: '擦玻璃' },
-  { id: 'deep', name: '深度保洁' },
-  { id: 'newhome', name: '新居开荒' },
-  { id: 'kitchen', name: '厨房保养' },
-  { id: 'bathroom', name: '卫生间保养' },
-  { id: 'longterm', name: '家庭长期保洁' },
-  { id: 'floor', name: '地板打蜡' },
-  { id: 'sofa', name: '皮质沙发保养' }
-])
+const fetchServicesByCategory = async (categoryId: string, page = 1) => {
+  if (categoryId === 'all') {
+    await fetchPopularServices(page)
+    return
+  }
 
-// 当前选中的分类
-const activeCategory = ref('all')
+  const numericId = Number(categoryId)
+  if (Number.isNaN(numericId)) {
+    serviceErrorMessage.value = '无效的分类ID'
+    filteredServices.value = []
+    servicePageInfo.value = {
+      total: 0,
+      current: 1,
+      size: servicePageSize,
+      pages: 0
+    }
+    return
+  }
+
+  await loadServices(
+    () => serviceAPI.getServicesByCategory(numericId, page, servicePageSize),
+    'category',
+    { categoryId },
+    page
+  )
+}
+
+const searchServices = async (page = 1, keywordParam?: string) => {
+  const keyword = keywordParam ?? serviceSearchKeyword.value.trim()
+
+  if (!keyword) {
+    await fetchServicesByCategory(activeCategory.value, page)
+    return
+  }
+
+  serviceSearchKeyword.value = keyword
+
+  await loadServices(
+    () => serviceAPI.searchServices(keyword, page, servicePageSize),
+    'search',
+    { keyword },
+    page
+  )
+}
+
+const clearServiceSearch = async () => {
+  serviceSearchKeyword.value = ''
+  await fetchServicesByCategory(activeCategory.value, 1)
+}
+
+const handleServiceSearchInput = () => {
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+  }
+
+  serviceSearchTimer = window.setTimeout(() => {
+    searchServices()
+  }, 400)
+}
+
+const selectCategory = async (categoryId: string) => {
+  activeCategory.value = categoryId
+  serviceSearchKeyword.value = ''
+  await fetchServicesByCategory(categoryId, 1)
+}
+
+const fetchCategories = async () => {
+  isCategoryLoading.value = true
+  categoryErrorMessage.value = ''
+  try {
+    const response = await categoryAPI.getPublicCategories()
+    const categories = Array.isArray(response?.data) ? response.data : []
+
+    const normalized = categories.map((category: any): ServiceCategoryOption => ({
+      id: String(category?.id),
+      name: category?.name || '未命名分类'
+    }))
+
+    serviceCategories.value = [
+      { id: 'all', name: '全部' },
+      ...normalized
+    ]
+  } catch (error: any) {
+    console.error('加载分类失败:', error)
+    categoryErrorMessage.value = error?.message || '服务分类加载失败'
+    serviceCategories.value = [{ id: 'all', name: '全部' }]
+  } finally {
+    isCategoryLoading.value = false
+  }
+}
+
+const handleServiceSectionActivation = () => {
+  if (filteredServices.value.length === 0 && !isServiceLoading.value) {
+    fetchServicesByCategory(activeCategory.value, 1)
+  }
+}
+
+const changeServicePage = async (page: number) => {
+  if (page < 1 || page === servicePageInfo.value.current) {
+    return
+  }
+
+  if (servicePageInfo.value.pages > 0 && page > servicePageInfo.value.pages) {
+    return
+  }
+
+  const query = lastServiceQuery.value
+
+  if (query.mode === 'search' && query.keyword) {
+    await searchServices(page, query.keyword)
+  } else if (query.mode === 'category' && query.categoryId) {
+    await fetchServicesByCategory(query.categoryId, page)
+  } else {
+    await fetchPopularServices(page)
+  }
+}
 
 // 小贴士数据
 const allTips = ref([
@@ -1359,52 +1535,9 @@ const bookingForm = ref({
 // 设置激活菜单
 const setActiveMenu = (menu: string) => {
   activeMenu.value = menu
-}
 
-
-// 服务搜索功能
-const searchServices = () => {
-  const keyword = serviceSearchKeyword.value.trim().toLowerCase()
-  let baseServices = [...allServices.value]
-  
-  // 先按分类过滤
-  if (activeCategory.value !== 'all') {
-    baseServices = baseServices.filter(service => service.category === activeCategory.value)
-  }
-  
-  // 再按关键词搜索
-  if (keyword === '') {
-    filteredServices.value = baseServices
-  } else {
-    filteredServices.value = baseServices.filter(service => 
-      service.name.toLowerCase().includes(keyword) ||
-      service.description.toLowerCase().includes(keyword)
-    )
-  }
-}
-
-// 清空搜索
-const clearServiceSearch = () => {
-  serviceSearchKeyword.value = ''
-  filterServicesByCategory()
-}
-
-// 选择服务分类
-const selectCategory = (categoryId: string) => {
-  activeCategory.value = categoryId
-  filterServicesByCategory()
-}
-
-// 按分类过滤服务
-const filterServicesByCategory = () => {
-  if (activeCategory.value === 'all') {
-    filteredServices.value = [...allServices.value]
-  } else {
-    filteredServices.value = allServices.value.filter(service => service.category === activeCategory.value)
-  }
-  // 如果有搜索关键词，继续应用搜索过滤
-  if (serviceSearchKeyword.value.trim()) {
-    searchServices()
+  if (menu === 'services') {
+    handleServiceSectionActivation()
   }
 }
 
@@ -1825,12 +1958,22 @@ const savePersonalInfo = () => {
   
   // 模拟保存
   console.log('保存个人信息:', personalInfoForm.value)
-  
-  // 同步更新右上角显示的用户名
-  // 这里需要更新页面中显示的用户名，从"小张"改为personalInfoForm.value.name
-  const usernameElement = document.querySelector('.username')
-  if (usernameElement) {
-    usernameElement.textContent = personalInfoForm.value.name
+
+  userInfo.value.username = personalInfoForm.value.name
+
+  const storedInfo = localStorage.getItem('userInfo')
+  if (storedInfo) {
+    try {
+      const parsed = JSON.parse(storedInfo)
+      parsed.userData = parsed.userData || {}
+      parsed.userData.realName = personalInfoForm.value.name
+      parsed.userData.phone = personalInfoForm.value.phone
+      parsed.userData.email = personalInfoForm.value.email
+      parsed.userData.avatar = personalInfoForm.value.avatar
+      localStorage.setItem('userInfo', JSON.stringify(parsed))
+    } catch (error) {
+      console.error('更新本地用户信息失败:', error)
+    }
   }
   
   alert('个人信息保存成功！')
@@ -1928,9 +2071,9 @@ const confirmRecharge = () => {
   
   // 更新账户余额
   currentBalance.value += rechargeInfoForm.value.amount
-  
+
   // 同步更新个人信息中的余额
-  personalInfoForm.value.balance = currentBalance.value.toString()
+  personalInfoForm.value.balance = currentBalance.value.toFixed(2)
   
   alert(`充值成功！充值金额：¥${rechargeInfoForm.value.amount}`)
   
@@ -1949,10 +2092,10 @@ const confirmRecharge = () => {
 // 退出登录
 const logout = () => {
   if (confirm('确定要退出登录吗？')) {
-    // 清除用户信息
+    removeToken()
     localStorage.removeItem('userInfo')
-    // 跳转到登录页
-    window.location.href = '/login'
+    showUserDropdown.value = false
+    router.replace('/login')
   }
 }
 
@@ -1964,10 +2107,26 @@ const handleClickOutside = (event: Event) => {
   }
 }
 
-// 监听点击事件
-document.addEventListener('click', handleClickOutside)
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
 
+  if (!initializeUser()) {
+    return
+  }
 
+  fetchUserProfile()
+  fetchCategories()
+  fetchServicesByCategory(activeCategory.value, 1)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+    serviceSearchTimer = null
+  }
+})
 
 </script>
 
@@ -2508,6 +2667,26 @@ document.addEventListener('click', handleClickOutside)
 
 .clear-btn:hover {
   background: #e0a800;
+}
+
+.service-status {
+  margin: 10px 0 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.service-status.error-message {
+  color: #c0392b;
+}
+
+.service-status.loading-message {
+  color: #555;
+}
+
+.page-summary {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #666;
 }
 
 /* 无搜索结果样式 */
