@@ -1,101 +1,94 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getToken, getTokenExpiry, getUserType, removeToken, getSessionProfile } from '@/utils/api'
+
+const roleDefaultRoute: Record<string, string> = {
+  ADMIN: '/admin-home',
+  PROVIDER: '/provider-home',
+  USER: '/user-home'
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('../views/LoginView.vue'),
+      redirect: () => {
+        const token = getToken()
+        const expiresAt = getTokenExpiry()
+        const userType = getUserType()
+        if (token && expiresAt && expiresAt > Date.now() && userType) {
+          return roleDefaultRoute[userType] ?? '/login'
+        }
+        return '/login'
+      }
     },
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/LoginView.vue'),
+      component: () => import('../views/LoginView.vue')
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('../views/RegisterView.vue'),
+      component: () => import('../views/RegisterView.vue')
     },
     {
       path: '/user-home',
       name: 'user-home',
       component: () => import('../views/UserHomeView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, roles: ['USER'] }
     },
     {
       path: '/provider-home',
       name: 'provider-home',
       component: () => import('../views/ProviderHomeView.vue'),
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, roles: ['PROVIDER'] }
     },
     {
       path: '/admin-home',
       name: 'admin-home',
       component: () => import('../views/AdminHomeView.vue'),
-      meta: { requiresAuth: true }
-    },
-  ],
+      meta: { requiresAuth: true, roles: ['ADMIN'] }
+    }
+  ]
 })
 
-// 路由守卫
-router.beforeEach((to, from, next) => {
-  // 检查路由是否需要认证
-  if (to.meta.requiresAuth) {
-    // 检查用户是否已登录
-    const userInfo = localStorage.getItem('userInfo')
-    
-    if (userInfo) {
-      try {
-        const user = JSON.parse(userInfo)
-        // 检查登录时间是否超过24小时
-        const loginTime = new Date(user.loginTime)
-        const now = new Date()
-        const hoursDiff = (now.getTime() - loginTime.getTime()) / (1000 * 60 * 60)
-        
-        if (hoursDiff > 24) {
-          // 登录过期，清除用户信息并跳转到登录页
-          localStorage.removeItem('userInfo')
-          next('/login')
-        } else {
-          // 用户已登录且未过期，检查角色权限
-          if (user.role === 'admin') {
-            // 管理员角色只能访问管理员页面
-            if (to.name !== 'admin-home') {
-              next('/admin-home')
-            } else {
-              next()
-            }
-          } else if (user.role === 'provider') {
-            // 家政人员角色只能访问家政人员页面
-            if (to.name !== 'provider-home') {
-              next('/provider-home')
-            } else {
-              next()
-            }
-          } else {
-            // 用户角色只能访问用户页面
-            if (to.name !== 'user-home') {
-              next('/user-home')
-            } else {
-              next()
-            }
-          }
-        }
-      } catch (error) {
-        // 用户信息格式错误，清除并跳转到登录页
-        localStorage.removeItem('userInfo')
-        next('/login')
+router.beforeEach((to, _from, next) => {
+  if (!to.meta.requiresAuth) {
+    if (to.name === 'login' || to.name === 'register') {
+      const token = getToken()
+      const expiresAt = getTokenExpiry()
+      const userType = getUserType()
+      if (token && expiresAt && expiresAt > Date.now() && userType) {
+        return next(roleDefaultRoute[userType] ?? '/user-home')
       }
-    } else {
-      // 用户未登录，跳转到登录页
-      next('/login')
     }
-  } else {
-    // 不需要认证的路由，直接访问
-    next()
+    return next()
   }
+
+  const token = getToken()
+  const expiresAt = getTokenExpiry()
+  const userType = getUserType()
+
+  if (!token || !expiresAt || expiresAt <= Date.now() || !userType) {
+    removeToken()
+    return next({ name: 'login' })
+  }
+
+  const allowedRoles = to.meta.roles as string[] | undefined
+  const normalizedRole = userType.toUpperCase()
+
+  if (allowedRoles && !allowedRoles.includes(normalizedRole)) {
+    const fallback = roleDefaultRoute[normalizedRole] ?? '/login'
+    return next(fallback)
+  }
+
+  if (!getSessionProfile()) {
+    // 如果本地没有缓存的用户资料，让页面自行调用 /auth/me
+    // 这里不做额外处理，仅保证守卫不阻塞
+  }
+
+  return next()
 })
 
 export default router

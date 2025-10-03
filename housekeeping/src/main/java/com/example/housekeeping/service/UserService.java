@@ -2,13 +2,12 @@ package com.example.housekeeping.service;
 
 import com.example.housekeeping.entity.User;
 import com.example.housekeeping.repository.UserRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * 用户服务
@@ -16,7 +15,7 @@ import java.util.Optional;
 @Service
 public class UserService {
 
-    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private final UserRepository userRepository;
 
     public UserService(UserRepository userRepository) {
@@ -75,6 +74,16 @@ public class UserService {
         }
         if (updateUser.getAddress() != null) {
             user.setAddress(updateUser.getAddress());
+        }
+        if (updateUser.getPhone() != null && !updateUser.getPhone().equals(user.getPhone())) {
+            String phone = updateUser.getPhone().trim();
+            if (!PHONE_PATTERN.matcher(phone).matches()) {
+                throw new RuntimeException("手机号格式不正确");
+            }
+            if (userRepository.existsByPhone(phone)) {
+                throw new RuntimeException("手机号已被使用");
+            }
+            user.setPhone(phone);
         }
 
         return userRepository.save(user);

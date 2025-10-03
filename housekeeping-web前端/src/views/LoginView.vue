@@ -1,488 +1,223 @@
 <template>
-  <div class="login-container">
-    <!-- 背景装饰 -->
-    <div class="background-decoration">
-      <div class="candle candle-1"></div>
-      <div class="candle candle-2"></div>
-      <div class="plate">
-        <div class="pancakes"></div>
-        <div class="fork"></div>
-      </div>
-      <div class="banana-dish">
-        <div class="banana"></div>
-        <div class="string"></div>
-      </div>
-      <div class="mug"></div>
-      <div class="tablecloth"></div>
-    </div>
+  <div class="auth-layout">
+    <section class="auth-panel">
+      <h1 class="auth-title">家政服务平台登录</h1>
+      <p class="auth-subtitle">请使用注册账号登录系统</p>
 
-    <!-- 登录表单 -->
-    <div class="login-form">
-      <h1 class="form-title">家政服务平台</h1>
-      
-      <form @submit.prevent="handleLogin" class="form">
-        <!-- 账号输入 -->
-        <div class="input-group">
-          <div class="input-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M20 21V19C20 17.9391 19.5786 16.9217 18.8284 16.1716C18.0783 15.4214 17.0609 15 16 15H8C6.93913 15 5.92172 15.4214 5.17157 16.1716C4.42143 16.9217 4 17.9391 4 19V21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <input 
-            type="text" 
-            v-model="formData.username" 
-            placeholder="请输入账号" 
-            class="form-input"
-            required
-          />
-        </div>
+      <form class="auth-form" @submit.prevent="handleLogin">
+        <label class="form-field">
+          <span>账号</span>
+          <input v-model.trim="form.username" type="text" placeholder="请输入账号" required />
+        </label>
 
-        <!-- 密码输入 -->
-        <div class="input-group">
-          <div class="input-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" stroke-width="2"/>
-              <circle cx="12" cy="16" r="1" stroke="currentColor" stroke-width="2"/>
-              <path d="M7 11V7C7 5.67392 7.52678 4.40215 8.46447 3.46447C9.40215 2.52678 10.6739 2 12 2C13.3261 2 14.5979 2.52678 15.5355 3.46447C16.4732 4.40215 17 5.67392 17 7V11" stroke="currentColor" stroke-width="2"/>
-            </svg>
-          </div>
-          <input 
-            type="password" 
-            v-model="formData.password" 
-            placeholder="请输入密码" 
-            class="form-input"
-            required
-          />
-        </div>
+        <label class="form-field">
+          <span>密码</span>
+          <input v-model="form.password" type="password" placeholder="请输入密码" required />
+        </label>
 
-        <!-- 角色选择 -->
-        <div class="input-group">
-          <select v-model="formData.role" class="form-select">
+        <label class="form-field">
+          <span>角色</span>
+          <select v-model="form.role">
+            <option value="user">普通用户</option>
+            <option value="provider">家政服务人员</option>
             <option value="admin">管理员</option>
-            <option value="user">用户</option>
-            <option value="provider">家政人员</option>
           </select>
-          <div class="select-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polyline points="6,9 12,15 18,9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-        </div>
+        </label>
 
-        <!-- 错误提示 -->
-        <div v-if="errorMessage" class="error-message">
-          {{ errorMessage }}
-        </div>
+        <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
 
-        <!-- 登录按钮 -->
-        <button type="submit" class="login-btn" :disabled="isLoading">
-          <span v-if="isLoading">登录中...</span>
-          <span v-else>登录</span>
+        <button class="auth-button" type="submit" :disabled="isSubmitting">
+          {{ isSubmitting ? '登录中...' : '登录' }}
         </button>
-
-        <!-- 注册链接 -->
-        <div class="register-link">
-          <span>还没有账号?</span>
-          <a href="#" @click.prevent="goToRegister" class="register-text">请注册</a>
-        </div>
       </form>
-    </div>
+
+      <p class="auth-extra">
+        还没有账号？
+        <router-link to="/register">立即注册</router-link>
+      </p>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI, setToken } from '@/utils/api'
+import { authAPI, setToken, setUserType, setSessionProfile } from '@/utils/api'
 
 const router = useRouter()
 
-// 表单数据
-const formData = ref({
+const form = reactive({
   username: '',
   password: '',
   role: 'user'
 })
 
-// 登录状态
-const isLoading = ref(false)
+const isSubmitting = ref(false)
 const errorMessage = ref('')
+const successMessage = ref('')
 
-
-// 处理登录
 const handleLogin = async () => {
-  // 重置错误信息
   errorMessage.value = ''
-  
-  // 验证输入
-  if (!formData.value.username.trim()) {
-    errorMessage.value = '请输入账号'
+  successMessage.value = ''
+
+  if (!form.username || !form.password) {
+    errorMessage.value = '请输入账号和密码'
     return
   }
-  
-  if (!formData.value.password.trim()) {
-    errorMessage.value = '请输入密码'
-    return
-  }
-  
-  isLoading.value = true
-  
+
+  isSubmitting.value = true
   try {
-    let response
-    // 根据角色调用不同的登录接口
-    if (formData.value.role === 'admin') {
-      response = await authAPI.adminLogin(formData.value.username, formData.value.password)
-    } else if (formData.value.role === 'provider') {
-      response = await authAPI.providerLogin(formData.value.username, formData.value.password)
-    } else {
-      response = await authAPI.userLogin(formData.value.username, formData.value.password)
+    const response = await authAPI.login(form.role as 'user' | 'provider' | 'admin', form.username, form.password)
+    if (!response || !response.data) {
+      throw new Error('登录响应异常')
     }
-    
-    // 保存token和用户信息
-    if (response.data && response.data.token) {
-      setToken(response.data.token)
-      
-      // 保存用户信息到localStorage
-      localStorage.setItem('userInfo', JSON.stringify({
-        username: formData.value.username,
-        role: formData.value.role,
-        loginTime: new Date().toISOString(),
-        userId: response.data.user?.id,
-        userData: response.data.user,
-        userType: response.data.userType
-      }))
-      
-      console.log('登录成功:', response)
-      
-      // 根据用户角色跳转到不同的主界面
-      if (formData.value.role === 'admin') {
+
+    const { token, expiresAt, userType, profile } = response.data
+    if (!token || !expiresAt || !userType) {
+      throw new Error('登录信息不完整')
+    }
+
+    setToken(token, expiresAt)
+    setUserType(userType)
+    setSessionProfile(profile)
+
+    successMessage.value = '登录成功，正在跳转...'
+
+    setTimeout(() => {
+      if (userType === 'ADMIN') {
         router.replace('/admin-home')
-      } else if (formData.value.role === 'provider') {
+      } else if (userType === 'PROVIDER') {
         router.replace('/provider-home')
       } else {
         router.replace('/user-home')
       }
-    } else {
-      errorMessage.value = '登录响应格式错误'
-      console.error('登录响应数据:', response)
-    }
+    }, 300)
   } catch (error: any) {
-    errorMessage.value = error.message || '登录失败，请稍后重试'
-    console.error('登录错误:', error)
+    console.error('登录失败:', error)
+    errorMessage.value = error?.message || '登录失败，请稍后重试'
   } finally {
-    isLoading.value = false
+    isSubmitting.value = false
   }
-}
-
-// 跳转到注册页面
-const goToRegister = () => {
-  router.push('/register')
 }
 </script>
 
 <style scoped>
-.login-container {
-  height: 100vh;
-  width: 100vw;
+.auth-layout {
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: fixed;
-  top: 0;
-  left: 0;
-  background: linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #CD853F 100%);
-  overflow: hidden;
-  margin: 0;
-  padding: 0;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 24px;
 }
 
-/* 背景装饰样式 */
-.background-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
+.auth-panel {
   width: 100%;
-  height: 100%;
-  z-index: 1;
+  max-width: 420px;
+  background: #ffffff;
+  padding: 40px 36px;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.tablecloth {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 60%;
-  background: 
-    repeating-linear-gradient(
-      0deg,
-      #F5F5DC 0px,
-      #F5F5DC 20px,
-      #DEB887 20px,
-      #DEB887 40px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      #F5F5DC 0px,
-      #F5F5DC 20px,
-      #DEB887 20px,
-      #DEB887 40px
-    );
-  opacity: 0.3;
-}
-
-.candle {
-  position: absolute;
-  width: 8px;
-  height: 40px;
-  background: #8B4513;
-  border-radius: 4px;
-}
-
-.candle-1 {
-  bottom: 20%;
-  left: 15%;
-  transform: rotate(-5deg);
-}
-
-.candle-2 {
-  bottom: 18%;
-  left: 20%;
-  transform: rotate(3deg);
-}
-
-.candle::after {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 8px;
-  background: #FFD700;
-  border-radius: 2px;
-  box-shadow: 0 0 10px #FFD700;
-}
-
-.plate {
-  position: absolute;
-  bottom: 15%;
-  left: 10%;
-  width: 60px;
-  height: 60px;
-  background: #FFFFFF;
-  border: 3px solid #333;
-  border-radius: 50%;
-}
-
-.pancakes {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 40px;
-  height: 30px;
-  background: #8B4513;
-  border-radius: 20px;
-}
-
-.fork {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 2px;
-  height: 20px;
-  background: #C0C0C0;
-  border-radius: 1px;
-}
-
-.banana-dish {
-  position: absolute;
-  bottom: 25%;
-  left: 25%;
-  width: 30px;
-  height: 20px;
-  background: #DEB887;
-  border-radius: 15px;
-}
-
-.banana {
-  position: absolute;
-  top: 2px;
-  left: 5px;
-  width: 20px;
-  height: 15px;
-  background: #FFD700;
-  border-radius: 10px;
-}
-
-.string {
-  position: absolute;
-  top: -5px;
-  left: 10px;
-  width: 10px;
-  height: 8px;
-  background: #8B4513;
-  border-radius: 2px;
-}
-
-.mug {
-  position: absolute;
-  bottom: 10%;
-  right: 20%;
-  width: 40px;
-  height: 50px;
-  background: #8B4513;
-  border-radius: 0 8px 8px 0;
-}
-
-.mug::after {
-  content: '';
-  position: absolute;
-  top: 10px;
-  right: -8px;
-  width: 8px;
-  height: 20px;
-  background: #8B4513;
-  border-radius: 0 4px 4px 0;
-}
-
-/* 登录表单样式 */
-.login-form {
-  background: rgba(200, 200, 200, 0.8);
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  z-index: 2;
-  position: relative;
-  min-width: 350px;
-}
-
-.form-title {
-  color: #333;
+.auth-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
   text-align: center;
-  margin-bottom: 30px;
-  font-size: 24px;
-  font-weight: 600;
 }
 
-.form {
+.auth-subtitle {
+  color: #475569;
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
-.input-group {
-  position: relative;
+.form-field {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.input-icon {
-  position: absolute;
-  left: 12px;
-  color: #666;
-  z-index: 3;
-}
-
-.form-input {
-  width: 100%;
-  padding: 12px 12px 12px 45px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+.form-field span {
   font-size: 14px;
-  background: #fff;
-  transition: border-color 0.3s ease;
+  color: #1e293b;
 }
 
-.form-input:focus {
+.form-field input,
+.form-field select {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: #2563eb;
   outline: none;
-  border-color: #8B4513;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
-.form-select {
-  width: 100%;
-  padding: 12px 40px 12px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background: #fff;
-  appearance: none;
-  cursor: pointer;
-  transition: border-color 0.3s ease;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: #8B4513;
-}
-
-.select-arrow {
-  position: absolute;
-  right: 12px;
-  color: #666;
-  pointer-events: none;
-}
-
-.login-btn {
-  background: #8B4513;
-  color: white;
-  padding: 12px;
+.auth-button {
+  height: 46px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.login-btn:hover:not(:disabled) {
-  background: #A0522D;
+.auth-button:hover {
+  box-shadow: 0 12px 20px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
 }
 
-.login-btn:disabled {
-  background: #ccc;
+.auth-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
-.register-link {
-  text-align: center;
-  color: #666;
+.form-error {
+  color: #dc2626;
   font-size: 14px;
+  margin-top: -8px;
 }
 
-.register-text {
-  color: #8B4513;
+.form-success {
+  color: #16a34a;
+  font-size: 14px;
+  margin-top: -8px;
+}
+
+.auth-extra {
+  margin-top: 24px;
+  text-align: center;
+  color: #475569;
+}
+
+a {
+  color: #2563eb;
   text-decoration: none;
-  font-weight: 600;
-  margin-left: 4px;
 }
 
-.register-text:hover {
+a:hover {
   text-decoration: underline;
-}
-
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 10px 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  text-align: center;
-  border: 1px solid #f5c6cb;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .login-form {
-    margin: 20px;
-    min-width: auto;
-    width: calc(100% - 40px);
-  }
-  
-  .background-decoration {
-    opacity: 0.5;
-  }
 }
 </style>

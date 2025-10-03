@@ -2,8 +2,6 @@ package com.example.housekeeping.service;
 
 import com.example.housekeeping.entity.ServiceProvider;
 import com.example.housekeeping.repository.ServiceProviderRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -11,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * 家政服务者服务
@@ -18,7 +17,7 @@ import java.util.Optional;
 @Service
 public class ServiceProviderService {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceProviderService.class);
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private final ServiceProviderRepository serviceProviderRepository;
 
     public ServiceProviderService(ServiceProviderRepository serviceProviderRepository) {
@@ -86,6 +85,16 @@ public class ServiceProviderService {
         }
         if (updateProvider.getSkills() != null) {
             provider.setSkills(updateProvider.getSkills());
+        }
+        if (updateProvider.getPhone() != null && !updateProvider.getPhone().equals(provider.getPhone())) {
+            String phone = updateProvider.getPhone().trim();
+            if (!PHONE_PATTERN.matcher(phone).matches()) {
+                throw new RuntimeException("手机号格式不正确");
+            }
+            if (serviceProviderRepository.existsByPhone(phone)) {
+                throw new RuntimeException("手机号已被使用");
+            }
+            provider.setPhone(phone);
         }
 
         return serviceProviderRepository.save(provider);

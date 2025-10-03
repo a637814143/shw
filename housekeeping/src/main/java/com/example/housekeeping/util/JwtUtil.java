@@ -133,6 +133,10 @@ public class JwtUtil {
         }
     }
 
+    public Long getExpiration() {
+        return expiration;
+    }
+
     /**
      * 获取签名密钥
      */

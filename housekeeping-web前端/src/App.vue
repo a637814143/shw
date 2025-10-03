@@ -15,16 +15,13 @@ import { RouterView } from 'vue-router'
 }
 
 html, body {
-  height: 100%;
+  min-height: 100%;
   width: 100%;
-  overflow: hidden;
   background: #e3f2fd;
 }
 
 #app {
-  height: 100vh;
-  width: 100vw;
-  margin: 0;
-  padding: 0;
+  min-height: 100vh;
+  width: 100%;
 }
 </style>
