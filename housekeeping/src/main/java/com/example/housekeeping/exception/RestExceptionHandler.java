@@ -17,9 +17,9 @@ import java.util.List;
  * 全局异常处理器
  */
 @RestControllerAdvice
-public class GlobalExceptionHandler {
+public class RestExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(RestExceptionHandler.class);
 
     /**
      * 处理业务异常
