@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
 @CrossOrigin(origins = "*")
 public class AuthController {
 
@@ -24,7 +23,7 @@ public class AuthController {
         this.authService = authService;
     }
 
-    @PostMapping("/register")
+    @PostMapping(path = "/api/auth/register")
     public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
         UserAccount account = authService.register(request.getUsername(), request.getPassword(), request.getType());
         Map<String, Object> payload = Map.of(
@@ -35,7 +34,7 @@ public class AuthController {
         return ResponseEntity.ok(payload);
     }
 
-    @PostMapping("/login")
+    @PostMapping(path = "/api/auth/login")
     public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
         Map<String, Object> payload = authService.login(request.getUsername(), request.getPassword());
         return ResponseEntity.ok(payload);
