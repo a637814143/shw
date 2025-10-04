@@ -71,6 +71,13 @@ public class RestExceptionHandler {
         return Result.badRequest(e.getMessage());
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleIllegalStateException(IllegalStateException e) {
+        log.error("业务状态异常：{}", e.getMessage(), e);
+        return Result.badRequest(e.getMessage());
+    }
+
     /**
      * 处理空指针异常
      */

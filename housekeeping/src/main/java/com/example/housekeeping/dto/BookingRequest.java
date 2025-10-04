@@ -28,6 +28,8 @@ public class BookingRequest {
     @NotNull(message = "必须选择服务项目")
     private Long serviceItemId;
 
+    private String createdBy;
+
     public String getCustomerName() {
         return customerName;
     }
@@ -74,5 +76,13 @@ public class BookingRequest {
 
     public void setServiceItemId(Long serviceItemId) {
         this.serviceItemId = serviceItemId;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
     }
 }

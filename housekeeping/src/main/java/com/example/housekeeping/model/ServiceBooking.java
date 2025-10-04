@@ -16,6 +16,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Entity(name = "SimpleServiceBooking")
 @Table(name = "service_bookings")
@@ -52,6 +53,15 @@ public class ServiceBooking {
     @Column(nullable = false, length = 30)
     private String status = "PENDING";
 
+    @Column(name = "created_by", nullable = false, length = 100)
+    private String createdBy;
+
+    @Column(name = "assigned_provider", length = 100)
+    private String assignedProvider;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal price;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_item_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
@@ -60,13 +70,22 @@ public class ServiceBooking {
     public ServiceBooking() {
     }
 
-    public ServiceBooking(String customerName, String phone, String address, LocalDate serviceDate, String notes, ServiceItem serviceItem) {
+    public ServiceBooking(String customerName,
+                          String phone,
+                          String address,
+                          LocalDate serviceDate,
+                          String notes,
+                          ServiceItem serviceItem,
+                          String createdBy,
+                          BigDecimal price) {
         this.customerName = customerName;
         this.phone = phone;
         this.address = address;
         this.serviceDate = serviceDate;
         this.notes = notes;
         this.serviceItem = serviceItem;
+        this.createdBy = createdBy;
+        this.price = price;
     }
 
     public Long getId() {
@@ -119,6 +138,30 @@ public class ServiceBooking {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(String createdBy) {
+        this.createdBy = createdBy;
+    }
+
+    public String getAssignedProvider() {
+        return assignedProvider;
+    }
+
+    public void setAssignedProvider(String assignedProvider) {
+        this.assignedProvider = assignedProvider;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
     }
 
     public ServiceItem getServiceItem() {

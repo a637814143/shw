@@ -10,6 +10,16 @@ SET FOREIGN_KEY_CHECKS = 0;
 CREATE DATABASE IF NOT EXISTS housekeeping_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE housekeeping_db;
 
+-- 系统角色账号表
+DROP TABLE IF EXISTS `user_family`;
+CREATE TABLE `user_family` (
+  `user_name` varchar(100) NOT NULL COMMENT '登录账号',
+  `password` varchar(128) NOT NULL COMMENT '密码（Base64后SHA-512）',
+  `types` varchar(20) NOT NULL COMMENT '角色类型：ADMIN/USER/PROVIDER',
+  `money` decimal(12,2) NOT NULL DEFAULT 0 COMMENT '钱包余额',
+  PRIMARY KEY (`user_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统角色账号表';
+
 -- 管理员表
 DROP TABLE IF EXISTS `admin`;
 CREATE TABLE `admin` (

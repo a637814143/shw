@@ -4,6 +4,8 @@ import com.example.housekeeping.model.ServiceItem;
 import com.example.housekeeping.service.ServiceItemService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +36,9 @@ public class ServiceItemController {
     }
 
     @PostMapping
-    public ResponseEntity<ServiceItem> create(@Valid @RequestBody ServiceItem serviceItem) {
+    public ResponseEntity<ServiceItem> create(Authentication authentication,
+                                              @Valid @RequestBody ServiceItem serviceItem) {
+        assertAdmin(authentication);
         ServiceItem created = serviceItemService.create(serviceItem);
         return ResponseEntity
                 .created(URI.create("/api/services/" + created.getId()))
@@ -47,13 +51,26 @@ public class ServiceItemController {
     }
 
     @PutMapping("/{id}")
-    public ServiceItem update(@PathVariable Long id, @Valid @RequestBody ServiceItem serviceItem) {
+    public ServiceItem update(@PathVariable Long id,
+                              Authentication authentication,
+                              @Valid @RequestBody ServiceItem serviceItem) {
+        assertAdmin(authentication);
         return serviceItemService.update(id, serviceItem);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
+        assertAdmin(authentication);
         serviceItemService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private void assertAdmin(Authentication authentication) {
+        boolean admin = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(role -> role.equals("ROLE_ADMIN"));
+        if (!admin) {
+            throw new IllegalStateException("只有管理员可以管理服务项目");
+        }
     }
 }
