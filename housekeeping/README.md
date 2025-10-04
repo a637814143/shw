@@ -82,7 +82,7 @@ src/main/java/com/example/housekeeping/
 │   └── WithdrawRecord.java
 ├── exception/              # 异常处理
 │   ├── BusinessException.java
-│   └── GlobalExceptionHandler.java
+│   └── RestExceptionHandler.java
 ├── repository/             # 数据访问层
 │   ├── AdminRepository.java
 │   ├── BannerRepository.java

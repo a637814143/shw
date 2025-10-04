@@ -1,225 +1,98 @@
 package com.example.housekeeping.service;
 
-import com.example.housekeeping.entity.Admin;
-import com.example.housekeeping.entity.ServiceProvider;
-import com.example.housekeeping.entity.User;
-import com.example.housekeeping.repository.AdminRepository;
-import com.example.housekeeping.repository.ServiceProviderRepository;
-import com.example.housekeeping.repository.UserRepository;
+import com.example.housekeeping.model.UserAccount;
+import com.example.housekeeping.repository.UserAccountRepository;
 import com.example.housekeeping.util.JwtUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
-/**
- * 认证服务
- */
 @Service
 public class AuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
-    private final UserRepository userRepository;
-    private final ServiceProviderRepository serviceProviderRepository;
-    private final AdminRepository adminRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserAccountRepository userAccountRepository;
     private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository, 
-                      ServiceProviderRepository serviceProviderRepository,
-                      AdminRepository adminRepository,
-                      PasswordEncoder passwordEncoder,
-                      JwtUtil jwtUtil) {
-        this.userRepository = userRepository;
-        this.serviceProviderRepository = serviceProviderRepository;
-        this.adminRepository = adminRepository;
-        this.passwordEncoder = passwordEncoder;
+    public AuthService(UserAccountRepository userAccountRepository, JwtUtil jwtUtil) {
+        this.userAccountRepository = userAccountRepository;
         this.jwtUtil = jwtUtil;
     }
 
-    /**
-     * 用户登录
-     */
-    public Map<String, Object> userLogin(String username, String password) {
-        Optional<User> userOpt = userRepository.findByUsernameAndStatus(username, 1);
-        if (userOpt.isEmpty()) {
-            throw new RuntimeException("用户名或密码错误");
+    public UserAccount register(String username, String rawPassword, String type) {
+        String normalizedType = normalizeType(type);
+        if ("ADMIN".equals(normalizedType)) {
+            throw new IllegalArgumentException("管理员账号不支持自行注册");
         }
 
-        User user = userOpt.get();
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+        if (userAccountRepository.existsByUserName(username)) {
+            throw new IllegalStateException("用户名已存在");
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getUsername(), "USER");
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("user", user);
-        result.put("userType", "USER");
-        
-        return result;
+        String hashedPassword = encodePassword(rawPassword);
+        BigDecimal initialMoney = "USER".equals(normalizedType)
+                ? BigDecimal.valueOf(1000)
+                : BigDecimal.ZERO;
+
+        UserAccount account = new UserAccount(username, hashedPassword, normalizedType, initialMoney);
+        return userAccountRepository.save(account);
     }
 
-    /**
-     * 服务者登录
-     */
-    public Map<String, Object> providerLogin(String username, String password) {
-        Optional<ServiceProvider> providerOpt = serviceProviderRepository.findByUsernameAndStatus(username, 1);
-        if (providerOpt.isEmpty()) {
-            throw new RuntimeException("用户名或密码错误");
+    public Map<String, Object> login(String username, String rawPassword) {
+        UserAccount account = userAccountRepository.findById(username)
+                .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
+
+        String hashedPassword = encodePassword(rawPassword);
+        if (!account.getPassword().equals(hashedPassword)) {
+            throw new IllegalArgumentException("用户名或密码错误");
         }
 
-        ServiceProvider provider = providerOpt.get();
-        if (!passwordEncoder.matches(password, provider.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
-        }
+        String token = jwtUtil.generateToken(null, username, account.getTypes());
 
-        String token = jwtUtil.generateToken(provider.getId(), provider.getUsername(), "PROVIDER");
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("user", provider);
-        result.put("userType", "PROVIDER");
-        
-        return result;
+        Map<String, Object> userView = new HashMap<>();
+        userView.put("userName", account.getUserName());
+        userView.put("types", account.getTypes());
+        userView.put("money", account.getMoney());
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("token", token);
+        payload.put("user", userView);
+        return payload;
     }
 
-    /**
-     * 管理员登录
-     */
-    public Map<String, Object> adminLogin(String username, String password) {
-        Optional<Admin> adminOpt = adminRepository.findByUsernameAndStatus(username, 1);
-        if (adminOpt.isEmpty()) {
-            throw new RuntimeException("用户名或密码错误");
-        }
-
-        Admin admin = adminOpt.get();
-        if (!passwordEncoder.matches(password, admin.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
-        }
-
-        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("user", admin);
-        result.put("userType", "ADMIN");
-        
-        return result;
+    public UserAccount findByUsername(String username) {
+        return userAccountRepository.findById(username)
+                .orElseThrow(() -> new IllegalArgumentException("账号不存在"));
     }
 
-    /**
-     * 用户注册
-     */
-    public User userRegister(String username, String password, String phone) {
-        // 检查用户名是否已存在
-        if (userRepository.existsByUsername(username)) {
-            throw new RuntimeException("用户名已存在");
-        }
-
-        // 检查手机号是否已存在
-        if (userRepository.existsByPhone(phone)) {
-            throw new RuntimeException("手机号已存在");
-        }
-
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
-        user.setPhone(phone);
-        user.setStatus(1);
-
-        return userRepository.save(user);
+    public UserAccount save(UserAccount account) {
+        return userAccountRepository.save(account);
     }
 
-    /**
-     * 服务者注册
-     */
-    public ServiceProvider providerRegister(String username, String password, String phone) {
-        // 检查用户名是否已存在
-        if (serviceProviderRepository.existsByUsername(username)) {
-            throw new RuntimeException("用户名已存在");
+    private String normalizeType(String type) {
+        if (type == null) {
+            throw new IllegalArgumentException("必须指定账号类型");
         }
-
-        // 检查手机号是否已存在
-        if (serviceProviderRepository.existsByPhone(phone)) {
-            throw new RuntimeException("手机号已存在");
-        }
-
-        ServiceProvider provider = new ServiceProvider();
-        provider.setUsername(username);
-        provider.setPassword(passwordEncoder.encode(password));
-        provider.setPhone(phone);
-        provider.setStatus(1);
-        provider.setCertificationStatus(0);
-
-        return serviceProviderRepository.save(provider);
+        return type.trim().toUpperCase();
     }
 
-    /**
-     * 管理员注册
-     */
-    public Admin adminRegister(String username, String password, String phone) {
-        // 检查用户名是否已存在
-        if (adminRepository.existsByUsername(username)) {
-            throw new RuntimeException("用户名已存在");
-        }
-
-        // 检查手机号是否已存在
-        if (adminRepository.existsByPhone(phone)) {
-            throw new RuntimeException("手机号已存在");
-        }
-
-        Admin admin = new Admin();
-        admin.setUsername(username);
-        admin.setPassword(passwordEncoder.encode(password));
-        admin.setPhone(phone);
-        admin.setStatus(1);
-
-        return adminRepository.save(admin);
-    }
-
-    /**
-     * 修改密码
-     */
-    public void changePassword(Long userId, String userType, String oldPassword, String newPassword) {
-        switch (userType) {
-            case "USER":
-                User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("用户不存在"));
-                if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-                    throw new RuntimeException("原密码错误");
-                }
-                user.setPassword(passwordEncoder.encode(newPassword));
-                userRepository.save(user);
-                break;
-                
-            case "PROVIDER":
-                ServiceProvider provider = serviceProviderRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("服务者不存在"));
-                if (!passwordEncoder.matches(oldPassword, provider.getPassword())) {
-                    throw new RuntimeException("原密码错误");
-                }
-                provider.setPassword(passwordEncoder.encode(newPassword));
-                serviceProviderRepository.save(provider);
-                break;
-                
-            case "ADMIN":
-                Admin admin = adminRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("管理员不存在"));
-                if (!passwordEncoder.matches(oldPassword, admin.getPassword())) {
-                    throw new RuntimeException("原密码错误");
-                }
-                admin.setPassword(passwordEncoder.encode(newPassword));
-                adminRepository.save(admin);
-                break;
-                
-            default:
-                throw new RuntimeException("用户类型错误");
+    public String encodePassword(String rawPassword) {
+        try {
+            String base64 = Base64.getEncoder().encodeToString(rawPassword.getBytes(StandardCharsets.UTF_8));
+            MessageDigest digest = MessageDigest.getInstance("SHA-512");
+            byte[] hashed = digest.digest(base64.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashed) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("密码加密失败", e);
         }
     }
 }

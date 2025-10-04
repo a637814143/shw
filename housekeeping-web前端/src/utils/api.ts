@@ -1,185 +1,168 @@
-// API工具类
-const API_BASE_URL = 'http://localhost:8082/api'
+export type UserRole = 'ADMIN' | 'USER' | 'PROVIDER'
 
-// 获取存储的token
-const getToken = () => {
-  return localStorage.getItem('jwt_token')
+export interface ServiceItem {
+  id: number
+  name: string
+  description: string
+  price: number
 }
 
-// 设置token
-const setToken = (token: string) => {
-  localStorage.setItem('jwt_token', token)
+export interface Booking {
+  id: number
+  customerName: string
+  phone: string
+  address: string
+  serviceDate: string
+  notes: string
+  status: string
+  price: number
+  createdBy: string
+  assignedProvider?: string | null
+  serviceItem: ServiceItem
 }
 
-// 移除token
-const removeToken = () => {
-  localStorage.removeItem('jwt_token')
+export interface BookingPayload {
+  customerName: string
+  phone: string
+  address: string
+  serviceDate: string
+  notes: string
+  serviceItemId: number
+  createdBy?: string
 }
 
-// 通用请求方法
-const request = async (url: string, options: RequestInit = {}) => {
-  const token = getToken()
-  
-  const config: RequestInit = {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers,
-    },
+export interface AuthSession {
+  token: string
+  user: {
+    userName: string
+    types: UserRole
+    money: number
   }
+}
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8082/api'
+const AUTH_STORAGE_KEY = 'hk.auth.session'
+export const AUTH_EVENT = 'hk-auth-changed'
+
+export function getSession(): AuthSession | null {
+  const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+  if (!raw) return null
   try {
-    const response = await fetch(`${API_BASE_URL}${url}`, config)
-    
-    // 如果返回401，说明token无效或过期
-    if (response.status === 401) {
-      removeToken()
-      localStorage.removeItem('userInfo')
-      window.location.href = '/login'
-      throw new Error('未授权访问，请重新登录')
-    }
-    
-    const data = await response.json()
-    
-    if (!response.ok) {
-      throw new Error(data.message || '请求失败')
-    }
-    
-    return data
+    return JSON.parse(raw) as AuthSession
   } catch (error) {
-    console.error('API请求错误:', error)
-    throw error
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    return null
   }
 }
 
-// 登录API
-export const authAPI = {
-  // 用户登录
-  userLogin: (username: string, password: string) => {
-    return request('/auth/user/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    })
-  },
-  
-  // 管理员登录
-  adminLogin: (username: string, password: string) => {
-    return request('/auth/admin/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    })
-  },
-  
-  // 服务者登录
-  providerLogin: (username: string, password: string) => {
-    return request('/auth/provider/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password })
-    })
-  },
-  
-  // 用户注册
-  userRegister: (username: string, password: string, phone: string) => {
-    return request('/auth/user/register', {
-      method: 'POST',
-      body: JSON.stringify({ username, password, phone })
-    })
-  },
-  
-  // 服务者注册
-  providerRegister: (username: string, password: string, phone: string) => {
-    return request('/auth/provider/register', {
-      method: 'POST',
-      body: JSON.stringify({ username, password, phone })
-    })
-  }
+export function saveSession(session: AuthSession) {
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session))
+  window.dispatchEvent(new CustomEvent(AUTH_EVENT, { detail: { session } }))
 }
 
-// 用户API
-export const userAPI = {
-  // 获取用户信息
-  getUserInfo: () => {
-    return request('/user/profile')
-  },
-  
-  // 更新用户信息
-  updateUserInfo: (userData: any) => {
-    return request('/user/profile', {
-      method: 'PUT',
-      body: JSON.stringify(userData)
-    })
-  },
-  
-  // 修改密码
-  changePassword: (userId: number, userType: string, oldPassword: string, newPassword: string) => {
-    return request('/auth/change-password', {
-      method: 'POST',
-      body: JSON.stringify({ userId, userType, oldPassword, newPassword })
-    })
-  }
+export function clearSession() {
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+  window.dispatchEvent(new CustomEvent(AUTH_EVENT))
 }
 
-// 服务者API
-export const providerAPI = {
-  // 获取服务者信息
-  getProviderInfo: () => {
-    return request('/provider/profile')
-  },
-  
-  // 更新服务者信息
-  updateProviderInfo: (providerData: any) => {
-    return request('/provider/profile', {
-      method: 'PUT',
-      body: JSON.stringify(providerData)
-    })
+async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const session = getSession()
+  const headers = new Headers(options.headers || {})
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
+  if (session?.token) {
+    headers.set('Authorization', `Bearer ${session.token}`)
+  }
+
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers,
+    redirect: 'manual',
+  })
+
+  if (response.status === 302) {
+    clearSession()
+    const location = response.headers.get('Location') ?? '/login'
+    window.location.replace(location)
+    throw new Error('登录状态已失效，请重新登录')
+  }
+
+  if (response.status === 204) {
+    return null as T
+  }
+
+  const text = await response.text()
+  const body = text ? JSON.parse(text) : null
+
+  if (!response.ok) {
+    if (body && typeof body === 'object' && 'message' in body) {
+      throw new Error((body as { message: string }).message)
+    }
+    throw new Error('请求失败，请稍后重试。')
+  }
+
+  return body as T
 }
 
-// 服务API
-export const serviceAPI = {
-  // 获取服务列表
-  getServices: (page = 1, size = 10) => {
-    return request(`/service/public/popular?page=${page}&size=${size}`)
-  },
-  
-  // 搜索服务
-  searchServices: (keyword: string, page = 1, size = 10) => {
-    return request(`/service/public/search?keyword=${keyword}&page=${page}&size=${size}`)
-  },
-  
-  // 获取服务详情
-  getServiceById: (id: number) => {
-    return request(`/service/public/${id}`)
-  },
-  
-  // 获取服务者的服务列表
-  getProviderServices: (page = 1, size = 10) => {
-    return request(`/service/provider/list?page=${page}&size=${size}`)
-  },
-  
-  // 创建服务
-  createService: (serviceData: any) => {
-    return request('/service', {
-      method: 'POST',
-      body: JSON.stringify(serviceData)
-    })
-  },
-  
-  // 更新服务
-  updateService: (id: number, serviceData: any) => {
-    return request(`/service/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(serviceData)
-    })
-  },
-  
-  // 删除服务
-  deleteService: (id: number) => {
-    return request(`/service/${id}`, {
-      method: 'DELETE'
-    })
-  }
+export async function login(payload: { username: string; password: string }) {
+  const data = await request<AuthSession>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  saveSession(data)
+  return data
 }
 
-export { getToken, setToken, removeToken }
+export async function register(payload: {
+  username: string
+  password: string
+  type: Exclude<UserRole, 'ADMIN'>
+}) {
+  return request<{ userName: string; types: UserRole; money: number }>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchWallet() {
+  return request<{ userName: string; types: UserRole; money: number; role: UserRole }>('/wallet/me')
+}
+
+export async function fetchServices() {
+  return request<ServiceItem[]>('/services')
+}
+
+export async function fetchAllBookings() {
+  return request<Booking[]>('/bookings')
+}
+
+export async function fetchMyBookings() {
+  return request<Booking[]>('/bookings/mine')
+}
+
+export async function createBooking(payload: BookingPayload) {
+  return request<Booking>('/bookings', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateBooking(id: number, payload: BookingPayload) {
+  return request<Booking>(`/bookings/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteBooking(id: number) {
+  await request<void>(`/bookings/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function acceptBooking(id: number) {
+  return request<Booking>(`/bookings/${id}/accept`, {
+    method: 'POST',
+  })
+}
