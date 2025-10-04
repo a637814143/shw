@@ -30,6 +30,19 @@ public class ServiceItem {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price = BigDecimal.ZERO;
 
+    public ServiceItem() {
+    }
+
+    public ServiceItem(String name, String description, BigDecimal price) {
+        this.name = name;
+        this.description = description;
+        setPrice(price);
+    }
+
+    public ServiceItem(String name, String description, int price) {
+        this(name, description, BigDecimal.valueOf(price));
+    }
+
     public Long getId() {
         return id;
     }
