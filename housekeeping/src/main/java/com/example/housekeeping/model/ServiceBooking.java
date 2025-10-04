@@ -17,7 +17,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
-@Entity
+@Entity(name = "SimpleServiceBooking")
 @Table(name = "service_bookings")
 public class ServiceBooking {
 
