@@ -27,7 +27,7 @@ public class AuthController {
         UserAccount account = authService.register(request.getUsername(), request.getPassword(), request.getType());
         Map<String, Object> payload = Map.of(
                 "userName", account.getUserName(),
-                "types", account.getTypes(),
+                "types", account.getTypes().name(),
                 "money", account.getMoney()
         );
         return ResponseEntity.ok(payload);

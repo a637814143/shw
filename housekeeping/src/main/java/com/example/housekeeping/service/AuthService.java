@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.model.AccountType;
 import com.example.housekeeping.model.UserAccount;
 import com.example.housekeeping.repository.UserAccountRepository;
 import com.example.housekeeping.util.JwtUtil;
@@ -25,26 +26,26 @@ public class AuthService {
     }
 
     public UserAccount register(String username, String rawPassword, String type) {
-        String normalizedType = normalizeType(type);
-        if ("ADMIN".equals(normalizedType)) {
+        AccountType accountType = AccountType.from(type);
+        if (accountType == AccountType.ADMIN) {
             throw new IllegalArgumentException("管理员账号不支持自行注册");
         }
 
-        if (userAccountRepository.existsByUserName(username)) {
+        if (userAccountRepository.existsByUserNameIgnoreCase(username)) {
             throw new IllegalStateException("用户名已存在");
         }
 
         String hashedPassword = encodePassword(rawPassword);
-        BigDecimal initialMoney = "USER".equals(normalizedType)
+        BigDecimal initialMoney = accountType == AccountType.USER
                 ? BigDecimal.valueOf(1000)
                 : BigDecimal.ZERO;
 
-        UserAccount account = new UserAccount(username, hashedPassword, normalizedType, initialMoney);
+        UserAccount account = new UserAccount(username, hashedPassword, accountType.name(), initialMoney);
         return userAccountRepository.save(account);
     }
 
     public Map<String, Object> login(String username, String rawPassword) {
-        UserAccount account = userAccountRepository.findById(username)
+        UserAccount account = userAccountRepository.findByUserNameIgnoreCase(username)
                 .orElseThrow(() -> new IllegalArgumentException("用户名或密码错误"));
 
         String hashedPassword = encodePassword(rawPassword);
@@ -52,11 +53,11 @@ public class AuthService {
             throw new IllegalArgumentException("用户名或密码错误");
         }
 
-        String token = jwtUtil.generateToken(null, username, account.getTypes());
+        String token = jwtUtil.generateToken(account.getId(), account.getUserName(), account.getTypes().name());
 
         Map<String, Object> userView = new HashMap<>();
         userView.put("userName", account.getUserName());
-        userView.put("types", account.getTypes());
+        userView.put("types", account.getTypes().name());
         userView.put("money", account.getMoney());
 
         Map<String, Object> payload = new HashMap<>();
@@ -66,19 +67,12 @@ public class AuthService {
     }
 
     public UserAccount findByUsername(String username) {
-        return userAccountRepository.findById(username)
+        return userAccountRepository.findByUserNameIgnoreCase(username)
                 .orElseThrow(() -> new IllegalArgumentException("账号不存在"));
     }
 
     public UserAccount save(UserAccount account) {
         return userAccountRepository.save(account);
-    }
-
-    private String normalizeType(String type) {
-        if (type == null) {
-            throw new IllegalArgumentException("必须指定账号类型");
-        }
-        return type.trim().toUpperCase();
     }
 
     public String encodePassword(String rawPassword) {
