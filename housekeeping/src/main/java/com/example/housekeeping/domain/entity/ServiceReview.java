@@ -8,11 +8,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "service_reviews")
 public class ServiceReview extends BaseEntity {
@@ -42,4 +38,68 @@ public class ServiceReview extends BaseEntity {
     private String reply;
 
     private LocalDateTime repliedAt;
+
+    public ServiceAppointment getAppointment() {
+        return appointment;
+    }
+
+    public void setAppointment(ServiceAppointment appointment) {
+        this.appointment = appointment;
+    }
+
+    public UserAccount getUser() {
+        return user;
+    }
+
+    public void setUser(UserAccount user) {
+        this.user = user;
+    }
+
+    public ServiceProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(ServiceProvider provider) {
+        this.provider = provider;
+    }
+
+    public HousekeepingService getService() {
+        return service;
+    }
+
+    public void setService(HousekeepingService service) {
+        this.service = service;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        this.comment = comment;
+    }
+
+    public String getReply() {
+        return reply;
+    }
+
+    public void setReply(String reply) {
+        this.reply = reply;
+    }
+
+    public LocalDateTime getRepliedAt() {
+        return repliedAt;
+    }
+
+    public void setRepliedAt(LocalDateTime repliedAt) {
+        this.repliedAt = repliedAt;
+    }
 }

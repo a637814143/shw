@@ -10,11 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "provider_certifications")
 public class ProviderCertification extends BaseEntity {
@@ -41,4 +37,76 @@ public class ProviderCertification extends BaseEntity {
     private LocalDateTime submittedAt;
 
     private LocalDateTime reviewedAt;
+
+    public ServiceProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(ServiceProvider provider) {
+        this.provider = provider;
+    }
+
+    public CertificationStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(CertificationStatus status) {
+        this.status = status;
+    }
+
+    public String getDocuments() {
+        return documents;
+    }
+
+    public void setDocuments(String documents) {
+        this.documents = documents;
+    }
+
+    public String getExperienceYears() {
+        return experienceYears;
+    }
+
+    public void setExperienceYears(String experienceYears) {
+        this.experienceYears = experienceYears;
+    }
+
+    public String getSpeciality() {
+        return speciality;
+    }
+
+    public void setSpeciality(String speciality) {
+        this.speciality = speciality;
+    }
+
+    public String getAuditRemark() {
+        return auditRemark;
+    }
+
+    public void setAuditRemark(String auditRemark) {
+        this.auditRemark = auditRemark;
+    }
+
+    public String getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(String reviewedBy) {
+        this.reviewedBy = reviewedBy;
+    }
+
+    public LocalDateTime getSubmittedAt() {
+        return submittedAt;
+    }
+
+    public void setSubmittedAt(LocalDateTime submittedAt) {
+        this.submittedAt = submittedAt;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
+    }
 }
