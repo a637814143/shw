@@ -4,7 +4,6 @@ import com.example.housekeeping.domain.entity.ServiceReview;
 import com.example.housekeeping.dto.ReviewReplyRequest;
 import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.service.ReviewService;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,14 +24,14 @@ public class ReviewController {
     }
 
     @PostMapping("/user/{userId}")
-    public ServiceReview submitReview(@PathVariable Long userId, @Valid @RequestBody ServiceReviewRequest request) {
+    public ServiceReview submitReview(@PathVariable Long userId, @RequestBody ServiceReviewRequest request) {
         return reviewService.submitReview(userId, request);
     }
 
     @PostMapping("/{reviewId}/reply")
     public ServiceReview replyReview(@PathVariable Long reviewId,
             @RequestParam Long providerId,
-            @Valid @RequestBody ReviewReplyRequest request) {
+            @RequestBody ReviewReplyRequest request) {
         return reviewService.replyReview(reviewId, request, providerId);
     }
 

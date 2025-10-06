@@ -5,7 +5,6 @@ import com.example.housekeeping.domain.entity.ServiceCategory;
 import com.example.housekeeping.dto.HousekeepingServiceRequest;
 import com.example.housekeeping.dto.ServiceCategoryRequest;
 import com.example.housekeeping.service.HousekeepingCatalogService;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,12 +31,12 @@ public class CatalogController {
     }
 
     @PostMapping("/categories")
-    public ServiceCategory createCategory(@Valid @RequestBody ServiceCategoryRequest request) {
+    public ServiceCategory createCategory(@RequestBody ServiceCategoryRequest request) {
         return catalogService.createCategory(request);
     }
 
     @PutMapping("/categories/{id}")
-    public ServiceCategory updateCategory(@PathVariable Long id, @Valid @RequestBody ServiceCategoryRequest request) {
+    public ServiceCategory updateCategory(@PathVariable Long id, @RequestBody ServiceCategoryRequest request) {
         return catalogService.updateCategory(id, request);
     }
 
@@ -62,12 +61,12 @@ public class CatalogController {
     }
 
     @PostMapping("/services")
-    public HousekeepingService createService(@Valid @RequestBody HousekeepingServiceRequest request) {
+    public HousekeepingService createService(@RequestBody HousekeepingServiceRequest request) {
         return catalogService.createService(request);
     }
 
     @PutMapping("/services/{id}")
-    public HousekeepingService updateService(@PathVariable Long id, @Valid @RequestBody HousekeepingServiceRequest request) {
+    public HousekeepingService updateService(@PathVariable Long id, @RequestBody HousekeepingServiceRequest request) {
         return catalogService.updateService(id, request);
     }
 

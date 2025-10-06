@@ -7,7 +7,6 @@ import com.example.housekeeping.dto.RegisterRequest;
 import com.example.housekeeping.dto.UpdatePasswordRequest;
 import com.example.housekeeping.dto.UpdateProfileRequest;
 import com.example.housekeeping.service.AuthService;
-import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -26,19 +25,19 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@Valid @RequestBody AuthRequest request) {
+    public AuthResponse login(@RequestBody AuthRequest request) {
         return authService.login(request);
     }
 
     @PostMapping("/register")
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
+    public AuthResponse register(@RequestBody RegisterRequest request) {
         return authService.register(request);
     }
 
     @PutMapping("/{role}/{id}/password")
     public void updatePassword(@PathVariable("role") String role,
             @PathVariable("id") Long id,
-            @Valid @RequestBody UpdatePasswordRequest request) {
+            @RequestBody UpdatePasswordRequest request) {
         authService.updatePassword(resolveRole(role), id, request);
     }
 

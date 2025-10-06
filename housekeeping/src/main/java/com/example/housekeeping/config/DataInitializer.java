@@ -10,6 +10,7 @@ import com.example.housekeeping.domain.entity.SystemAnnouncement;
 import com.example.housekeeping.domain.entity.UserAccount;
 import com.example.housekeeping.domain.enums.AnnouncementTarget;
 import com.example.housekeeping.repository.AdminRepository;
+import com.example.housekeeping.security.PasswordHasher;
 import com.example.housekeeping.repository.CarouselItemRepository;
 import com.example.housekeeping.repository.HomeTipRepository;
 import com.example.housekeeping.repository.HousekeepingServiceRepository;
@@ -22,7 +23,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,7 +37,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SystemAnnouncementRepository systemAnnouncementRepository;
     private final HomeTipRepository homeTipRepository;
     private final CarouselItemRepository carouselItemRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordHasher;
 
     public DataInitializer(AdminRepository adminRepository,
             UserAccountRepository userAccountRepository,
@@ -47,7 +47,7 @@ public class DataInitializer implements CommandLineRunner {
             SystemAnnouncementRepository systemAnnouncementRepository,
             HomeTipRepository homeTipRepository,
             CarouselItemRepository carouselItemRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordHasher passwordHasher) {
         this.adminRepository = adminRepository;
         this.userAccountRepository = userAccountRepository;
         this.serviceProviderRepository = serviceProviderRepository;
@@ -56,7 +56,7 @@ public class DataInitializer implements CommandLineRunner {
         this.systemAnnouncementRepository = systemAnnouncementRepository;
         this.homeTipRepository = homeTipRepository;
         this.carouselItemRepository = carouselItemRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.passwordHasher = passwordHasher;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class DataInitializer implements CommandLineRunner {
         if (adminRepository.count() == 0) {
             Admin admin = new Admin();
             admin.setUsername("admin");
-            admin.setPassword(passwordEncoder.encode("admin123"));
+            admin.setPassword(passwordHasher.hash("admin123"));
             admin.setFullName("系统管理员");
             admin.setEnabled(true);
             admin.setLastLoginAt(LocalDateTime.now());
@@ -74,7 +74,7 @@ public class DataInitializer implements CommandLineRunner {
         if (userAccountRepository.count() == 0) {
             UserAccount user = new UserAccount();
             user.setUsername("user");
-            user.setPassword(passwordEncoder.encode("123456"));
+            user.setPassword(passwordHasher.hash("123456"));
             user.setFullName("测试用户");
             user.setEmail("user@example.com");
             user.setPhone("13800000000");
@@ -85,7 +85,7 @@ public class DataInitializer implements CommandLineRunner {
         if (serviceProviderRepository.count() == 0) {
             ServiceProvider provider = new ServiceProvider();
             provider.setUsername("provider");
-            provider.setPassword(passwordEncoder.encode("provider123"));
+            provider.setPassword(passwordHasher.hash("provider123"));
             provider.setFullName("金牌保洁员");
             provider.setPhone("13900000000");
             provider.setServiceArea("上海市");

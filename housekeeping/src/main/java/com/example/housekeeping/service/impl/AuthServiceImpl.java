@@ -12,13 +12,13 @@ import com.example.housekeeping.dto.UpdateProfileRequest;
 import com.example.housekeeping.repository.AdminRepository;
 import com.example.housekeeping.repository.ServiceProviderRepository;
 import com.example.housekeeping.repository.UserAccountRepository;
+import com.example.housekeeping.security.PasswordHasher;
 import com.example.housekeeping.service.AuthService;
 import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -30,20 +30,20 @@ public class AuthServiceImpl implements AuthService {
     private final AdminRepository adminRepository;
     private final UserAccountRepository userAccountRepository;
     private final ServiceProviderRepository serviceProviderRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final PasswordHasher passwordHasher;
 
     @Override
     public AuthResponse login(AuthRequest request) {
         return switch (request.role()) {
             case ADMIN -> adminRepository.findByUsername(request.username())
-                    .filter(admin -> passwordEncoder.matches(request.password(), admin.getPassword()))
+                    .filter(admin -> passwordHasher.matches(request.password(), admin.getPassword()))
                     .map(admin -> {
                         admin.setLastLoginAt(LocalDateTime.now());
                         return buildResponse(admin.getId(), RoleType.ADMIN, admin.getUsername(), admin.getFullName());
                     })
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "管理员账号或密码不正确"));
             case USER -> userAccountRepository.findByUsername(request.username())
-                    .filter(user -> passwordEncoder.matches(request.password(), user.getPassword()))
+                    .filter(user -> passwordHasher.matches(request.password(), user.getPassword()))
                     .map(user -> {
                         if (!user.isEnabled()) {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用");
@@ -53,7 +53,7 @@ public class AuthServiceImpl implements AuthService {
                     })
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "用户账号或密码不正确"));
             case PROVIDER -> serviceProviderRepository.findByUsername(request.username())
-                    .filter(provider -> passwordEncoder.matches(request.password(), provider.getPassword()))
+                    .filter(provider -> passwordHasher.matches(request.password(), provider.getPassword()))
                     .map(provider -> {
                         if (!provider.isEnabled()) {
                             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "账号已被禁用");
@@ -74,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "账号已存在");
         }
 
-        String encodedPassword = passwordEncoder.encode(request.password());
+        String encodedPassword = passwordHasher.hash(request.password());
         LocalDateTime now = LocalDateTime.now();
         return switch (request.role()) {
             case ADMIN -> {
@@ -120,15 +120,15 @@ public class AuthServiceImpl implements AuthService {
         switch (role) {
             case ADMIN -> adminRepository.findById(id).ifPresentOrElse(admin -> {
                 ensurePasswordMatches(request.oldPassword(), admin.getPassword());
-                admin.setPassword(passwordEncoder.encode(request.newPassword()));
+                admin.setPassword(passwordHasher.hash(request.newPassword()));
             }, () -> { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "管理员不存在"); });
             case USER -> userAccountRepository.findById(id).ifPresentOrElse(user -> {
                 ensurePasswordMatches(request.oldPassword(), user.getPassword());
-                user.setPassword(passwordEncoder.encode(request.newPassword()));
+                user.setPassword(passwordHasher.hash(request.newPassword()));
             }, () -> { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"); });
             case PROVIDER -> serviceProviderRepository.findById(id).ifPresentOrElse(provider -> {
                 ensurePasswordMatches(request.oldPassword(), provider.getPassword());
-                provider.setPassword(passwordEncoder.encode(request.newPassword()));
+                provider.setPassword(passwordHasher.hash(request.newPassword()));
             }, () -> { throw new ResponseStatusException(HttpStatus.NOT_FOUND, "服务者不存在"); });
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不支持的角色类型");
         }
@@ -155,7 +155,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void ensurePasswordMatches(String rawPassword, String encodedPassword) {
-        if (!passwordEncoder.matches(rawPassword, encodedPassword)) {
+        if (!passwordHasher.matches(rawPassword, encodedPassword)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "原密码不正确");
         }
     }

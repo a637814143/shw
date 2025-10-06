@@ -2,7 +2,6 @@ package com.example.housekeeping.controller;
 
 import com.example.housekeeping.domain.entity.UserAccount;
 import com.example.housekeeping.repository.UserAccountRepository;
-import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -43,7 +42,7 @@ public class UserManagementController {
     }
 
     @PutMapping("/{id}/balance")
-    public UserAccount adjustBalance(@PathVariable Long id, @RequestParam @NotNull BigDecimal balance) {
+    public UserAccount adjustBalance(@PathVariable Long id, @RequestParam BigDecimal balance) {
         UserAccount user = getUser(id);
         user.setBalance(balance);
         return user;

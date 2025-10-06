@@ -5,7 +5,6 @@ import com.example.housekeeping.dto.AppointmentAssignmentRequest;
 import com.example.housekeeping.dto.AppointmentCreateRequest;
 import com.example.housekeeping.dto.AppointmentStatusUpdateRequest;
 import com.example.housekeeping.service.AppointmentService;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,20 +47,20 @@ public class AppointmentController {
 
     @PostMapping("/user/{userId}")
     public ServiceAppointment createAppointment(@PathVariable Long userId,
-            @Valid @RequestBody AppointmentCreateRequest request) {
+            @RequestBody AppointmentCreateRequest request) {
         return appointmentService.createAppointment(userId, request);
     }
 
     @PostMapping("/{appointmentId}/assign")
     public ServiceAppointment assignProvider(@PathVariable Long appointmentId,
-            @Valid @RequestBody AppointmentAssignmentRequest request,
+            @RequestBody AppointmentAssignmentRequest request,
             @RequestParam(name = "adminName", defaultValue = "系统管理员") String adminName) {
         return appointmentService.assignProvider(appointmentId, request, adminName);
     }
 
     @PatchMapping("/{appointmentId}/status")
     public ServiceAppointment updateStatus(@PathVariable Long appointmentId,
-            @Valid @RequestBody AppointmentStatusUpdateRequest request,
+            @RequestBody AppointmentStatusUpdateRequest request,
             @RequestParam(name = "actor", defaultValue = "系统用户") String actor) {
         return appointmentService.updateStatus(appointmentId, request, actor);
     }

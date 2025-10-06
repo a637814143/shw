@@ -6,7 +6,6 @@ import com.example.housekeeping.dto.RechargeRequest;
 import com.example.housekeeping.dto.WithdrawalProcessRequest;
 import com.example.housekeeping.dto.WithdrawalRequest;
 import com.example.housekeeping.service.FinanceService;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -27,7 +26,7 @@ public class FinanceController {
     }
 
     @PostMapping("/recharge/user/{userId}")
-    public RechargeRecord createRecharge(@PathVariable Long userId, @Valid @RequestBody RechargeRequest request) {
+    public RechargeRecord createRecharge(@PathVariable Long userId, @RequestBody RechargeRequest request) {
         return financeService.createRecharge(userId, request);
     }
 
@@ -42,13 +41,13 @@ public class FinanceController {
     }
 
     @PostMapping("/withdraw/provider/{providerId}")
-    public WithdrawalRecord requestWithdrawal(@PathVariable Long providerId, @Valid @RequestBody WithdrawalRequest request) {
+    public WithdrawalRecord requestWithdrawal(@PathVariable Long providerId, @RequestBody WithdrawalRequest request) {
         return financeService.requestWithdrawal(providerId, request);
     }
 
     @PatchMapping("/withdraw/{withdrawalId}")
     public WithdrawalRecord processWithdrawal(@PathVariable Long withdrawalId,
-            @Valid @RequestBody WithdrawalProcessRequest request) {
+            @RequestBody WithdrawalProcessRequest request) {
         return financeService.processWithdrawal(withdrawalId, request);
     }
 

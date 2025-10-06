@@ -5,7 +5,6 @@ import com.example.housekeeping.domain.enums.CertificationStatus;
 import com.example.housekeeping.dto.CertificationReviewRequest;
 import com.example.housekeeping.dto.CertificationSubmissionRequest;
 import com.example.housekeeping.service.CertificationService;
-import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,13 +27,13 @@ public class CertificationController {
 
     @PostMapping("/provider/{providerId}")
     public ProviderCertification submitCertification(@PathVariable Long providerId,
-            @Valid @RequestBody CertificationSubmissionRequest request) {
+            @RequestBody CertificationSubmissionRequest request) {
         return certificationService.submitCertification(providerId, request);
     }
 
     @PatchMapping("/{certificationId}")
     public ProviderCertification reviewCertification(@PathVariable Long certificationId,
-            @Valid @RequestBody CertificationReviewRequest request) {
+            @RequestBody CertificationReviewRequest request) {
         return certificationService.reviewCertification(certificationId, request);
     }
 

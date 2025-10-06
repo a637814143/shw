@@ -12,7 +12,6 @@ import com.example.housekeeping.repository.CarouselItemRepository;
 import com.example.housekeeping.repository.HomeTipRepository;
 import com.example.housekeeping.repository.HousekeepingServiceRepository;
 import com.example.housekeeping.repository.SystemAnnouncementRepository;
-import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -61,14 +60,14 @@ public class ContentController {
     }
 
     @PostMapping("/announcements")
-    public SystemAnnouncement createAnnouncement(@Valid @RequestBody AnnouncementRequest request) {
+    public SystemAnnouncement createAnnouncement(@RequestBody AnnouncementRequest request) {
         SystemAnnouncement announcement = new SystemAnnouncement();
         applyAnnouncement(request, announcement);
         return systemAnnouncementRepository.save(announcement);
     }
 
     @PutMapping("/announcements/{id}")
-    public SystemAnnouncement updateAnnouncement(@PathVariable Long id, @Valid @RequestBody AnnouncementRequest request) {
+    public SystemAnnouncement updateAnnouncement(@PathVariable Long id, @RequestBody AnnouncementRequest request) {
         SystemAnnouncement announcement = systemAnnouncementRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "公告不存在"));
         applyAnnouncement(request, announcement);
@@ -107,14 +106,14 @@ public class ContentController {
     }
 
     @PostMapping("/tips")
-    public HomeTip createTip(@Valid @RequestBody HomeTipRequest request) {
+    public HomeTip createTip(@RequestBody HomeTipRequest request) {
         HomeTip tip = new HomeTip();
         applyTip(request, tip);
         return homeTipRepository.save(tip);
     }
 
     @PutMapping("/tips/{id}")
-    public HomeTip updateTip(@PathVariable Long id, @Valid @RequestBody HomeTipRequest request) {
+    public HomeTip updateTip(@PathVariable Long id, @RequestBody HomeTipRequest request) {
         HomeTip tip = homeTipRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "居家贴士不存在"));
         applyTip(request, tip);
@@ -149,14 +148,14 @@ public class ContentController {
     }
 
     @PostMapping("/carousel")
-    public CarouselItem createCarousel(@Valid @RequestBody CarouselRequest request) {
+    public CarouselItem createCarousel(@RequestBody CarouselRequest request) {
         CarouselItem item = new CarouselItem();
         applyCarousel(request, item);
         return carouselItemRepository.save(item);
     }
 
     @PutMapping("/carousel/{id}")
-    public CarouselItem updateCarousel(@PathVariable Long id, @Valid @RequestBody CarouselRequest request) {
+    public CarouselItem updateCarousel(@PathVariable Long id, @RequestBody CarouselRequest request) {
         CarouselItem item = carouselItemRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "轮播图不存在"));
         applyCarousel(request, item);
