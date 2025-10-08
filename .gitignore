@@ -1,7 +1,2 @@
-.vscode/
-
-.idea/
-
-housekeeping/.idea/
-
-*.tmp
+**/.idea/
+**/.vscode/
