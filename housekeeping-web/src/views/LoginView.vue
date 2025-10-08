@@ -58,7 +58,7 @@
 
         <!-- 角色选择 -->
         <div class="input-group">
-          <select v-model="formData.role" class="form-select">
+          <select v-model="formData.usertype" class="form-select">
             <option value="admin">管理员</option>
             <option value="user">用户</option>
             <option value="provider">家政人员</option>
@@ -101,102 +101,81 @@ const router = useRouter()
 const formData = ref({
   username: '',
   password: '',
-  role: 'user'
+  usertype: 'user'
 })
 
-// 登录状态
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-// 获取所有有效用户（包括预设用户和注册用户）
-const getAllValidUsers = () => {
-  // 预设的测试用户
-  const defaultUsers = [
-    { username: 'user', password: '123456', role: 'user' },
-    { username: 'admin', password: 'admin123', role: 'admin' },
-    { username: 'provider', password: 'provider123', role: 'provider' },
-    { username: 'test', password: 'test123', role: 'user' }
-  ]
-  
-  // 从localStorage获取注册的用户
-  const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-  
-  // 合并所有用户，registeredUsers中的用户会覆盖defaultUsers中的同名用户
-  const allUsers = [...defaultUsers]
-  
-  // 用registeredUsers中的用户覆盖defaultUsers中的同名用户
-  registeredUsers.forEach((registeredUser: any) => {
-    const existingIndex = allUsers.findIndex(u => u.username === registeredUser.username)
-    if (existingIndex !== -1) {
-      allUsers[existingIndex] = registeredUser
-    } else {
-      allUsers.push(registeredUser)
-    }
-  })
-  
-  return allUsers
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
-// 处理登录
 const handleLogin = async () => {
-  // 重置错误信息
   errorMessage.value = ''
-  
-  // 验证输入
+
   if (!formData.value.username.trim()) {
     errorMessage.value = '请输入账号'
     return
   }
-  
+
   if (!formData.value.password.trim()) {
     errorMessage.value = '请输入密码'
     return
   }
-  
+
+  if (!formData.value.usertype.trim()) {
+    errorMessage.value = '请选择角色'
+    return
+  }
+
   isLoading.value = true
-  
+
   try {
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 验证用户凭据
-    const validUsers = getAllValidUsers()
-    const user = validUsers.find(u => 
-      u.username === formData.value.username && 
-      u.password === formData.value.password &&
-      u.role === formData.value.role
-    )
-    
-    if (user) {
-      // 登录成功，保存用户信息到localStorage
-      localStorage.setItem('userInfo', JSON.stringify({
-        username: user.username,
-        role: user.role,
-        loginTime: new Date().toISOString()
-      }))
-      
-      console.log('登录成功:', user)
-      
-      // 根据用户角色跳转到不同的主界面
-      if (user.role === 'admin') {
-        router.replace('/admin-home')
-      } else if (user.role === 'provider') {
-        router.replace('/provider-home')
-      } else {
-        router.replace('/user-home')
-      }
-    } else {
-      errorMessage.value = '账号、密码或角色不正确，请重新输入'
+    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: formData.value.username,
+        password: formData.value.password,
+        usertype: formData.value.usertype
+      })
+    })
+
+    let result: any = null
+
+    try {
+      result = await response.json()
+    } catch (error) {
+      result = null
     }
+
+    if (!response.ok) {
+      errorMessage.value = result?.message || '账号、密码或角色不正确，请重新输入'
+      return
+    }
+
+    if (!result?.username || !result?.usertype) {
+      errorMessage.value = '服务器返回数据异常，请稍后重试'
+      return
+    }
+
+    localStorage.setItem('userInfo', JSON.stringify({
+      username: result.username,
+      usertype: result.usertype,
+      usermoney: result.usermoney,
+      loginTime: new Date().toISOString()
+    }))
+
+    router.replace('/panel')
   } catch (error) {
-    errorMessage.value = '登录失败，请稍后重试'
     console.error('登录错误:', error)
+    errorMessage.value = '登录失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
 }
 
-// 跳转到注册页面
 const goToRegister = () => {
   router.push('/register')
 }
