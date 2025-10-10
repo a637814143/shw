@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface UserForHousekeeperRepository extends JpaRepository<UserForHousekeeper, String> {
     Optional<UserForHousekeeper> findByUsername(String username);
+
+    long countByUsertypeIgnoreCase(String usertype);
 }
