@@ -133,73 +133,69 @@ const isLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 // 处理注册
 const handleRegister = async () => {
-  // 重置消息
   errorMessage.value = ''
   successMessage.value = ''
-  
-  // 验证输入
+
   if (!formData.value.username.trim()) {
     errorMessage.value = '请输入账号'
     return
   }
-  
+
   if (!formData.value.password.trim()) {
     errorMessage.value = '请输入密码'
     return
   }
-  
+
   if (formData.value.password !== formData.value.confirmPassword) {
     errorMessage.value = '密码确认不匹配'
     return
   }
-  
+
   if (formData.value.password.length < 6) {
     errorMessage.value = '密码长度至少6位'
     return
   }
-  
+
   isLoading.value = true
-  
+
   try {
-    // 模拟API调用延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // 模拟注册成功
-    console.log('注册数据:', formData.value)
-    
-    // 将新用户保存到localStorage
-    const newUser = {
-      username: formData.value.username,
-      password: formData.value.password,
-      role: formData.value.role
+    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username: formData.value.username.trim(),
+        password: formData.value.password,
+        usertype: formData.value.role
+      })
+    })
+
+    let result: any = null
+
+    try {
+      result = await response.json()
+    } catch (error) {
+      result = null
     }
-    
-    // 获取已注册的用户列表
-    const registeredUsers = JSON.parse(localStorage.getItem('registeredUsers') || '[]')
-    
-    // 检查用户名是否已存在
-    const existingUser = registeredUsers.find((u: any) => u.username === newUser.username)
-    if (existingUser) {
-      errorMessage.value = '用户名已存在，请选择其他用户名'
+
+    if (!response.ok) {
+      errorMessage.value = result?.message || '注册失败，请稍后重试'
       return
     }
-    
-    // 添加新用户到注册用户列表
-    registeredUsers.push(newUser)
-    localStorage.setItem('registeredUsers', JSON.stringify(registeredUsers))
-    
-    successMessage.value = '注册成功！请使用新账号登录'
-    
-    // 延迟跳转到登录页面
+
+    successMessage.value = result?.message || '注册成功！请使用新账号登录'
+
     setTimeout(() => {
       router.replace('/login')
     }, 1500)
-    
   } catch (error) {
-    errorMessage.value = '注册失败，请稍后重试'
     console.error('注册错误:', error)
+    errorMessage.value = '注册失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
