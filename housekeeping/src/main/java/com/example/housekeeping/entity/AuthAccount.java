@@ -1,7 +1,9 @@
 package com.example.housekeeping.entity;
 
 import com.example.housekeeping.enums.AccountRole;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -23,7 +25,6 @@ public class AuthAccount extends BaseEntity {
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 20)
     private AccountRole role;
 }
