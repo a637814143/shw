@@ -39,6 +39,27 @@ CREATE TABLE `admin`  (
 INSERT INTO `admin` VALUES (1, 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTV5DCi', '系统管理员', '13800138000', 'admin@housekeeping.com', 1, '2025-10-10 19:06:59', '2025-10-10 19:06:59');
 
 -- ----------------------------
+-- Table structure for auth_account
+-- ----------------------------
+DROP TABLE IF EXISTS `auth_account`;
+CREATE TABLE `auth_account`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '账号ID',
+  `account` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '登录账号',
+  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '加密密码',
+  `role` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '角色：admin/staff/user',
+  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_account`(`account` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '统一登录账号表' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of auth_account
+-- ----------------------------
+INSERT INTO `auth_account` VALUES
+(1, 'user001', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTV5DCi', 'USER', '2025-10-10 19:06:59', '2025-10-10 19:06:59');
+
+-- ----------------------------
 -- Table structure for user
 -- ----------------------------
 DROP TABLE IF EXISTS `user`;

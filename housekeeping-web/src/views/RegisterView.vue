@@ -47,7 +47,9 @@
             <option value="user">用户</option>
           </select>
         </div>
-        <button type="submit" class="primary-button">注册</button>
+        <button type="submit" class="primary-button" :disabled="isSubmitting">
+          {{ isSubmitting ? '注册中…' : '注册' }}
+        </button>
       </form>
       <p class="auth-switch">
         已有账号？
@@ -61,35 +63,19 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
-import {
-  USER_STORAGE_KEY,
-  type RegisteredUser,
-  AUTH_ROLE_KEY,
-} from '../constants/auth'
+import { AUTH_ROLE_KEY, type UserRole } from '../constants/auth'
+import { registerAccount } from '../services/auth'
 
 const router = useRouter()
 
 const account = ref('')
 const password = ref('')
 const confirmPassword = ref('')
-const role = ref<'admin' | 'staff' | 'user'>('user')
+const role = ref<UserRole>('user')
+const isSubmitting = ref(false)
 
-const getStoredUsers = (): RegisteredUser[] => {
-  try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as RegisteredUser[]) : []
-  } catch (error) {
-    console.warn('读取本地用户信息失败：', error)
-    return []
-  }
-}
-
-const persistUsers = (users: RegisteredUser[]) => {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users))
-}
-
-const handleRegister = () => {
-  if (!account.value || !password.value || !confirmPassword.value) {
+const handleRegister = async () => {
+  if (!account.value.trim() || !password.value || !confirmPassword.value) {
     window.alert('请完整填写账号和密码信息')
     return
   }
@@ -99,27 +85,22 @@ const handleRegister = () => {
     return
   }
 
-  const users = getStoredUsers()
-  const duplicated = users.some(
-    (user) => user.account.trim() === account.value.trim()
-  )
+  isSubmitting.value = true
+  try {
+    await registerAccount({
+      account: account.value.trim(),
+      password: password.value,
+      role: role.value,
+    })
 
-  if (duplicated) {
-    window.alert('该账号已存在，请更换账号')
-    return
+    sessionStorage.removeItem(AUTH_ROLE_KEY)
+    window.alert('注册成功，请使用账号登录')
+    router.push({ name: 'login' })
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '注册失败，请稍后再试')
+  } finally {
+    isSubmitting.value = false
   }
-
-  users.push({
-    account: account.value.trim(),
-    password: password.value,
-    role: role.value,
-  })
-
-  persistUsers(users)
-  sessionStorage.removeItem(AUTH_ROLE_KEY)
-
-  window.alert('注册成功，请使用账号登录')
-  router.push({ name: 'login' })
 }
 </script>
 
@@ -220,6 +201,12 @@ const handleRegister = () => {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .primary-button:hover {

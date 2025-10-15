@@ -31,7 +31,9 @@
             <option value="user">用户</option>
           </select>
         </div>
-        <button type="submit" class="primary-button">登录</button>
+        <button type="submit" class="primary-button" :disabled="isSubmitting">
+          {{ isSubmitting ? '登录中…' : '登录' }}
+        </button>
       </form>
       <p class="auth-switch">
         没有账号？
@@ -48,53 +50,46 @@ import { RouterLink, useRouter } from 'vue-router'
 import {
   AUTH_ACCOUNT_KEY,
   AUTH_ROLE_KEY,
-  USER_STORAGE_KEY,
-  type RegisteredUser,
+  AUTH_TOKEN_KEY,
+  type UserRole,
 } from '../constants/auth'
+import { loginAccount } from '../services/auth'
 
 const router = useRouter()
 const account = ref('')
 const password = ref('')
-const role = ref<'admin' | 'staff' | 'user'>('admin')
+const role = ref<UserRole>('user')
+const isSubmitting = ref(false)
 
-const getStoredUsers = (): RegisteredUser[] => {
-  try {
-    const raw = localStorage.getItem(USER_STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as RegisteredUser[]) : []
-  } catch (error) {
-    console.warn('读取本地用户信息失败：', error)
-    return []
-  }
-}
-
-const handleLogin = () => {
-  if (!account.value || !password.value) {
+const handleLogin = async () => {
+  if (!account.value.trim() || !password.value) {
     window.alert('请输入账号和密码')
     return
   }
 
-  const users = getStoredUsers()
-  const matchedUser = users.find(
-    (user) =>
-      user.account.trim() === account.value.trim() &&
-      user.password === password.value &&
-      user.role === role.value
-  )
+  isSubmitting.value = true
+  try {
+    const result = await loginAccount({
+      account: account.value.trim(),
+      password: password.value,
+      role: role.value,
+    })
 
-  if (!matchedUser) {
-    window.alert('账号、密码或角色不匹配，请重试')
-    return
+    if (result.role !== 'user') {
+      window.alert('仅支持用户账号登录访问用户主界面')
+      return
+    }
+
+    sessionStorage.setItem(AUTH_TOKEN_KEY, result.token)
+    sessionStorage.setItem(AUTH_ACCOUNT_KEY, result.account)
+    sessionStorage.setItem(AUTH_ROLE_KEY, result.role)
+
+    router.push({ name: 'user-dashboard' })
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '登录失败，请稍后重试')
+  } finally {
+    isSubmitting.value = false
   }
-
-  if (matchedUser.role !== 'user') {
-    window.alert('仅支持用户账号登录访问用户主界面')
-    return
-  }
-
-  sessionStorage.setItem(AUTH_ROLE_KEY, matchedUser.role)
-  sessionStorage.setItem(AUTH_ACCOUNT_KEY, matchedUser.account)
-
-  router.push({ name: 'user-dashboard' })
 }
 </script>
 
@@ -188,6 +183,12 @@ const handleLogin = () => {
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .primary-button:hover {
