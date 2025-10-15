@@ -25,7 +25,8 @@ public class HousekeepItem {
     @Column(name = "title", length = 200)
     private String title;
 
-    @Column(name = "content", columnDefinition = "TEXT")
+    @Lob
+    @Column(name = "content")
     private String content;
 
     @Column(name = "icon", length = 32)

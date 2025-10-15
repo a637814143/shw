@@ -73,16 +73,18 @@ const handleLogin = async () => {
       role: role.value,
     })
 
-    if (result.role !== 'user') {
-      window.alert('仅支持普通用户账号登录访问用户主界面')
-      return
-    }
-
     sessionStorage.setItem(AUTH_TOKEN_KEY, result.token)
     sessionStorage.setItem(AUTH_ACCOUNT_KEY, result.account)
     sessionStorage.setItem(AUTH_ROLE_KEY, result.role)
 
-    router.push({ name: 'user-dashboard' })
+    if (result.role === 'user') {
+      router.push({ name: 'user-dashboard' })
+    } else {
+      router.push({
+        name: 'role-landing',
+        query: { role: result.role },
+      })
+    }
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '登录失败，请稍后重试')
   } finally {
