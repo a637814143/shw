@@ -2,18 +2,30 @@
   <div class="auth-page">
     <h1 class="auth-title">家政服务平台</h1>
     <div class="auth-card">
-      <form class="auth-form">
+      <form class="auth-form" @submit.prevent="handleLogin">
         <div class="form-row">
           <label class="form-label" for="account">请输入账号</label>
-          <input id="account" class="form-input" type="text" />
+          <input
+            id="account"
+            v-model="account"
+            class="form-input"
+            type="text"
+            autocomplete="username"
+          />
         </div>
         <div class="form-row">
           <label class="form-label" for="password">请输入密码</label>
-          <input id="password" class="form-input" type="password" />
+          <input
+            id="password"
+            v-model="password"
+            class="form-input"
+            type="password"
+            autocomplete="current-password"
+          />
         </div>
         <div class="form-row">
           <label class="form-label" for="role">请选择角色</label>
-          <select id="role" class="form-select">
+          <select id="role" v-model="role" class="form-select">
             <option value="admin">管理员</option>
             <option value="staff">家政人员</option>
             <option value="user">用户</option>
@@ -30,7 +42,18 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+
+const router = useRouter()
+const account = ref('')
+const password = ref('')
+const role = ref('admin')
+
+const handleLogin = () => {
+  // TODO: replace with real authentication once backend is ready
+  router.push({ name: 'user-dashboard', query: { role: role.value } })
+}
 </script>
 
 <style scoped>
