@@ -12,12 +12,36 @@
           <input id="password" class="form-input" type="password" />
         </div>
         <div class="form-row role-row">
-          <span class="form-label">角色</span>
-          <span class="role-option">管理员</span>
+          <label class="form-label" for="role">请选择角色</label>
+          <select id="role" class="form-select">
+            <option value="admin">管理员</option>
+            <option value="staff">家政人员</option>
+            <option value="user">用户</option>
+          </select>
         </div>
         <button type="submit" class="login-button">登录</button>
       </form>
-      <p class="register-hint">没有账号？请注册</p>
+      <section class="register-section">
+        <h2 class="register-title">没有账号？立即注册</h2>
+        <p class="register-description">
+          注册成为家政服务平台的用户，即可快速发布需求或加入平台成为家政人员。
+        </p>
+        <form class="register-form">
+          <div class="form-row">
+            <label class="form-label" for="register-account">设置账号</label>
+            <input id="register-account" class="form-input" type="text" placeholder="请输入账号" />
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="register-password">设置密码</label>
+            <input id="register-password" class="form-input" type="password" placeholder="请输入密码" />
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="register-confirm">确认密码</label>
+            <input id="register-confirm" class="form-input" type="password" placeholder="请再次输入密码" />
+          </div>
+          <button type="button" class="register-button">注册账号</button>
+        </form>
+      </section>
     </div>
   </div>
 </template>
@@ -85,18 +109,30 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
-.role-row {
-  justify-content: space-between;
-}
-
-.role-option {
+.form-select {
   flex: 1;
   padding: 10px 12px;
   border: 1px solid #d5d9e2;
   border-radius: 8px;
-  background-color: #f0f4ff;
+  background-color: #fafbff;
   color: #1f2a44;
   font-size: 16px;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #3b82f6 50%),
+    linear-gradient(135deg, #3b82f6 50%, transparent 50%),
+    linear-gradient(to right, #d5d9e2, #d5d9e2);
+  background-position: calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 15px) calc(50% - 3px),
+    calc(100% - 2.5rem) 50%;
+  background-size: 5px 5px, 5px 5px, 1px 50%;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .login-button {
@@ -122,11 +158,53 @@
   transform: translateY(0);
 }
 
-.register-hint {
-  margin-top: 24px;
-  text-align: center;
-  color: #6b7280;
+.register-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.register-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2a44;
+  margin-bottom: 12px;
+}
+
+.register-description {
   font-size: 14px;
+  color: #6b7280;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.register-button {
+  margin-top: 8px;
+  align-self: flex-end;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.register-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(5, 150, 105, 0.25);
+}
+
+.register-button:active {
+  transform: translateY(0);
 }
 
 @media (max-width: 480px) {
