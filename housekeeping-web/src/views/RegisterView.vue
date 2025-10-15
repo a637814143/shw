@@ -47,39 +47,6 @@
             <option value="user">用户</option>
           </select>
         </div>
-        <div v-if="isUserRole" class="form-row">
-          <label class="form-label" for="register-realname">真实姓名</label>
-          <input
-            id="register-realname"
-            v-model="realName"
-            class="form-input"
-            type="text"
-            placeholder="请输入真实姓名"
-            autocomplete="name"
-          />
-        </div>
-        <div v-if="isUserRole" class="form-row">
-          <label class="form-label" for="register-phone">手机号</label>
-          <input
-            id="register-phone"
-            v-model="phone"
-            class="form-input"
-            type="tel"
-            placeholder="请输入11位手机号"
-            autocomplete="tel"
-          />
-        </div>
-        <div v-if="isUserRole" class="form-row">
-          <label class="form-label" for="register-email">邮箱（选填）</label>
-          <input
-            id="register-email"
-            v-model="email"
-            class="form-input"
-            type="email"
-            placeholder="请输入邮箱"
-            autocomplete="email"
-          />
-        </div>
         <button type="submit" class="primary-button" :disabled="isSubmitting">
           {{ isSubmitting ? '注册中…' : '注册' }}
         </button>
@@ -93,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
 import { AUTH_ROLE_KEY, type UserRole } from '../constants/auth'
@@ -105,12 +72,7 @@ const account = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const role = ref<UserRole>('user')
-const realName = ref('')
-const phone = ref('')
-const email = ref('')
 const isSubmitting = ref(false)
-
-const isUserRole = computed(() => role.value === 'user')
 
 const handleRegister = async () => {
   if (!account.value.trim() || !password.value || !confirmPassword.value) {
@@ -123,32 +85,12 @@ const handleRegister = async () => {
     return
   }
 
-  if (isUserRole.value) {
-    if (!realName.value.trim()) {
-      window.alert('请输入真实姓名')
-      return
-    }
-
-    if (!phone.value.trim()) {
-      window.alert('请输入手机号')
-      return
-    }
-
-    if (!/^1[3-9]\d{9}$/.test(phone.value.trim())) {
-      window.alert('请输入正确的11位手机号')
-      return
-    }
-  }
-
   isSubmitting.value = true
   try {
     const payload: RegisterPayload = {
       account: account.value.trim(),
       password: password.value,
       role: role.value,
-      realName: isUserRole.value ? realName.value.trim() : undefined,
-      phone: isUserRole.value ? phone.value.trim() : undefined,
-      email: isUserRole.value && email.value.trim() ? email.value.trim() : undefined,
     }
 
     await registerAccount(payload)

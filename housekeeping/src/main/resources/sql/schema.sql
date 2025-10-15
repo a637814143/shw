@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
   `username` varchar(50) NOT NULL COMMENT '用户名',
   `password` varchar(255) NOT NULL COMMENT '密码',
-  `real_name` varchar(50) NOT NULL COMMENT '真实姓名',
-  `phone` varchar(20) NOT NULL COMMENT '手机号',
+  `real_name` varchar(50) DEFAULT NULL COMMENT '真实姓名',
+  `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
   `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
   `avatar` varchar(255) DEFAULT NULL COMMENT '头像',
   `balance` decimal(10,2) DEFAULT 0.00 COMMENT '余额',
@@ -240,6 +240,50 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统公告表';
+
+-- 用户仪表盘服务项目
+CREATE TABLE IF NOT EXISTS `dashboard_service_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name` varchar(100) NOT NULL COMMENT '服务名称',
+  `description` varchar(255) NOT NULL COMMENT '服务描述',
+  `icon` varchar(20) NOT NULL COMMENT '图标',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='前台仪表盘服务条目表';
+
+-- 用户仪表盘居家贴士
+CREATE TABLE IF NOT EXISTS `dashboard_tip_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` varchar(150) NOT NULL COMMENT '标题',
+  `content` text NOT NULL COMMENT '内容',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='前台仪表盘贴士表';
+
+-- 用户仪表盘服务评价
+CREATE TABLE IF NOT EXISTS `dashboard_review_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `author` varchar(50) NOT NULL COMMENT '评价人',
+  `service_name` varchar(100) NOT NULL COMMENT '服务名称',
+  `rating` int NOT NULL COMMENT '评分',
+  `content` text NOT NULL COMMENT '评价内容',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='前台仪表盘评价表';
+
+-- 用户仪表盘特惠
+CREATE TABLE IF NOT EXISTS `dashboard_offer_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` varchar(150) NOT NULL COMMENT '标题',
+  `content` text NOT NULL COMMENT '内容',
+  `tag` varchar(50) DEFAULT NULL COMMENT '标签',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='前台仪表盘特惠表';
 
 -- 插入初始管理员数据
 INSERT INTO `admin` (`username`, `password`, `real_name`, `phone`, `email`, `status`) VALUES

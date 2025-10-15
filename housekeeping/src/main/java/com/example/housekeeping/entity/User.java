@@ -3,7 +3,6 @@ package com.example.housekeeping.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -26,15 +25,12 @@ public class User extends BaseEntity {
     @Column(name = "password", nullable = false)
     private String password;
     
-    @NotBlank(message = "真实姓名不能为空")
-    @Column(name = "real_name", nullable = false, length = 50)
+    @Column(name = "real_name", length = 50)
     private String realName;
-    
-    @NotBlank(message = "手机号不能为空")
-    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
-    @Column(name = "phone", unique = true, nullable = false, length = 20)
+
+    @Column(name = "phone", unique = true, length = 20)
     private String phone;
-    
+
     @Email(message = "邮箱格式不正确")
     @Column(name = "email", length = 100)
     private String email;
