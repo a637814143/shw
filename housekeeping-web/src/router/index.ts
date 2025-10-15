@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { AUTH_ROLE_KEY } from '../constants/auth'
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -23,6 +25,19 @@ const router = createRouter({
       component: () => import('../views/UserDashboardView.vue'),
     },
   ],
+})
+
+router.beforeEach((to, _from, next) => {
+  if (to.name === 'user-dashboard') {
+    const role = sessionStorage.getItem(AUTH_ROLE_KEY)
+    if (role !== 'user') {
+      window.alert('请先使用用户账号登录')
+      next({ name: 'login' })
+      return
+    }
+  }
+
+  next()
 })
 
 export default router
