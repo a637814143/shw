@@ -42,9 +42,9 @@
         <div class="form-row">
           <label class="form-label" for="register-role">请选择角色</label>
           <select id="register-role" v-model="role" class="form-select">
-            <option value="admin">管理员</option>
-            <option value="staff">家政人员</option>
-            <option value="user">用户</option>
+            <option v-for="roleOption in roleOptions" :key="roleOption.value" :value="roleOption.value">
+              {{ roleOption.label }}
+            </option>
           </select>
         </div>
         <button type="submit" class="primary-button" :disabled="isSubmitting">
@@ -63,7 +63,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
-import { AUTH_ROLE_KEY, type UserRole } from '../constants/auth'
+import { AUTH_ROLE_KEY, ROLE_LABELS, type UserRole } from '../constants/auth'
 import { registerAccount, type RegisterPayload } from '../services/auth'
 
 const router = useRouter()
@@ -72,6 +72,10 @@ const account = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const role = ref<UserRole>('user')
+const roleOptions = (['user', 'company'] as UserRole[]).map((value) => ({
+  value,
+  label: ROLE_LABELS[value],
+}))
 const isSubmitting = ref(false)
 
 const handleRegister = async () => {

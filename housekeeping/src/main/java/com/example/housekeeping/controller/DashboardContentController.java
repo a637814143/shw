@@ -2,13 +2,13 @@ package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.DashboardOfferItemRequest;
+import com.example.housekeeping.dto.DashboardOfferItemResponse;
 import com.example.housekeeping.dto.DashboardReviewItemRequest;
+import com.example.housekeeping.dto.DashboardReviewItemResponse;
 import com.example.housekeeping.dto.DashboardServiceItemRequest;
+import com.example.housekeeping.dto.DashboardServiceItemResponse;
 import com.example.housekeeping.dto.DashboardTipItemRequest;
-import com.example.housekeeping.entity.DashboardOfferItem;
-import com.example.housekeeping.entity.DashboardReviewItem;
-import com.example.housekeeping.entity.DashboardServiceItem;
-import com.example.housekeeping.entity.DashboardTipItem;
+import com.example.housekeeping.dto.DashboardTipItemResponse;
 import com.example.housekeeping.service.DashboardContentService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,18 +27,18 @@ public class DashboardContentController {
     private DashboardContentService dashboardContentService;
 
     @GetMapping("/services")
-    public Result<List<DashboardServiceItem>> listServices() {
+    public Result<List<DashboardServiceItemResponse>> listServices() {
         return Result.success(dashboardContentService.listServices());
     }
 
     @PostMapping("/services")
-    public Result<DashboardServiceItem> createService(@Valid @RequestBody DashboardServiceItemRequest request) {
+    public Result<DashboardServiceItemResponse> createService(@Valid @RequestBody DashboardServiceItemRequest request) {
         return Result.success("创建成功", dashboardContentService.createService(request));
     }
 
     @PutMapping("/services/{id}")
-    public Result<DashboardServiceItem> updateService(@PathVariable Long id,
-                                                      @Valid @RequestBody DashboardServiceItemRequest request) {
+    public Result<DashboardServiceItemResponse> updateService(@PathVariable Long id,
+                                                              @Valid @RequestBody DashboardServiceItemRequest request) {
         return Result.success("更新成功", dashboardContentService.updateService(id, request));
     }
 
@@ -49,18 +49,18 @@ public class DashboardContentController {
     }
 
     @GetMapping("/tips")
-    public Result<List<DashboardTipItem>> listTips() {
+    public Result<List<DashboardTipItemResponse>> listTips() {
         return Result.success(dashboardContentService.listTips());
     }
 
     @PostMapping("/tips")
-    public Result<DashboardTipItem> createTip(@Valid @RequestBody DashboardTipItemRequest request) {
+    public Result<DashboardTipItemResponse> createTip(@Valid @RequestBody DashboardTipItemRequest request) {
         return Result.success("创建成功", dashboardContentService.createTip(request));
     }
 
     @PutMapping("/tips/{id}")
-    public Result<DashboardTipItem> updateTip(@PathVariable Long id,
-                                              @Valid @RequestBody DashboardTipItemRequest request) {
+    public Result<DashboardTipItemResponse> updateTip(@PathVariable Long id,
+                                                      @Valid @RequestBody DashboardTipItemRequest request) {
         return Result.success("更新成功", dashboardContentService.updateTip(id, request));
     }
 
@@ -71,18 +71,18 @@ public class DashboardContentController {
     }
 
     @GetMapping("/reviews")
-    public Result<List<DashboardReviewItem>> listReviews() {
+    public Result<List<DashboardReviewItemResponse>> listReviews() {
         return Result.success(dashboardContentService.listReviews());
     }
 
     @PostMapping("/reviews")
-    public Result<DashboardReviewItem> createReview(@Valid @RequestBody DashboardReviewItemRequest request) {
+    public Result<DashboardReviewItemResponse> createReview(@Valid @RequestBody DashboardReviewItemRequest request) {
         return Result.success("创建成功", dashboardContentService.createReview(request));
     }
 
     @PutMapping("/reviews/{id}")
-    public Result<DashboardReviewItem> updateReview(@PathVariable Long id,
-                                                    @Valid @RequestBody DashboardReviewItemRequest request) {
+    public Result<DashboardReviewItemResponse> updateReview(@PathVariable Long id,
+                                                            @Valid @RequestBody DashboardReviewItemRequest request) {
         return Result.success("更新成功", dashboardContentService.updateReview(id, request));
     }
 
@@ -93,18 +93,18 @@ public class DashboardContentController {
     }
 
     @GetMapping("/offers")
-    public Result<List<DashboardOfferItem>> listOffers() {
+    public Result<List<DashboardOfferItemResponse>> listOffers() {
         return Result.success(dashboardContentService.listOffers());
     }
 
     @PostMapping("/offers")
-    public Result<DashboardOfferItem> createOffer(@Valid @RequestBody DashboardOfferItemRequest request) {
+    public Result<DashboardOfferItemResponse> createOffer(@Valid @RequestBody DashboardOfferItemRequest request) {
         return Result.success("创建成功", dashboardContentService.createOffer(request));
     }
 
     @PutMapping("/offers/{id}")
-    public Result<DashboardOfferItem> updateOffer(@PathVariable Long id,
-                                                  @Valid @RequestBody DashboardOfferItemRequest request) {
+    public Result<DashboardOfferItemResponse> updateOffer(@PathVariable Long id,
+                                                          @Valid @RequestBody DashboardOfferItemRequest request) {
         return Result.success("更新成功", dashboardContentService.updateOffer(id, request));
     }
 

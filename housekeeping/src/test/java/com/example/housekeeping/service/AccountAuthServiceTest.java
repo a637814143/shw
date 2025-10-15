@@ -2,13 +2,15 @@ package com.example.housekeeping.service;
 
 import com.example.housekeeping.dto.AccountRegisterRequest;
 import com.example.housekeeping.dto.AccountSummary;
-import com.example.housekeeping.repository.AuthAccountRepository;
-import com.example.housekeeping.repository.UserRepository;
+import com.example.housekeeping.entity.UserAll;
+import com.example.housekeeping.repository.UserAllRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,19 +22,15 @@ class AccountAuthServiceTest {
     private AccountAuthService accountAuthService;
 
     @Autowired
-    private AuthAccountRepository authAccountRepository;
-
-    @Autowired
-    private UserRepository userRepository;
+    private UserAllRepository userAllRepository;
 
     @BeforeEach
     void clearData() {
-        userRepository.deleteAll();
-        authAccountRepository.deleteAll();
+        userAllRepository.deleteAll();
     }
 
     @Test
-    void registerUserCreatesAuthAndProfile() {
+    void registerUserCreatesRecordWithDefaultMoney() {
         AccountRegisterRequest request = new AccountRegisterRequest();
         request.setAccount("test_user");
         request.setPassword("password123");
@@ -41,7 +39,9 @@ class AccountAuthServiceTest {
         AccountSummary summary = accountAuthService.register(request);
 
         assertThat(summary.getAccount()).isEqualTo("test_user");
-        assertThat(authAccountRepository.findByAccount("test_user")).isPresent();
-        assertThat(userRepository.findByUsername("test_user")).isPresent();
+        UserAll saved = userAllRepository.findByUsername("test_user").orElseThrow();
+        assertThat(saved.getMoney()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(saved.getUserType()).isEqualTo("普通用户");
+        assertThat(saved.getPasswd()).isNotBlank();
     }
 }
