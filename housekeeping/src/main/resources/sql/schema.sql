@@ -15,6 +15,18 @@ CREATE TABLE IF NOT EXISTS `admin` (
   UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表';
 
+-- 统一登录账号表
+CREATE TABLE IF NOT EXISTS `auth_account` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '账号ID',
+  `account` varchar(50) NOT NULL COMMENT '登录账号',
+  `password` varchar(255) NOT NULL COMMENT '加密密码',
+  `role` varchar(20) NOT NULL COMMENT '角色：admin/staff/user',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_account` (`account`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='统一登录账号表';
+
 -- 普通用户表
 CREATE TABLE IF NOT EXISTS `user` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
