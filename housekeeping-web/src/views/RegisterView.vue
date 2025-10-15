@@ -5,18 +5,47 @@
       <p class="auth-description">
         填写以下信息即可创建家政服务平台账号，发布需求或加入成为家政人员。
       </p>
-      <form class="auth-form">
+      <form class="auth-form" @submit.prevent="handleRegister">
         <div class="form-row">
           <label class="form-label" for="register-account">设置账号</label>
-          <input id="register-account" class="form-input" type="text" placeholder="请输入账号" />
+          <input
+            id="register-account"
+            v-model="account"
+            class="form-input"
+            type="text"
+            placeholder="请输入账号"
+            autocomplete="username"
+          />
         </div>
         <div class="form-row">
           <label class="form-label" for="register-password">设置密码</label>
-          <input id="register-password" class="form-input" type="password" placeholder="请输入密码" />
+          <input
+            id="register-password"
+            v-model="password"
+            class="form-input"
+            type="password"
+            placeholder="请输入密码"
+            autocomplete="new-password"
+          />
         </div>
         <div class="form-row">
           <label class="form-label" for="register-confirm">确认密码</label>
-          <input id="register-confirm" class="form-input" type="password" placeholder="请再次输入密码" />
+          <input
+            id="register-confirm"
+            v-model="confirmPassword"
+            class="form-input"
+            type="password"
+            placeholder="请再次输入密码"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="register-role">请选择角色</label>
+          <select id="register-role" v-model="role" class="form-select">
+            <option value="admin">管理员</option>
+            <option value="staff">家政人员</option>
+            <option value="user">用户</option>
+          </select>
         </div>
         <button type="submit" class="primary-button">注册</button>
       </form>
@@ -29,7 +58,69 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+
+import {
+  USER_STORAGE_KEY,
+  type RegisteredUser,
+  AUTH_ROLE_KEY,
+} from '../constants/auth'
+
+const router = useRouter()
+
+const account = ref('')
+const password = ref('')
+const confirmPassword = ref('')
+const role = ref<'admin' | 'staff' | 'user'>('user')
+
+const getStoredUsers = (): RegisteredUser[] => {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as RegisteredUser[]) : []
+  } catch (error) {
+    console.warn('读取本地用户信息失败：', error)
+    return []
+  }
+}
+
+const persistUsers = (users: RegisteredUser[]) => {
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users))
+}
+
+const handleRegister = () => {
+  if (!account.value || !password.value || !confirmPassword.value) {
+    window.alert('请完整填写账号和密码信息')
+    return
+  }
+
+  if (password.value !== confirmPassword.value) {
+    window.alert('两次输入的密码不一致')
+    return
+  }
+
+  const users = getStoredUsers()
+  const duplicated = users.some(
+    (user) => user.account.trim() === account.value.trim()
+  )
+
+  if (duplicated) {
+    window.alert('该账号已存在，请更换账号')
+    return
+  }
+
+  users.push({
+    account: account.value.trim(),
+    password: password.value,
+    role: role.value,
+  })
+
+  persistUsers(users)
+  sessionStorage.removeItem(AUTH_ROLE_KEY)
+
+  window.alert('注册成功，请使用账号登录')
+  router.push({ name: 'login' })
+}
 </script>
 
 <style scoped>
@@ -85,7 +176,8 @@ import { RouterLink } from 'vue-router'
   color: #3a4660;
 }
 
-.form-input {
+.form-input,
+.form-select {
   flex: 1;
   padding: 10px 12px;
   border: 1px solid #d5d9e2;
@@ -96,10 +188,24 @@ import { RouterLink } from 'vue-router'
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.form-input:focus {
+.form-input:focus,
+.form-select:focus {
   outline: none;
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.form-select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #10b981 50%),
+    linear-gradient(135deg, #10b981 50%, transparent 50%),
+    linear-gradient(to right, #d5d9e2, #d5d9e2);
+  background-position: calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 15px) calc(50% - 3px),
+    calc(100% - 2.5rem) 50%;
+  background-size: 5px 5px, 5px 5px, 1px 50%;
+  background-repeat: no-repeat;
+  cursor: pointer;
 }
 
 .primary-button {

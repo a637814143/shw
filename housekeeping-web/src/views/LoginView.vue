@@ -45,14 +45,56 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
+import {
+  AUTH_ACCOUNT_KEY,
+  AUTH_ROLE_KEY,
+  USER_STORAGE_KEY,
+  type RegisteredUser,
+} from '../constants/auth'
+
 const router = useRouter()
 const account = ref('')
 const password = ref('')
-const role = ref('admin')
+const role = ref<'admin' | 'staff' | 'user'>('admin')
+
+const getStoredUsers = (): RegisteredUser[] => {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY)
+    return raw ? (JSON.parse(raw) as RegisteredUser[]) : []
+  } catch (error) {
+    console.warn('读取本地用户信息失败：', error)
+    return []
+  }
+}
 
 const handleLogin = () => {
-  // TODO: replace with real authentication once backend is ready
-  router.push({ name: 'user-dashboard', query: { role: role.value } })
+  if (!account.value || !password.value) {
+    window.alert('请输入账号和密码')
+    return
+  }
+
+  const users = getStoredUsers()
+  const matchedUser = users.find(
+    (user) =>
+      user.account.trim() === account.value.trim() &&
+      user.password === password.value &&
+      user.role === role.value
+  )
+
+  if (!matchedUser) {
+    window.alert('账号、密码或角色不匹配，请重试')
+    return
+  }
+
+  if (matchedUser.role !== 'user') {
+    window.alert('仅支持用户账号登录访问用户主界面')
+    return
+  }
+
+  sessionStorage.setItem(AUTH_ROLE_KEY, matchedUser.role)
+  sessionStorage.setItem(AUTH_ACCOUNT_KEY, matchedUser.account)
+
+  router.push({ name: 'user-dashboard' })
 }
 </script>
 
