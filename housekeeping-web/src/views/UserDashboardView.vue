@@ -7,6 +7,7 @@
       </div>
       <div class="header-actions">
         <span class="welcome">您好，{{ username }}！</span>
+        <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
       </div>
     </header>
@@ -186,12 +187,14 @@ import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
+  fetchCurrentAccount,
   createUserOrder,
   fetchServiceReviews,
   fetchUserOrders,
   fetchUserServices,
   requestUserRefund,
   submitUserReview,
+  type AccountProfileItem,
   type HousekeepServiceItem,
   type ServiceOrderItem,
   type ServiceReviewItem,
@@ -206,7 +209,11 @@ interface SectionMeta {
 }
 
 const router = useRouter()
-const username = computed(() => sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '用户')
+const account = ref<AccountProfileItem | null>(null)
+const username = computed(
+  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '用户',
+)
+const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
 
 const sections: SectionMeta[] = [
   { key: 'services', icon: '🧹', label: '选择服务' },
@@ -241,6 +248,10 @@ const reviewableServices = computed(() => {
 
 const switchSection = (key: SectionKey) => {
   activeSection.value = key
+  if (key === 'orders') {
+    loadOrders()
+    loadAccount()
+  }
 }
 
 const logout = () => {
@@ -266,6 +277,14 @@ const loadOrders = async () => {
   }
 }
 
+const loadAccount = async () => {
+  try {
+    account.value = await fetchCurrentAccount()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const loadReviews = async (serviceId: number) => {
   try {
     serviceReviews.value = await fetchServiceReviews(serviceId)
@@ -283,6 +302,7 @@ const handleSelectService = async (service: HousekeepServiceItem) => {
     await createUserOrder({ serviceId: service.id })
     window.alert('已成功预约服务，您可以在“我的订单”中查看进度。')
     await loadOrders()
+    await loadAccount()
     activeSection.value = 'orders'
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '预约失败，请稍后再试')
@@ -371,7 +391,7 @@ watch(
 )
 
 onMounted(async () => {
-  await Promise.all([loadServices(), loadOrders()])
+  await Promise.all([loadAccount(), loadServices(), loadOrders()])
 })
 </script>
 
@@ -409,6 +429,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.wallet {
+  font-weight: 600;
+  color: #2563eb;
 }
 
 .welcome {

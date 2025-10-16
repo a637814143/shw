@@ -7,6 +7,7 @@
       </div>
       <div class="header-actions">
         <span class="welcome">您好，{{ username }}！</span>
+        <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
       </div>
     </header>
@@ -152,12 +153,14 @@ import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
+  fetchCurrentAccount,
   createCompanyService,
   deleteCompanyService,
   fetchCompanyRefunds,
   fetchCompanyServices,
   handleCompanyRefund,
   updateCompanyService,
+  type AccountProfileItem,
   type CompanyServicePayload,
   type HousekeepServiceItem,
   type ServiceOrderItem,
@@ -172,7 +175,11 @@ interface SectionMeta {
 }
 
 const router = useRouter()
-const username = computed(() => sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '公司用户')
+const account = ref<AccountProfileItem | null>(null)
+const username = computed(
+  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '公司用户',
+)
+const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
 
 const sections: SectionMeta[] = [
   { key: 'services', icon: '🧹', label: '服务管理' },
@@ -261,6 +268,7 @@ const submitServiceForm = async () => {
       await createCompanyService(payload)
     }
     await loadServices()
+    await loadAccount()
     closeServiceForm()
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '保存服务失败')
@@ -284,6 +292,7 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
   try {
     await handleCompanyRefund(order.id, { approve, message })
     await loadRefunds()
+    await loadAccount()
     window.alert('已提交处理结果')
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '处理失败')
@@ -306,13 +315,21 @@ const loadRefunds = async () => {
   }
 }
 
+const loadAccount = async () => {
+  try {
+    account.value = await fetchCurrentAccount()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const formatDate = (value: string) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
 onMounted(async () => {
-  await loadServices()
+  await Promise.all([loadAccount(), loadServices()])
 })
 </script>
 
@@ -349,6 +366,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.wallet {
+  font-weight: 600;
+  color: #2563eb;
 }
 
 .welcome {

@@ -11,10 +11,12 @@ import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
+import com.example.housekeeping.repository.UserAllRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,6 +36,9 @@ public class ServiceOrderService {
     @Autowired
     private AccountLookupService accountLookupService;
 
+    @Autowired
+    private UserAllRepository userAllRepository;
+
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
         UserAll user = accountLookupService.getCurrentAccount();
@@ -42,14 +47,30 @@ public class ServiceOrderService {
         HousekeepService service = housekeepServiceRepository.findById(request.getServiceId())
             .orElseThrow(() -> new RuntimeException("服务不存在"));
 
+        BigDecimal price = service.getPrice();
+        if (price == null) {
+            throw new RuntimeException("服务价格未设置");
+        }
+        if (user.getMoney().compareTo(price) < 0) {
+            throw new RuntimeException("余额不足，请先充值");
+        }
+
+        UserAll company = service.getCompany();
+        user.setMoney(user.getMoney().subtract(price));
+        company.setMoney(company.getMoney().add(price));
+
         ServiceOrder order = new ServiceOrder();
         order.setService(service);
         order.setUser(user);
+        order.setAmount(price);
         order.setStatus(ServiceOrderStatus.PENDING);
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(order.getCreatedAt());
 
-        return mapToResponse(serviceOrderRepository.save(order));
+        ServiceOrder saved = serviceOrderRepository.save(order);
+        userAllRepository.save(user);
+        userAllRepository.save(company);
+        return mapToResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -126,6 +147,17 @@ public class ServiceOrderService {
         }
 
         if (Boolean.TRUE.equals(request.getApprove())) {
+            BigDecimal amount = order.getAmount();
+            if (amount == null) {
+                throw new RuntimeException("订单金额异常");
+            }
+            UserAll user = order.getUser();
+            UserAll company = order.getService().getCompany();
+            if (company.getMoney().compareTo(amount) < 0) {
+                throw new RuntimeException("家政公司余额不足，无法退款");
+            }
+            user.setMoney(user.getMoney().add(amount));
+            company.setMoney(company.getMoney().subtract(amount));
             order.setStatus(ServiceOrderStatus.REFUND_APPROVED);
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
@@ -134,7 +166,10 @@ public class ServiceOrderService {
         order.setHandledBy(actor);
         order.setUpdatedAt(Instant.now());
 
-        return mapToResponse(serviceOrderRepository.save(order));
+        ServiceOrder saved = serviceOrderRepository.save(order);
+        userAllRepository.save(order.getUser());
+        userAllRepository.save(order.getService().getCompany());
+        return mapToResponse(saved);
     }
 
     private void ensureRole(UserAll account, AccountRole expectedRole) {
@@ -150,7 +185,7 @@ public class ServiceOrderService {
             service.getId(),
             service.getName(),
             service.getUnit(),
-            service.getPrice(),
+            order.getAmount(),
             service.getContact(),
             service.getCompany().getUsername(),
             order.getUser().getUsername(),

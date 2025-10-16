@@ -24,11 +24,32 @@ const withAuthHeaders = (options: RequestInit = {}): RequestInit => {
 }
 
 const handleResponse = async <T>(response: Response): Promise<T> => {
-  const json = (await response.json()) as ApiResponse<T>
-  if (!response.ok || json.code !== 200) {
-    throw new Error(json.message || '请求失败')
+  const rawText = await response.text()
+  if (!rawText) {
+    if (response.ok) {
+      return null as T
+    }
+    throw new Error(response.statusText || '请求失败')
   }
-  return json.data
+
+  let parsed: Partial<ApiResponse<T>> & Record<string, any>
+  try {
+    parsed = JSON.parse(rawText)
+  } catch (error) {
+    const fallbackMessage = response.statusText || '服务器响应异常'
+    throw new Error(fallbackMessage)
+  }
+
+  if (typeof parsed.code !== 'number') {
+    const fallbackMessage = parsed.message || parsed.error || response.statusText || '请求失败'
+    throw new Error(fallbackMessage)
+  }
+
+  if (!response.ok || parsed.code !== 200) {
+    throw new Error(parsed.message || '请求失败')
+  }
+
+  return parsed.data as T
 }
 
 export type ServiceOrderStatus =
@@ -77,6 +98,13 @@ export interface ServiceReviewItem {
 }
 
 export interface UserAccountItem {
+  id: number
+  username: string
+  role: string
+  balance: number
+}
+
+export interface AccountProfileItem {
   id: number
   username: string
   role: string
@@ -259,4 +287,9 @@ export const handleAdminRefund = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<ServiceOrderItem>(response)
+}
+
+export const fetchCurrentAccount = async (): Promise<AccountProfileItem> => {
+  const response = await fetch(buildUrl('/api/account/me'), withAuthHeaders())
+  return handleResponse<AccountProfileItem>(response)
 }

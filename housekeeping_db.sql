@@ -43,6 +43,7 @@ CREATE TABLE `service_order` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `service_id` bigint NOT NULL COMMENT '服务ID',
   `user_id` bigint NOT NULL COMMENT '下单用户',
+  `amount` decimal(12,2) NOT NULL COMMENT '实际支付金额',
   `status` varchar(32) NOT NULL COMMENT '订单状态',
   `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
   `refund_response` varchar(500) DEFAULT NULL COMMENT '退款处理说明',
