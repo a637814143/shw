@@ -8,6 +8,7 @@ import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.repository.UserAllRepository;
 import com.example.housekeeping.util.JwtUtil;
+import com.example.housekeeping.util.LegacyPasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,9 @@ public class AccountAuthService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private LegacyPasswordEncoder legacyPasswordEncoder;
+
     @Transactional
     public AccountSummary register(AccountRegisterRequest request) {
         String normalizedAccount = request.getAccount().trim();
@@ -42,7 +46,7 @@ public class AccountAuthService {
 
         UserAll account = new UserAll();
         account.setUsername(normalizedAccount);
-        account.setPasswd(encodePassword(request.getPassword()));
+        account.setPasswd(legacyPasswordEncoder.encode(request.getPassword()));
         account.setMoney(DEFAULT_BALANCE);
         account.setUserType(role.getLabel());
 
@@ -61,7 +65,7 @@ public class AccountAuthService {
             throw new RuntimeException("角色不匹配，请选择正确的角色登录");
         }
 
-        if (!account.getPasswd().equals(encodePassword(request.getPassword()))) {
+        if (!account.getPasswd().equals(legacyPasswordEncoder.encode(request.getPassword()))) {
             throw new RuntimeException("账号或密码错误");
         }
 
@@ -69,25 +73,4 @@ public class AccountAuthService {
         return new LoginResponse(token, account.getUsername(), account.getUsername(), requestedRole.getCode());
     }
 
-    private String encodePassword(String rawPassword) {
-        String first = java.util.Base64.getEncoder()
-                .encodeToString(rawPassword.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        String second = java.util.Base64.getEncoder()
-                .encodeToString(first.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        return rot13(second);
-    }
-
-    private String rot13(String input) {
-        StringBuilder builder = new StringBuilder(input.length());
-        for (char c : input.toCharArray()) {
-            if (c >= 'a' && c <= 'z') {
-                builder.append((char) ((c - 'a' + 13) % 26 + 'a'));
-            } else if (c >= 'A' && c <= 'Z') {
-                builder.append((char) ((c - 'A' + 13) % 26 + 'A'));
-            } else {
-                builder.append(c);
-            }
-        }
-        return builder.toString();
-    }
 }

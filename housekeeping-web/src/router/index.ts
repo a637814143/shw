@@ -29,6 +29,24 @@ const router = createRouter({
       },
     },
     {
+      path: '/company',
+      name: 'company-dashboard',
+      component: () => import('../views/CompanyDashboardView.vue'),
+      meta: {
+        requiresAuth: true,
+        allowedRoles: ['company'],
+      },
+    },
+    {
+      path: '/admin',
+      name: 'admin-dashboard',
+      component: () => import('../views/AdminDashboardView.vue'),
+      meta: {
+        requiresAuth: true,
+        allowedRoles: ['admin'],
+      },
+    },
+    {
       path: '/role',
       name: 'role-landing',
       component: () => import('../views/RoleLandingView.vue'),
@@ -55,7 +73,7 @@ router.beforeEach((to, _from, next) => {
 
     const role = sessionStorage.getItem(AUTH_ROLE_KEY)
     if (meta.allowedRoles && (!role || !meta.allowedRoles.includes(role))) {
-      window.alert('当前页面仅对普通用户开放')
+      window.alert('当前账号无权访问该页面')
       next({ name: 'login' })
       return
     }
