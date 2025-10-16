@@ -1,11 +1,31 @@
 @import './base.css';
 
-body {
-  background: #f0f4ff;
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+body::before {
+  background:
+    radial-gradient(600px circle at 10% 20%, rgba(124, 58, 237, 0.18), transparent 65%),
+    radial-gradient(520px circle at 85% 15%, rgba(37, 99, 235, 0.18), transparent 65%),
+    radial-gradient(480px circle at 15% 80%, rgba(16, 185, 129, 0.14), transparent 60%);
+}
+
+body::after {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0.1) 100%);
+  backdrop-filter: blur(80px);
 }
 
 #app {
   min-height: 100vh;
   margin: 0;
   padding: 0;
+  position: relative;
+  isolation: isolate;
 }
