@@ -79,6 +79,10 @@ const handleLogin = async () => {
 
     if (result.role === 'user') {
       router.push({ name: 'user-dashboard' })
+    } else if (result.role === 'company') {
+      router.push({ name: 'company-dashboard' })
+    } else if (result.role === 'admin') {
+      router.push({ name: 'admin-dashboard' })
     } else {
       router.push({
         name: 'role-landing',

@@ -11,11 +11,13 @@
           当前账号：<strong>{{ account }}</strong>
         </p>
         <p class="card-message">
-          当前前端仅开放普通用户功能页面。管理员与家政公司请通过后台管理系统或联系平台工作人员使用完整功能。
+          如果您看到本页，说明当前账号暂无可访问的专属面板。请返回登录页重新选择角色，或直接访问对应入口：普通用户
+          <RouterLink class="inline-link" to="/user">/user</RouterLink>、家政公司
+          <RouterLink class="inline-link" to="/company">/company</RouterLink>、系统管理员
+          <RouterLink class="inline-link" to="/admin">/admin</RouterLink>。
         </p>
         <div class="card-actions">
           <button type="button" class="primary-button" @click="goToLogin">返回登录</button>
-          <RouterLink class="secondary-link" to="/user">前往用户界面（需普通用户账号）</RouterLink>
         </div>
       </section>
     </main>
@@ -149,13 +151,15 @@ const goToLogin = () => {
   box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25);
 }
 
-.secondary-link {
+.secondary-link,
+.inline-link {
   font-size: 15px;
   color: #2563eb;
   text-decoration: none;
 }
 
-.secondary-link:hover {
+.secondary-link:hover,
+.inline-link:hover {
   text-decoration: underline;
 }
 
