@@ -28,9 +28,6 @@ export interface RegisterPayload {
   account: string
   password: string
   role: UserRole
-  realName?: string
-  phone?: string
-  email?: string
 }
 
 export interface LoginPayload extends RegisterPayload {}

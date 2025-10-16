@@ -18,18 +18,4 @@ public class AccountRegisterRequest {
     @NotBlank(message = "角色不能为空")
     private String role;
 
-    /**
-     * 针对用户角色的真实姓名
-     */
-    private String realName;
-
-    /**
-     * 针对用户角色的手机号
-     */
-    private String phone;
-
-    /**
-     * 可选邮箱
-     */
-    private String email;
 }

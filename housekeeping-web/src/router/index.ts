@@ -23,16 +23,39 @@ const router = createRouter({
       path: '/user',
       name: 'user-dashboard',
       component: () => import('../views/UserDashboardView.vue'),
+      meta: {
+        requiresAuth: true,
+        allowedRoles: ['user'],
+      },
+    },
+    {
+      path: '/role',
+      name: 'role-landing',
+      component: () => import('../views/RoleLandingView.vue'),
+      meta: {
+        requiresAuth: true,
+      },
     },
   ],
 })
 
 router.beforeEach((to, _from, next) => {
-  if (to.name === 'user-dashboard') {
-    const role = sessionStorage.getItem(AUTH_ROLE_KEY)
+  const meta = to.meta as {
+    requiresAuth?: boolean
+    allowedRoles?: string[]
+  }
+
+  if (meta?.requiresAuth) {
     const token = sessionStorage.getItem(AUTH_TOKEN_KEY)
-    if (role !== 'user' || !token) {
-      window.alert('请先使用用户账号登录')
+    if (!token) {
+      window.alert('请先登录后再访问页面')
+      next({ name: 'login' })
+      return
+    }
+
+    const role = sessionStorage.getItem(AUTH_ROLE_KEY)
+    if (meta.allowedRoles && (!role || !meta.allowedRoles.includes(role))) {
+      window.alert('当前页面仅对普通用户开放')
       next({ name: 'login' })
       return
     }

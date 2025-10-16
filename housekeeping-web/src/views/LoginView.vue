@@ -26,9 +26,9 @@
         <div class="form-row">
           <label class="form-label" for="role">请选择角色</label>
           <select id="role" v-model="role" class="form-select">
-            <option value="admin">管理员</option>
-            <option value="staff">家政人员</option>
-            <option value="user">用户</option>
+            <option v-for="roleOption in roleOptions" :key="roleOption.value" :value="roleOption.value">
+              {{ roleOption.label }}
+            </option>
           </select>
         </div>
         <button type="submit" class="primary-button" :disabled="isSubmitting">
@@ -47,12 +47,7 @@
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 
-import {
-  AUTH_ACCOUNT_KEY,
-  AUTH_ROLE_KEY,
-  AUTH_TOKEN_KEY,
-  type UserRole,
-} from '../constants/auth'
+import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY, ROLE_LABELS, type UserRole } from '../constants/auth'
 import { loginAccount } from '../services/auth'
 
 const router = useRouter()
@@ -60,6 +55,9 @@ const account = ref('')
 const password = ref('')
 const role = ref<UserRole>('user')
 const isSubmitting = ref(false)
+const roleOptions = (
+  Object.entries(ROLE_LABELS) as Array<[UserRole, string]>
+).map(([value, label]) => ({ value, label }))
 
 const handleLogin = async () => {
   if (!account.value.trim() || !password.value) {
@@ -75,16 +73,18 @@ const handleLogin = async () => {
       role: role.value,
     })
 
-    if (result.role !== 'user') {
-      window.alert('仅支持用户账号登录访问用户主界面')
-      return
-    }
-
     sessionStorage.setItem(AUTH_TOKEN_KEY, result.token)
     sessionStorage.setItem(AUTH_ACCOUNT_KEY, result.account)
     sessionStorage.setItem(AUTH_ROLE_KEY, result.role)
 
-    router.push({ name: 'user-dashboard' })
+    if (result.role === 'user') {
+      router.push({ name: 'user-dashboard' })
+    } else {
+      router.push({
+        name: 'role-landing',
+        query: { role: result.role },
+      })
+    }
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '登录失败，请稍后重试')
   } finally {
