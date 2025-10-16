@@ -34,6 +34,9 @@ public class AccountInitializer implements ApplicationRunner {
                     if (existing.getMoney() == null) {
                         existing.setMoney(new BigDecimal("1000.00"));
                     }
+                    if (existing.getLoyaltyPoints() == null) {
+                        existing.setLoyaltyPoints(0);
+                    }
                     userAllRepository.save(existing);
                 },
                 () -> {
@@ -41,6 +44,7 @@ public class AccountInitializer implements ApplicationRunner {
                     admin.setUsername("admin");
                     admin.setPasswd(encodePassword("admin"));
                     admin.setMoney(new BigDecimal("1000.00"));
+                    admin.setLoyaltyPoints(0);
                     admin.setUserType(AccountRole.ADMIN.getLabel());
                     userAllRepository.save(admin);
                 }

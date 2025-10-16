@@ -3,6 +3,7 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
+import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.service.HousekeepServiceManager;
@@ -53,9 +54,20 @@ public class CompanyServiceController {
         return Result.success(serviceOrderService.listRefundRequestsForCompany());
     }
 
+    @GetMapping("/orders")
+    public Result<List<ServiceOrderResponse>> listActiveOrders() {
+        return Result.success(serviceOrderService.listActiveOrdersForCompany());
+    }
+
     @PostMapping("/refunds/{orderId}")
     public Result<ServiceOrderResponse> handleRefund(@PathVariable Long orderId,
                                                      @Valid @RequestBody RefundDecisionRequest request) {
         return Result.success("操作成功", serviceOrderService.handleRefund(orderId, request));
+    }
+
+    @PostMapping("/orders/{orderId}/progress")
+    public Result<ServiceOrderResponse> updateOrderProgress(@PathVariable Long orderId,
+                                                            @Valid @RequestBody OrderProgressUpdateRequest request) {
+        return Result.success("进度已更新", serviceOrderService.updateOrderProgress(orderId, request));
     }
 }

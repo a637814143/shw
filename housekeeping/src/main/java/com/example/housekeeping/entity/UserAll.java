@@ -28,6 +28,9 @@ public class UserAll {
     @Column(name = "money", nullable = false, precision = 12, scale = 2)
     private BigDecimal money;
 
+    @Column(name = "loyalty_points", nullable = false)
+    private Integer loyaltyPoints;
+
     @Column(name = "usertype", nullable = false, length = 32)
     private String userType;
 }

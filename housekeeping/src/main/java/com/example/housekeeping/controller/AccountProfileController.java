@@ -28,7 +28,8 @@ public class AccountProfileController {
             current.getId(),
             current.getUsername(),
             role.getCode(),
-            current.getMoney()
+            current.getMoney(),
+            current.getLoyaltyPoints() == null ? 0 : current.getLoyaltyPoints()
         );
         return Result.success(response);
     }

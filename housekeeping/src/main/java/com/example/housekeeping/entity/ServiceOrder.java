@@ -36,6 +36,18 @@ public class ServiceOrder {
     @Column(name = "status", nullable = false, length = 32)
     private ServiceOrderStatus status;
 
+    @Column(name = "scheduled_at", nullable = false)
+    private Instant scheduledAt;
+
+    @Column(name = "special_request", length = 500)
+    private String specialRequest;
+
+    @Column(name = "progress_note", length = 500)
+    private String progressNote;
+
+    @Column(name = "loyalty_points", nullable = false)
+    private Integer loyaltyPoints;
+
     @Column(name = "refund_reason", length = 500)
     private String refundReason;
 

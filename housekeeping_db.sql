@@ -6,6 +6,7 @@ CREATE TABLE `user_all` (
   `username` varchar(64) NOT NULL UNIQUE COMMENT '登录账号',
   `passwd` varchar(255) NOT NULL COMMENT '两次Base64再ROT13后的密码',
   `money` decimal(12,2) NOT NULL DEFAULT 1000.00 COMMENT '账户余额（CNY）',
+  `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '消费累积积分',
   `usertype` varchar(32) NOT NULL COMMENT '用户类型：普通用户/家政公司/系统管理员',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='统一用户账号表';
@@ -45,6 +46,10 @@ CREATE TABLE `service_order` (
   `user_id` bigint NOT NULL COMMENT '下单用户',
   `amount` decimal(12,2) NOT NULL COMMENT '实际支付金额',
   `status` varchar(32) NOT NULL COMMENT '订单状态',
+  `scheduled_at` datetime NOT NULL COMMENT '预约上门时间',
+  `special_request` varchar(500) DEFAULT NULL COMMENT '用户特殊需求',
+  `progress_note` varchar(500) DEFAULT NULL COMMENT '服务进度备注',
+  `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '本单积分',
   `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
   `refund_response` varchar(500) DEFAULT NULL COMMENT '退款处理说明',
   `handled_by` bigint DEFAULT NULL COMMENT '处理人',
