@@ -26,6 +26,8 @@ public class ServiceOrderResponse {
     private String refundReason;
     private String refundResponse;
     private String handledBy;
+    private String assignedWorker;
+    private String workerContact;
     private Instant createdAt;
     private Instant updatedAt;
 
@@ -33,6 +35,7 @@ public class ServiceOrderResponse {
                                 String contact, String companyName, String username, ServiceOrderStatus status,
                                 Instant scheduledAt, String specialRequest, String progressNote, Integer loyaltyPoints,
                                 String refundReason, String refundResponse, String handledBy,
+                                String assignedWorker, String workerContact,
                                 Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.serviceId = serviceId;
@@ -50,6 +53,8 @@ public class ServiceOrderResponse {
         this.refundReason = refundReason;
         this.refundResponse = refundResponse;
         this.handledBy = handledBy;
+        this.assignedWorker = assignedWorker;
+        this.workerContact = workerContact;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -116,6 +121,14 @@ public class ServiceOrderResponse {
 
     public String getHandledBy() {
         return handledBy;
+    }
+
+    public String getAssignedWorker() {
+        return assignedWorker;
+    }
+
+    public String getWorkerContact() {
+        return workerContact;
     }
 
     public Instant getCreatedAt() {

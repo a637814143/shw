@@ -7,7 +7,9 @@ public enum HousekeepItemType {
     SERVICE("service"),
     TIP("tip"),
     REVIEW("review"),
-    OFFER("offer");
+    OFFER("offer"),
+    CAROUSEL("carousel"),
+    ANNOUNCEMENT("announcement");
 
     private final String value;
 

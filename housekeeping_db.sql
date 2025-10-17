@@ -14,7 +14,7 @@ CREATE TABLE `user_all` (
 DROP TABLE IF EXISTS `housekeep`;
 CREATE TABLE `housekeep` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `item_type` varchar(20) NOT NULL COMMENT '数据类型：service/tip/review/offer',
+  `item_type` varchar(20) NOT NULL COMMENT '数据类型：service/tip/review/offer/carousel/announcement',
   `title` varchar(200) DEFAULT NULL COMMENT '标题或名称',
   `content` text COMMENT '正文内容',
   `icon` varchar(32) DEFAULT NULL COMMENT '图标/标识',
@@ -53,6 +53,8 @@ CREATE TABLE `service_order` (
   `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
   `refund_response` varchar(500) DEFAULT NULL COMMENT '退款处理说明',
   `handled_by` bigint DEFAULT NULL COMMENT '处理人',
+  `assigned_worker` varchar(100) DEFAULT NULL COMMENT '分配的家政人员',
+  `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
@@ -62,6 +64,33 @@ CREATE TABLE `service_order` (
   CONSTRAINT `fk_order_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`),
   CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政服务订单表';
+
+DROP TABLE IF EXISTS `service_favorite`;
+CREATE TABLE `service_favorite` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `service_id` bigint NOT NULL COMMENT '收藏的服务',
+  `user_id` bigint NOT NULL COMMENT '收藏用户',
+  `created_at` datetime NOT NULL COMMENT '收藏时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_favorite_user_service` (`user_id`, `service_id`),
+  KEY `idx_favorite_service` (`service_id`),
+  CONSTRAINT `fk_favorite_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
+  CONSTRAINT `fk_favorite_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务收藏表';
+
+DROP TABLE IF EXISTS `account_transaction`;
+CREATE TABLE `account_transaction` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` bigint NOT NULL COMMENT '关联账号',
+  `txn_type` varchar(20) NOT NULL COMMENT '交易类型：RECHARGE/WITHDRAW/ADJUST',
+  `amount` decimal(12,2) NOT NULL COMMENT '交易金额',
+  `note` varchar(255) DEFAULT NULL COMMENT '备注',
+  `created_at` datetime NOT NULL COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_txn_user` (`user_id`),
+  KEY `idx_txn_type_time` (`txn_type`, `created_at`),
+  CONSTRAINT `fk_txn_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账户资金流水记录';
 
 DROP TABLE IF EXISTS `service_review`;
 CREATE TABLE `service_review` (
