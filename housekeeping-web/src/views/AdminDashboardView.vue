@@ -1545,6 +1545,17 @@ onMounted(async () => {
   gap: 1rem;
 }
 
+.content-list li > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.content-list li strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .list-actions {
   display: flex;
   flex-direction: column;
@@ -1556,6 +1567,7 @@ onMounted(async () => {
   color: rgba(148, 163, 184, 0.7);
   font-size: 0.85rem;
   margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
 }
 
 .form-actions {
