@@ -101,6 +101,10 @@ export interface ServiceReviewItem {
   rating: number
   content: string
   createdAt: string
+  updatedAt: string
+  companyReply?: string | null
+  replyAt?: string | null
+  pinned?: boolean | null
 }
 
 export interface UserAccountItem {
@@ -165,6 +169,32 @@ export interface UpdateOrderProgressPayload {
   progressNote?: string
 }
 
+export interface CompanyConversationItem {
+  orderId: number
+  serviceName: string
+  customerName: string
+  status: ServiceOrderStatus
+  lastMessage: string
+  lastMessageAt: string | null
+  unreadCount: number
+}
+
+export interface CompanyMessageItem {
+  id: number
+  orderId: number
+  serviceName: string
+  senderName: string
+  recipientName: string
+  content: string
+  createdAt: string
+  readAt?: string | null
+  incoming: boolean
+}
+
+export interface CompanyMessagePayload {
+  content: string
+}
+
 // 公共接口
 export const fetchPublicServices = async (): Promise<HousekeepServiceItem[]> => {
   const response = await fetch(buildUrl('/api/public/services'))
@@ -173,6 +203,11 @@ export const fetchPublicServices = async (): Promise<HousekeepServiceItem[]> => 
 
 export const fetchServiceReviews = async (serviceId: number): Promise<ServiceReviewItem[]> => {
   const response = await fetch(buildUrl(`/api/public/services/${serviceId}/reviews`))
+  return handleResponse<ServiceReviewItem[]>(response)
+}
+
+export const fetchCompanyReviews = async (): Promise<ServiceReviewItem[]> => {
+  const response = await fetch(buildUrl('/api/company/services/reviews'), withAuthHeaders())
   return handleResponse<ServiceReviewItem[]>(response)
 }
 
@@ -278,6 +313,41 @@ export const updateCompanyOrderProgress = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<ServiceOrderItem>(response)
+}
+
+export const fetchCompanyConversations = async (): Promise<CompanyConversationItem[]> => {
+  const response = await fetch(buildUrl('/api/company/messages/threads'), withAuthHeaders())
+  return handleResponse<CompanyConversationItem[]>(response)
+}
+
+export const fetchCompanyMessages = async (
+  orderId: number,
+  params?: { since?: string },
+): Promise<CompanyMessageItem[]> => {
+  const url = new URL(buildUrl(`/api/company/messages/orders/${orderId}`))
+  if (params?.since) {
+    url.searchParams.set('since', params.since)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<CompanyMessageItem[]>(response)
+}
+
+export const sendCompanyMessage = async (
+  orderId: number,
+  payload: CompanyMessagePayload,
+): Promise<CompanyMessageItem> => {
+  const response = await fetch(buildUrl(`/api/company/messages/orders/${orderId}`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyMessageItem>(response)
+}
+
+export const markCompanyConversationRead = async (orderId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/messages/orders/${orderId}/read`), {
+    ...withAuthHeaders({ method: 'POST' }),
+  })
+  await handleResponse<null>(response)
 }
 
 // 管理员接口

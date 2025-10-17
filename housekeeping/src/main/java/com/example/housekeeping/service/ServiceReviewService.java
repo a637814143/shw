@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -44,7 +46,9 @@ public class ServiceReviewService {
         review.setUser(user);
         review.setRating(request.getRating());
         review.setContent(request.getContent());
-        review.setCreatedAt(Instant.now());
+        Instant now = Instant.now();
+        review.setCreatedAt(now);
+        review.setUpdatedAt(now);
 
         return mapToResponse(serviceReviewRepository.save(review));
     }
@@ -54,6 +58,21 @@ public class ServiceReviewService {
         HousekeepService service = housekeepServiceRepository.findById(serviceId)
             .orElseThrow(() -> new RuntimeException("服务不存在"));
         return serviceReviewRepository.findByServiceOrderByCreatedAtDesc(service).stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceReviewResponse> listReviewsForCurrentCompany() {
+        UserAll company = accountLookupService.getCurrentAccount();
+        ensureRole(company, AccountRole.COMPANY);
+
+        List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
+        if (services.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return serviceReviewRepository.findByServiceInOrderByCreatedAtDesc(services).stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -72,7 +91,11 @@ public class ServiceReviewService {
             review.getUser().getUsername(),
             review.getRating(),
             review.getContent(),
-            review.getCreatedAt()
+            review.getCreatedAt(),
+            review.getUpdatedAt(),
+            review.getCompanyReply(),
+            review.getReplyAt(),
+            review.getPinned()
         );
     }
 }

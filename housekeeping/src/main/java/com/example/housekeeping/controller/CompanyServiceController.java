@@ -6,8 +6,10 @@ import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.dto.ServiceReviewResponse;
 import com.example.housekeeping.service.HousekeepServiceManager;
 import com.example.housekeeping.service.ServiceOrderService;
+import com.example.housekeeping.service.ServiceReviewService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,9 @@ public class CompanyServiceController {
 
     @Autowired
     private ServiceOrderService serviceOrderService;
+
+    @Autowired
+    private ServiceReviewService serviceReviewService;
 
     @GetMapping
     public Result<List<HousekeepServiceResponse>> listCompanyServices() {
@@ -69,5 +74,10 @@ public class CompanyServiceController {
     public Result<ServiceOrderResponse> updateOrderProgress(@PathVariable Long orderId,
                                                             @Valid @RequestBody OrderProgressUpdateRequest request) {
         return Result.success("进度已更新", serviceOrderService.updateOrderProgress(orderId, request));
+    }
+
+    @GetMapping("/reviews")
+    public Result<List<ServiceReviewResponse>> listServiceReviews() {
+        return Result.success(serviceReviewService.listReviewsForCurrentCompany());
     }
 }

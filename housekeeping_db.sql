@@ -71,12 +71,33 @@ CREATE TABLE `service_review` (
   `rating` int NOT NULL COMMENT '评分',
   `content` varchar(500) DEFAULT NULL COMMENT '评价内容',
   `created_at` datetime NOT NULL COMMENT '评价时间',
+  `updated_at` datetime NOT NULL COMMENT '最后更新时间',
+  `company_reply` varchar(500) DEFAULT NULL COMMENT '商家回复',
+  `reply_at` datetime DEFAULT NULL COMMENT '回复时间',
+  `is_pinned` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否精选',
   PRIMARY KEY (`id`),
   KEY `idx_review_service` (`service_id`),
   KEY `idx_review_user` (`user_id`),
   CONSTRAINT `fk_review_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
   CONSTRAINT `fk_review_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务评价表';
+
+DROP TABLE IF EXISTS `company_message`;
+CREATE TABLE `company_message` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_id` bigint NOT NULL COMMENT '关联订单',
+  `sender_id` bigint NOT NULL COMMENT '发送者',
+  `recipient_id` bigint NOT NULL COMMENT '接收者',
+  `content` varchar(1000) NOT NULL COMMENT '消息内容',
+  `created_at` datetime NOT NULL COMMENT '发送时间',
+  `read_at` datetime DEFAULT NULL COMMENT '阅读时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_message_order` (`order_id`),
+  KEY `idx_message_recipient` (`recipient_id`),
+  CONSTRAINT `fk_message_order` FOREIGN KEY (`order_id`) REFERENCES `service_order` (`id`),
+  CONSTRAINT `fk_message_sender` FOREIGN KEY (`sender_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_message_recipient` FOREIGN KEY (`recipient_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='企业与客户沟通消息表';
 
 -- 初始化系统管理员账号
 INSERT INTO `user_all` (`username`, `passwd`, `money`, `usertype`)

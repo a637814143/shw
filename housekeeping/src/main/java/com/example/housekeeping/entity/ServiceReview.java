@@ -35,4 +35,16 @@ public class ServiceReview {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(name = "company_reply", length = 500)
+    private String companyReply;
+
+    @Column(name = "reply_at")
+    private Instant replyAt;
+
+    @Column(name = "is_pinned", nullable = false)
+    private Boolean pinned = Boolean.FALSE;
 }
