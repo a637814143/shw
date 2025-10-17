@@ -3,11 +3,13 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.dto.RefundRequest;
+import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.dto.ServiceReviewResponse;
 import com.example.housekeeping.service.HousekeepServiceManager;
+import com.example.housekeeping.service.ServiceFavoriteService;
 import com.example.housekeeping.service.ServiceOrderService;
 import com.example.housekeeping.service.ServiceReviewService;
 import jakarta.validation.Valid;
@@ -32,6 +34,9 @@ public class UserServiceController {
     @Autowired
     private ServiceReviewService serviceReviewService;
 
+    @Autowired
+    private ServiceFavoriteService serviceFavoriteService;
+
     @GetMapping
     public Result<List<HousekeepServiceResponse>> listServices() {
         return Result.success(housekeepServiceManager.listAllServices());
@@ -40,6 +45,11 @@ public class UserServiceController {
     @GetMapping("/orders")
     public Result<List<ServiceOrderResponse>> listOrders() {
         return Result.success(serviceOrderService.listOrdersForCurrentUser());
+    }
+
+    @GetMapping("/favorites")
+    public Result<List<ServiceFavoriteResponse>> listFavorites() {
+        return Result.success(serviceFavoriteService.listFavorites());
     }
 
     @PostMapping("/orders")
@@ -51,6 +61,18 @@ public class UserServiceController {
     public Result<ServiceOrderResponse> requestRefund(@PathVariable Long orderId,
                                                       @Valid @RequestBody RefundRequest request) {
         return Result.success("退款申请已提交", serviceOrderService.requestRefund(orderId, request));
+    }
+
+    @PostMapping("/{serviceId}/favorite")
+    public Result<Void> addFavorite(@PathVariable Long serviceId) {
+        serviceFavoriteService.addFavorite(serviceId);
+        return Result.success("收藏成功", null);
+    }
+
+    @DeleteMapping("/{serviceId}/favorite")
+    public Result<Void> removeFavorite(@PathVariable Long serviceId) {
+        serviceFavoriteService.removeFavorite(serviceId);
+        return Result.success("已取消收藏", null);
     }
 
     @PostMapping("/reviews")

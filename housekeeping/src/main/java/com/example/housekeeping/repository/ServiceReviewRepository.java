@@ -11,4 +11,6 @@ import java.util.List;
 public interface ServiceReviewRepository extends JpaRepository<ServiceReview, Long> {
 
     List<ServiceReview> findByServiceOrderByCreatedAtDesc(HousekeepService service);
+
+    List<ServiceReview> findByServiceInOrderByCreatedAtDesc(List<HousekeepService> services);
 }

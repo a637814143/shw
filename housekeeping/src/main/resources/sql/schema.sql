@@ -13,7 +13,7 @@ CREATE TABLE `user_all` (
 DROP TABLE IF EXISTS `housekeep`;
 CREATE TABLE `housekeep` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `item_type` varchar(20) NOT NULL COMMENT '数据类型：service/tip/review/offer',
+  `item_type` varchar(20) NOT NULL COMMENT '数据类型：service/tip/review/offer/carousel/announcement',
   `title` varchar(200) DEFAULT NULL COMMENT '标题或名称',
   `content` text COMMENT '正文内容',
   `icon` varchar(32) DEFAULT NULL COMMENT '图标/标识',
@@ -23,6 +23,109 @@ CREATE TABLE `housekeep` (
   `rating` decimal(3,1) DEFAULT NULL COMMENT '评分',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政内容信息表';
+
+DROP TABLE IF EXISTS `housekeep_service`;
+CREATE TABLE `housekeep_service` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `company_id` bigint NOT NULL COMMENT '所属家政公司',
+  `name` varchar(200) NOT NULL COMMENT '服务名称',
+  `unit` varchar(50) NOT NULL COMMENT '计价单位',
+  `price` decimal(12,2) NOT NULL COMMENT '服务价格',
+  `contact` varchar(100) NOT NULL COMMENT '联系方式',
+  `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
+  PRIMARY KEY (`id`),
+  KEY `idx_company` (`company_id`),
+  CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司发布的服务';
+
+DROP TABLE IF EXISTS `service_order`;
+CREATE TABLE `service_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `service_id` bigint NOT NULL COMMENT '服务ID',
+  `user_id` bigint NOT NULL COMMENT '下单用户',
+  `amount` decimal(12,2) NOT NULL COMMENT '实际支付金额',
+  `status` varchar(32) NOT NULL COMMENT '订单状态',
+  `scheduled_at` datetime NOT NULL COMMENT '预约上门时间',
+  `special_request` varchar(500) DEFAULT NULL COMMENT '用户特殊需求',
+  `progress_note` varchar(500) DEFAULT NULL COMMENT '服务进度备注',
+  `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '本单积分',
+  `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
+  `refund_response` varchar(500) DEFAULT NULL COMMENT '退款处理说明',
+  `handled_by` bigint DEFAULT NULL COMMENT '处理人',
+  `assigned_worker` varchar(100) DEFAULT NULL COMMENT '分配的家政人员',
+  `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
+  `created_at` datetime NOT NULL COMMENT '创建时间',
+  `updated_at` datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_order_service` (`service_id`),
+  KEY `idx_order_user` (`user_id`),
+  CONSTRAINT `fk_order_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
+  CONSTRAINT `fk_order_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政服务订单表';
+
+DROP TABLE IF EXISTS `service_review`;
+CREATE TABLE `service_review` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `service_id` bigint NOT NULL COMMENT '服务ID',
+  `user_id` bigint NOT NULL COMMENT '评价人',
+  `rating` int NOT NULL COMMENT '评分',
+  `content` varchar(500) DEFAULT NULL COMMENT '评价内容',
+  `created_at` datetime NOT NULL COMMENT '评价时间',
+  `updated_at` datetime NOT NULL COMMENT '最后更新时间',
+  `company_reply` varchar(500) DEFAULT NULL COMMENT '商家回复',
+  `reply_at` datetime DEFAULT NULL COMMENT '回复时间',
+  `is_pinned` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否精选',
+  PRIMARY KEY (`id`),
+  KEY `idx_review_service` (`service_id`),
+  KEY `idx_review_user` (`user_id`),
+  CONSTRAINT `fk_review_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
+  CONSTRAINT `fk_review_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务评价表';
+
+DROP TABLE IF EXISTS `company_message`;
+CREATE TABLE `company_message` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `order_id` bigint NOT NULL COMMENT '关联订单',
+  `sender_id` bigint NOT NULL COMMENT '发送者',
+  `recipient_id` bigint NOT NULL COMMENT '接收者',
+  `content` varchar(1000) NOT NULL COMMENT '消息内容',
+  `created_at` datetime NOT NULL COMMENT '发送时间',
+  `read_at` datetime DEFAULT NULL COMMENT '阅读时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_message_order` (`order_id`),
+  KEY `idx_message_recipient` (`recipient_id`),
+  CONSTRAINT `fk_message_order` FOREIGN KEY (`order_id`) REFERENCES `service_order` (`id`),
+  CONSTRAINT `fk_message_sender` FOREIGN KEY (`sender_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_message_recipient` FOREIGN KEY (`recipient_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='企业与客户沟通消息表';
+
+DROP TABLE IF EXISTS `service_favorite`;
+CREATE TABLE `service_favorite` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `service_id` bigint NOT NULL COMMENT '收藏的服务',
+  `user_id` bigint NOT NULL COMMENT '收藏用户',
+  `created_at` datetime NOT NULL COMMENT '收藏时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_favorite_user_service` (`user_id`, `service_id`),
+  KEY `idx_favorite_service` (`service_id`),
+  CONSTRAINT `fk_favorite_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
+  CONSTRAINT `fk_favorite_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='服务收藏表';
+
+DROP TABLE IF EXISTS `account_transaction`;
+CREATE TABLE `account_transaction` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id` bigint NOT NULL COMMENT '关联账号',
+  `txn_type` varchar(20) NOT NULL COMMENT '交易类型：RECHARGE/WITHDRAW/ADJUST',
+  `amount` decimal(12,2) NOT NULL COMMENT '交易金额',
+  `note` varchar(255) DEFAULT NULL COMMENT '备注',
+  `created_at` datetime NOT NULL COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_txn_user` (`user_id`),
+  KEY `idx_txn_type_time` (`txn_type`, `created_at`),
+  CONSTRAINT `fk_txn_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账户资金流水记录';
 
 -- 初始化管理员账号
 INSERT INTO `user_all` (`username`, `passwd`, `money`, `usertype`)

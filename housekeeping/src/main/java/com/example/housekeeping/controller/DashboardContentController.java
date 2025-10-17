@@ -1,6 +1,10 @@
 package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
+import com.example.housekeeping.dto.DashboardAnnouncementRequest;
+import com.example.housekeeping.dto.DashboardAnnouncementResponse;
+import com.example.housekeeping.dto.DashboardCarouselItemRequest;
+import com.example.housekeeping.dto.DashboardCarouselItemResponse;
 import com.example.housekeeping.dto.DashboardOfferItemRequest;
 import com.example.housekeeping.dto.DashboardOfferItemResponse;
 import com.example.housekeeping.dto.DashboardReviewItemRequest;
@@ -53,6 +57,28 @@ public class DashboardContentController {
         return Result.success(dashboardContentService.listTips());
     }
 
+    @GetMapping("/carousels")
+    public Result<List<DashboardCarouselItemResponse>> listCarousels() {
+        return Result.success(dashboardContentService.listCarousels());
+    }
+
+    @PostMapping("/carousels")
+    public Result<DashboardCarouselItemResponse> createCarousel(@Valid @RequestBody DashboardCarouselItemRequest request) {
+        return Result.success("创建成功", dashboardContentService.createCarousel(request));
+    }
+
+    @PutMapping("/carousels/{id}")
+    public Result<DashboardCarouselItemResponse> updateCarousel(@PathVariable Long id,
+                                                                @Valid @RequestBody DashboardCarouselItemRequest request) {
+        return Result.success("更新成功", dashboardContentService.updateCarousel(id, request));
+    }
+
+    @DeleteMapping("/carousels/{id}")
+    public Result<Void> deleteCarousel(@PathVariable Long id) {
+        dashboardContentService.deleteCarousel(id);
+        return Result.success("删除成功", null);
+    }
+
     @PostMapping("/tips")
     public Result<DashboardTipItemResponse> createTip(@Valid @RequestBody DashboardTipItemRequest request) {
         return Result.success("创建成功", dashboardContentService.createTip(request));
@@ -67,6 +93,28 @@ public class DashboardContentController {
     @DeleteMapping("/tips/{id}")
     public Result<Void> deleteTip(@PathVariable Long id) {
         dashboardContentService.deleteTip(id);
+        return Result.success("删除成功", null);
+    }
+
+    @GetMapping("/announcements")
+    public Result<List<DashboardAnnouncementResponse>> listAnnouncements() {
+        return Result.success(dashboardContentService.listAnnouncements());
+    }
+
+    @PostMapping("/announcements")
+    public Result<DashboardAnnouncementResponse> createAnnouncement(@Valid @RequestBody DashboardAnnouncementRequest request) {
+        return Result.success("创建成功", dashboardContentService.createAnnouncement(request));
+    }
+
+    @PutMapping("/announcements/{id}")
+    public Result<DashboardAnnouncementResponse> updateAnnouncement(@PathVariable Long id,
+                                                                    @Valid @RequestBody DashboardAnnouncementRequest request) {
+        return Result.success("更新成功", dashboardContentService.updateAnnouncement(id, request));
+    }
+
+    @DeleteMapping("/announcements/{id}")
+    public Result<Void> deleteAnnouncement(@PathVariable Long id) {
+        dashboardContentService.deleteAnnouncement(id);
         return Result.success("删除成功", null);
     }
 

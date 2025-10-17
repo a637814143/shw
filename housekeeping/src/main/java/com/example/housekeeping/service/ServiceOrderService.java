@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.AssignWorkerRequest;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
@@ -247,6 +248,39 @@ public class ServiceOrderService {
         return mapToResponse(saved);
     }
 
+    @Transactional
+    public ServiceOrderResponse assignWorker(Long orderId, AssignWorkerRequest request) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+
+        ServiceOrder order = serviceOrderRepository.findById(orderId)
+            .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        String workerName = normalizeMessage(request.getWorkerName());
+        String workerContact = normalizeMessage(request.getWorkerContact());
+        if (workerName == null || workerContact == null) {
+            throw new RuntimeException("家政人员与联系方式不能为空");
+        }
+
+        order.setAssignedWorker(workerName);
+        order.setWorkerContact(workerContact);
+        if (order.getStatus() == ServiceOrderStatus.SCHEDULED || order.getStatus() == ServiceOrderStatus.PENDING) {
+            order.setProgressNote("已安排 " + workerName + " 负责服务");
+        }
+        order.setUpdatedAt(Instant.now());
+        return mapToResponse(serviceOrderRepository.save(order));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceOrderResponse> listOrdersForAdmin() {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+        return serviceOrderRepository.findAll().stream()
+            .sorted(Comparator.comparing(ServiceOrder::getCreatedAt).reversed())
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
     private void ensureRole(UserAll account, AccountRole expectedRole) {
         if (!expectedRole.getLabel().equals(account.getUserType())) {
             throw new RuntimeException("权限不足");
@@ -272,6 +306,8 @@ public class ServiceOrderService {
             order.getRefundReason(),
             order.getRefundResponse(),
             order.getHandledBy() == null ? null : order.getHandledBy().getUsername(),
+            order.getAssignedWorker(),
+            order.getWorkerContact(),
             order.getCreatedAt(),
             order.getUpdatedAt()
         );

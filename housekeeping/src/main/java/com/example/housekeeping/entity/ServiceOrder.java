@@ -58,6 +58,12 @@ public class ServiceOrder {
     @JoinColumn(name = "handled_by")
     private UserAll handledBy;
 
+    @Column(name = "assigned_worker", length = 100)
+    private String assignedWorker;
+
+    @Column(name = "worker_contact", length = 100)
+    private String workerContact;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

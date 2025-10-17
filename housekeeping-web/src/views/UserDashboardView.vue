@@ -2,8 +2,8 @@
   <div class="dashboard">
     <header class="dashboard-header">
       <div>
-        <h1 class="dashboard-title">家政服务大厅</h1>
-        <p class="dashboard-subtitle">挑选心仪服务、管理订单与提交评价</p>
+        <h1 class="dashboard-title">家政服务体验中心</h1>
+        <p class="dashboard-subtitle">精选内容、智能预约、实时沟通，沉浸式高级体验。</p>
       </div>
       <div class="header-actions">
         <span class="welcome">您好，{{ username }}！</span>
@@ -13,26 +13,26 @@
       </div>
     </header>
 
-    <section class="stats-grid" aria-label="关键数据概览">
+    <section class="stats-grid" aria-label="账户概览">
       <article class="stat-card accent">
-        <p class="stat-label">账户积分</p>
+        <p class="stat-label">积分余额</p>
         <p class="stat-value">{{ loyaltyText }}</p>
-        <p class="stat-helper">完成服务会自动累积积分</p>
+        <p class="stat-helper">可在钱包中兑换余额（5:1）</p>
       </article>
       <article class="stat-card primary">
-        <p class="stat-label">待上门服务</p>
+        <p class="stat-label">待服务订单</p>
         <p class="stat-value">{{ orderStats.awaiting }}</p>
-        <p class="stat-helper">包括刚预约与等待师傅上门</p>
+        <p class="stat-helper">等待家政人员上门</p>
       </article>
-      <article class="stat-card success">
-        <p class="stat-label">服务进行中</p>
-        <p class="stat-value">{{ orderStats.inProgress }}</p>
-        <p class="stat-helper">实时同步家政公司进度</p>
+      <article class="stat-card glass">
+        <p class="stat-label">收藏服务</p>
+        <p class="stat-value">{{ favoritesCount }}</p>
+        <p class="stat-helper">点击服务卡片右上角可收藏</p>
       </article>
       <article class="stat-card warning">
-        <p class="stat-label">退款处理中</p>
-        <p class="stat-value">{{ orderStats.refunding }}</p>
-        <p class="stat-helper">等待家政公司或管理员处理</p>
+        <p class="stat-label">系统公告</p>
+        <p class="stat-value">{{ announcements.length }}</p>
+        <p class="stat-helper">关注最新服务与活动</p>
       </article>
     </section>
 
@@ -41,9 +41,7 @@
         <form class="dialog-card" @submit.prevent="submitBooking">
           <header class="dialog-header">
             <h2>预约 {{ bookingForm.service?.name }}</h2>
-            <p>
-              请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。
-            </p>
+            <p>请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。</p>
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
@@ -84,13 +82,83 @@
       </aside>
 
       <main class="content">
-        <section v-if="activeSection === 'services'" class="panel">
+        <section v-if="activeSection === 'discover'" class="panel immersive-panel">
           <header class="panel-header">
-            <h2>可选家政服务</h2>
-            <p>当前可预约 {{ services.length }} 项，点击服务卡片即可填写预约时间与需求。</p>
+            <div>
+              <h2>精选推荐</h2>
+              <p>浏览轮播专题、热门贴士与系统公告，打造 Apple 级视觉体验。</p>
+            </div>
+            <button type="button" class="ghost-button" @click="refreshDiscover" :disabled="discoverLoading">
+              {{ discoverLoading ? '刷新中…' : '刷新内容' }}
+            </button>
+          </header>
+          <div v-if="discoverLoading" class="loading-state">正在同步精选内容…</div>
+          <div v-else class="discover-grid">
+            <section class="carousel">
+              <header class="section-title">
+                <h3>主题轮播</h3>
+                <p>点击图片可查看详情或跳转服务。</p>
+              </header>
+              <div class="carousel-track" role="region" aria-label="精选轮播">
+                <article v-for="item in carousels" :key="item.id" class="carousel-card">
+                  <div class="carousel-media" :style="{ backgroundImage: `url(${item.imageUrl})` }"></div>
+                  <div class="carousel-body">
+                    <h4>{{ item.title }}</h4>
+                    <p>{{ item.serviceLink ? item.serviceLink : '精选家政专题' }}</p>
+                  </div>
+                </article>
+                <p v-if="!carousels.length" class="empty-tip">暂无轮播内容，稍后再来看看。</p>
+              </div>
+            </section>
+
+            <section class="tips">
+              <header class="section-title">
+                <h3>居家贴士</h3>
+                <p>精选生活小窍门，守护家庭温度。</p>
+              </header>
+              <ul class="tip-list">
+                <li v-for="item in tips" :key="item.id">
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.content }}</p>
+                </li>
+                <li v-if="!tips.length" class="empty-tip">暂无贴士内容。</li>
+              </ul>
+            </section>
+
+            <section class="announcements">
+              <header class="section-title">
+                <h3>系统公告</h3>
+                <p>及时获取平台政策与活动提醒。</p>
+              </header>
+              <ul class="announcement-list">
+                <li v-for="item in announcements" :key="item.id">
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.content }}</p>
+                </li>
+                <li v-if="!announcements.length" class="empty-tip">暂无公告。</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+
+        <section v-else-if="activeSection === 'services'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>可选家政服务</h2>
+              <p>当前可预约 {{ services.length }} 项，点击服务卡片即可填写预约时间与需求。</p>
+            </div>
+            <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
           </header>
           <div class="service-grid">
             <article v-for="service in services" :key="service.id" class="service-card">
+              <button
+                type="button"
+                class="favorite-toggle"
+                :class="{ active: favoriteIdSet.has(service.id) }"
+                @click="toggleFavorite(service)"
+              >
+                {{ favoriteIdSet.has(service.id) ? '♥' : '♡' }}
+              </button>
               <h3 class="service-title">{{ service.name }}</h3>
               <p class="service-company">提供方：{{ service.companyName }}</p>
               <dl class="service-meta">
@@ -108,9 +176,7 @@
                 </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
-              <button type="button" class="primary-button" @click="handleSelectService(service)">
-                选择该服务
-              </button>
+              <button type="button" class="primary-button" @click="handleSelectService(service)">预约服务</button>
             </article>
             <p v-if="!services.length" class="empty-tip">暂无家政公司发布服务，稍后再来看看吧。</p>
           </div>
@@ -148,15 +214,12 @@
                     <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
                   </td>
                   <td>
-                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
-                      {{ statusText(order.status) }}
-                    </span>
+                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
+                    <div v-if="order.assignedWorker" class="order-subtext">人员：{{ order.assignedWorker }}</div>
                   </td>
                   <td>
                     <div class="order-subtext">{{ order.progressNote || '等待家政公司更新' }}</div>
-                    <div v-if="order.specialRequest" class="order-subtext highlight">
-                      用户需求：{{ order.specialRequest }}
-                    </div>
+                    <div v-if="order.specialRequest" class="order-subtext highlight">需求：{{ order.specialRequest }}</div>
                   </td>
                   <td>
                     <div v-if="order.refundReason" class="order-subtext">{{ order.refundReason }}</div>
@@ -171,6 +234,13 @@
                   </td>
                   <td class="table-actions">
                     <button
+                      type="button"
+                      class="link-button"
+                      @click="jumpToMessages(order.id)"
+                    >
+                      去沟通
+                    </button>
+                    <button
                       v-if="canRequestRefund(order)"
                       type="button"
                       class="link-button"
@@ -178,7 +248,6 @@
                     >
                       申请退款
                     </button>
-                    <span v-else class="order-subtext muted">无可用操作</span>
                   </td>
                 </tr>
                 <tr v-if="!orders.length">
@@ -201,6 +270,48 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'wallet'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>钱包充值与积分兑换</h2>
+              <p>支持余额充值与积分兑换，兑换比例 5:1。</p>
+            </div>
+          </header>
+          <div class="wallet-grid">
+            <form class="wallet-card" @submit.prevent="submitRecharge">
+              <h3>快捷充值</h3>
+              <p>充值金额将实时到账，用于预约服务。</p>
+              <input v-model.number="walletForm.amount" type="number" min="0.01" step="0.01" placeholder="充值金额" />
+              <button type="submit" class="primary-button" :disabled="walletSaving">
+                {{ walletSaving ? '充值中…' : '确认充值' }}
+              </button>
+            </form>
+            <form class="wallet-card" @submit.prevent="submitExchange">
+              <h3>积分兑换</h3>
+              <p>每 5 积分可兑换 1 元余额，积分需为 5 的倍数。</p>
+              <input v-model.number="exchangeForm.points" type="number" min="5" step="5" placeholder="兑换积分" />
+              <button type="submit" class="primary-button" :disabled="exchangeSaving">
+                {{ exchangeSaving ? '兑换中…' : '确认兑换' }}
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <UserMessagingPanel
+          v-else-if="activeSection === 'messages'"
+          class="panel immersive-panel"
+          :conversations="conversations"
+          :active-conversation-id="activeConversationId"
+          :messages="messages"
+          :loading-conversations="conversationsLoading"
+          :loading-messages="messagesLoading"
+          :sending="messageSending"
+          @refresh-conversations="loadConversations"
+          @refresh-messages="refreshMessages"
+          @select-conversation="selectConversation"
+          @send-message="handleSendMessage"
+        />
+
         <section v-else class="panel">
           <header class="panel-header">
             <h2>提交服务评价</h2>
@@ -218,22 +329,11 @@
             </div>
             <div class="form-field">
               <label for="review-rating">评分（1-5分）</label>
-              <input
-                id="review-rating"
-                v-model.number="reviewForm.rating"
-                type="number"
-                min="1"
-                max="5"
-              />
+              <input id="review-rating" v-model.number="reviewForm.rating" type="number" min="1" max="5" />
             </div>
             <div class="form-field form-field-full">
               <label for="review-content">评价内容</label>
-              <textarea
-                id="review-content"
-                v-model="reviewForm.content"
-                rows="4"
-                placeholder="描述您的服务体验"
-              ></textarea>
+              <textarea id="review-content" v-model="reviewForm.content" rows="4" placeholder="描述您的服务体验"></textarea>
             </div>
             <div class="form-actions">
               <button type="submit" class="primary-button" :disabled="reviewSubmitting">
@@ -263,25 +363,44 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
+  addUserFavorite,
   fetchCurrentAccount,
   createUserOrder,
+  exchangeUserPoints,
+  fetchDashboardAnnouncements,
+  fetchDashboardCarousels,
+  fetchDashboardTips,
   fetchServiceReviews,
+  fetchUserConversations,
+  fetchUserFavorites,
+  fetchUserMessages,
   fetchUserOrders,
   fetchUserServices,
+  removeUserFavorite,
+  markUserConversationRead,
+  rechargeUserWallet,
   requestUserRefund,
+  sendUserMessage,
   submitUserReview,
   type AccountProfileItem,
+  type CompanyMessageItem,
+  type CompanyMessagePayload,
+  type DashboardAnnouncementItem,
+  type DashboardCarouselItem,
+  type DashboardTipItem,
   type HousekeepServiceItem,
+  type ServiceFavoriteItem,
   type ServiceOrderItem,
   type ServiceReviewItem,
+  type UserConversationItem,
 } from '../services/dashboard'
 
-type SectionKey = 'services' | 'orders' | 'reviews'
+import UserMessagingPanel from '../pages/user/UserMessagingPanel.vue'
 
 interface SectionMeta {
   key: SectionKey
@@ -289,30 +408,65 @@ interface SectionMeta {
   label: string
 }
 
+type SectionKey = 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
+
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
-const username = computed(
-  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '用户',
-)
-const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
-const loyaltyText = computed(() => (account.value ? account.value.loyaltyPoints.toString() : '0'))
-
-const sections: SectionMeta[] = [
-  { key: 'services', icon: '🧹', label: '选择服务' },
-  { key: 'orders', icon: '📋', label: '我的订单' },
-  { key: 'reviews', icon: '⭐', label: '评价服务' },
-]
-
-const activeSection = ref<SectionKey>('services')
 const services = ref<HousekeepServiceItem[]>([])
 const orders = ref<ServiceOrderItem[]>([])
+const serviceReviews = ref<ServiceReviewItem[]>([])
+const carousels = ref<DashboardCarouselItem[]>([])
+const tips = ref<DashboardTipItem[]>([])
+const announcements = ref<DashboardAnnouncementItem[]>([])
+const favorites = ref<ServiceFavoriteItem[]>([])
+const conversations = ref<UserConversationItem[]>([])
+const messages = ref<CompanyMessageItem[]>([])
+const conversationsLoading = ref(false)
+const messagesLoading = ref(false)
+const messageSending = ref(false)
+
+const activeConversationId = ref<number | null>(null)
+
+const bookingDialogVisible = ref(false)
+const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt: string; specialRequest: string }>({
+  service: null,
+  scheduledAt: '',
+  specialRequest: '',
+})
+
 const reviewForm = reactive<{ serviceId: number | ''; rating: number; content: string }>({
   serviceId: '',
   rating: 5,
   content: '',
 })
 const reviewSubmitting = ref(false)
-const serviceReviews = ref<ServiceReviewItem[]>([])
+
+const walletForm = reactive<{ amount: number | null }>({ amount: null })
+const walletSaving = ref(false)
+const exchangeForm = reactive<{ points: number | null }>({ points: null })
+const exchangeSaving = ref(false)
+
+const discoverLoading = ref(false)
+
+const sections: SectionMeta[] = [
+  { key: 'discover', icon: '🌟', label: '精选推荐' },
+  { key: 'services', icon: '🧹', label: '选择服务' },
+  { key: 'orders', icon: '📋', label: '我的订单' },
+  { key: 'wallet', icon: '💳', label: '充值/兑换' },
+  { key: 'messages', icon: '💬', label: '在线沟通' },
+  { key: 'reviews', icon: '⭐', label: '评价服务' },
+]
+
+const activeSection = ref<SectionKey>('discover')
+
+const username = computed(
+  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '用户',
+)
+const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
+const loyaltyText = computed(() => (account.value ? account.value.loyaltyPoints.toString() : '0'))
+
+const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
+const favoritesCount = computed(() => favorites.value.length)
 
 const orderStats = computed(() => {
   const total = orders.value.length
@@ -351,19 +505,12 @@ const reviewableServices = computed(() => {
   return Array.from(uniqueMap.values())
 })
 
-const switchSection = (key: SectionKey) => {
-  activeSection.value = key
-  if (key === 'orders') {
-    loadOrders()
-    loadAccount()
+const loadAccount = async () => {
+  try {
+    account.value = await fetchCurrentAccount()
+  } catch (error) {
+    console.error(error)
   }
-}
-
-const logout = () => {
-  sessionStorage.removeItem(AUTH_TOKEN_KEY)
-  sessionStorage.removeItem(AUTH_ACCOUNT_KEY)
-  sessionStorage.removeItem(AUTH_ROLE_KEY)
-  router.push({ name: 'login' })
 }
 
 const loadServices = async () => {
@@ -382,11 +529,29 @@ const loadOrders = async () => {
   }
 }
 
-const loadAccount = async () => {
+const loadFavorites = async () => {
   try {
-    account.value = await fetchCurrentAccount()
+    favorites.value = await fetchUserFavorites()
   } catch (error) {
     console.error(error)
+  }
+}
+
+const loadDiscover = async () => {
+  discoverLoading.value = true
+  try {
+    const [carouselData, tipData, announcementData] = await Promise.all([
+      fetchDashboardCarousels(),
+      fetchDashboardTips(),
+      fetchDashboardAnnouncements(),
+    ])
+    carousels.value = carouselData
+    tips.value = tipData
+    announcements.value = announcementData
+  } catch (error) {
+    console.error(error)
+  } finally {
+    discoverLoading.value = false
   }
 }
 
@@ -399,24 +564,36 @@ const loadReviews = async (serviceId: number) => {
   }
 }
 
-const bookingDialogVisible = ref(false)
-const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt: string; specialRequest: string }>(
-  {
-    service: null,
-    scheduledAt: '',
-    specialRequest: '',
-  },
-)
+const refreshDiscover = () => {
+  loadDiscover()
+}
 
-const toLocalInputValue = (date: Date) => {
-  const offset = date.getTimezoneOffset()
-  const local = new Date(date.getTime() - offset * 60_000)
-  return local.toISOString().slice(0, 16)
+const switchSection = (key: SectionKey) => {
+  activeSection.value = key
+  if (key === 'orders') {
+    loadOrders()
+    loadAccount()
+  } else if (key === 'messages') {
+    loadConversations()
+  } else if (key === 'wallet') {
+    loadAccount()
+  } else if (key === 'reviews') {
+    if (reviewForm.serviceId) {
+      loadReviews(Number(reviewForm.serviceId))
+    }
+  }
+}
+
+const logout = () => {
+  sessionStorage.removeItem(AUTH_TOKEN_KEY)
+  sessionStorage.removeItem(AUTH_ACCOUNT_KEY)
+  sessionStorage.removeItem(AUTH_ROLE_KEY)
+  router.push({ name: 'login' })
 }
 
 const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.service = service
-  bookingForm.scheduledAt = toLocalInputValue(new Date(Date.now() + 2 * 60 * 60 * 1000))
+  bookingForm.scheduledAt = ''
   bookingForm.specialRequest = ''
   bookingDialogVisible.value = true
 }
@@ -426,79 +603,172 @@ const closeBooking = () => {
 }
 
 const submitBooking = async () => {
-  if (!bookingForm.service) {
-    return
-  }
-  const scheduledDate = new Date(bookingForm.scheduledAt)
-  if (Number.isNaN(scheduledDate.getTime())) {
-    window.alert('请选择有效的预约时间')
+  if (!bookingForm.service || !bookingForm.scheduledAt) {
+    window.alert('请填写完整的预约信息')
     return
   }
   try {
     await createUserOrder({
       serviceId: bookingForm.service.id,
-      scheduledAt: scheduledDate.toISOString(),
-      specialRequest: bookingForm.specialRequest.trim() || undefined,
+      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+      specialRequest: bookingForm.specialRequest,
     })
-    window.alert('已成功预约服务，您可以在“我的订单”中查看进度。')
     bookingDialogVisible.value = false
     await Promise.all([loadOrders(), loadAccount()])
-    activeSection.value = 'orders'
+    window.alert('预约成功，系统已通知家政公司。')
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '预约失败，请稍后再试')
+    console.error(error)
   }
 }
 
 const canRequestRefund = (order: ServiceOrderItem) => {
   return (
-    order.status === 'PENDING' ||
-    order.status === 'SCHEDULED' ||
     order.status === 'IN_PROGRESS' ||
-    order.status === 'REFUND_REJECTED'
+    order.status === 'SCHEDULED' ||
+    order.status === 'COMPLETED'
   )
 }
 
 const handleRequestRefund = async (order: ServiceOrderItem) => {
-  const reason = window.prompt('请输入退款原因：', order.refundReason ?? '')
+  const reason = window.prompt('请输入退款原因：')
   if (!reason) return
   try {
     await requestUserRefund(order.id, { reason })
-    window.alert('退款申请已提交，等待家政公司或管理员处理。')
     await loadOrders()
+    window.alert('退款申请已提交，等待家政公司或管理员处理。')
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '提交退款申请失败')
+    console.error(error)
+  }
+}
+
+const toggleFavorite = async (service: HousekeepServiceItem) => {
+  try {
+    if (favoriteIdSet.value.has(service.id)) {
+      const target = favorites.value.find((item) => item.serviceId === service.id)
+      if (target) {
+        await removeUserFavorite(service.id)
+      }
+    } else {
+      await addUserFavorite(service.id)
+    }
+    await loadFavorites()
+  } catch (error) {
+    console.error(error)
   }
 }
 
 const handleSubmitReview = async () => {
-  const serviceIdNumber = Number(reviewForm.serviceId)
-  if (!Number.isFinite(serviceIdNumber) || serviceIdNumber <= 0) {
-    window.alert('请选择需要评价的服务')
-    return
-  }
-  if (!reviewForm.content.trim()) {
-    window.alert('请填写评价内容')
-    return
-  }
-  if (reviewForm.rating < 1 || reviewForm.rating > 5) {
-    window.alert('评分需在1-5之间')
+  if (!reviewForm.serviceId) {
+    window.alert('请选择要评价的服务')
     return
   }
   reviewSubmitting.value = true
   try {
     await submitUserReview({
-      serviceId: serviceIdNumber,
+      serviceId: Number(reviewForm.serviceId),
       rating: reviewForm.rating,
-      content: reviewForm.content.trim(),
+      content: reviewForm.content,
     })
-    window.alert('感谢您的评价！')
     reviewForm.content = ''
-    await loadReviews(serviceIdNumber)
+    await loadReviews(Number(reviewForm.serviceId))
+    window.alert('评价提交成功')
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '提交评价失败')
+    console.error(error)
   } finally {
     reviewSubmitting.value = false
   }
+}
+
+const submitRecharge = async () => {
+  if (!walletForm.amount || walletForm.amount <= 0) {
+    window.alert('请输入正确的充值金额')
+    return
+  }
+  walletSaving.value = true
+  try {
+    account.value = await rechargeUserWallet({ amount: walletForm.amount })
+    walletForm.amount = null
+    window.alert('充值成功')
+  } catch (error) {
+    console.error(error)
+  } finally {
+    walletSaving.value = false
+  }
+}
+
+const submitExchange = async () => {
+  if (!exchangeForm.points || exchangeForm.points <= 0 || exchangeForm.points % 5 !== 0) {
+    window.alert('积分需为 5 的倍数')
+    return
+  }
+  exchangeSaving.value = true
+  try {
+    account.value = await exchangeUserPoints({ points: exchangeForm.points })
+    exchangeForm.points = null
+    window.alert('积分兑换成功')
+  } catch (error) {
+    console.error(error)
+  } finally {
+    exchangeSaving.value = false
+  }
+}
+
+const loadConversations = async () => {
+  conversationsLoading.value = true
+  try {
+    conversations.value = await fetchUserConversations()
+    const firstConversation = conversations.value[0]
+    if (firstConversation && activeConversationId.value === null) {
+      activeConversationId.value = firstConversation.orderId
+      await refreshMessages()
+    }
+  } catch (error) {
+    console.error(error)
+  } finally {
+    conversationsLoading.value = false
+  }
+}
+
+const selectConversation = async (orderId: number) => {
+  activeConversationId.value = orderId
+  await Promise.all([refreshMessages(), markUserConversationRead(orderId)])
+}
+
+const refreshMessages = async () => {
+  if (activeConversationId.value === null) return
+  messagesLoading.value = true
+  try {
+    messages.value = await fetchUserMessages(activeConversationId.value)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    messagesLoading.value = false
+  }
+}
+
+const handleSendMessage = async (payload: CompanyMessagePayload) => {
+  if (activeConversationId.value === null) return
+  messageSending.value = true
+  try {
+    await sendUserMessage(activeConversationId.value, payload)
+    await refreshMessages()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    messageSending.value = false
+  }
+}
+
+const jumpToMessages = (orderId: number) => {
+  activeSection.value = 'messages'
+  activeConversationId.value = orderId
+  loadConversations().then(() => {
+    selectConversation(orderId)
+  })
+}
+
+const formatDateTime = (value: string) => {
+  return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
 const statusText = (status: ServiceOrderItem['status']) => {
@@ -507,632 +777,572 @@ const statusText = (status: ServiceOrderItem['status']) => {
       return '待上门'
     case 'IN_PROGRESS':
       return '服务中'
-    case 'PENDING':
-      return '等待服务'
     case 'COMPLETED':
       return '已完成'
+    case 'PENDING':
+      return '待确认'
     case 'REFUND_REQUESTED':
       return '退款审核中'
     case 'REFUND_APPROVED':
-      return '退款成功'
+      return '已退款'
     case 'REFUND_REJECTED':
-      return '退款被拒'
+      return '退款驳回'
     default:
       return status
   }
 }
 
-const formatDateTime = (value: string) => {
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
-}
-
-watch(
-  () => reviewForm.serviceId,
-  async (serviceId) => {
-    const id = Number(serviceId)
-    if (!Number.isNaN(id) && id > 0) {
-      await loadReviews(id)
-    } else {
-      serviceReviews.value = []
-    }
-  },
-)
-
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadOrders()])
+  await Promise.all([loadAccount(), loadServices(), loadOrders(), loadDiscover(), loadFavorites()])
 })
 </script>
-
 
 <style scoped>
 .dashboard {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 32px clamp(16px, 5vw, 48px) 48px;
-  position: relative;
-  z-index: 0;
-}
-
-.dashboard::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(15, 118, 110, 0.04) 52%, rgba(124, 58, 237, 0.06) 100%);
-  border-radius: 40px 40px 0 0;
-  z-index: -1;
+  padding: 2.5rem 2rem 3rem;
+  background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.18), transparent 50%),
+    linear-gradient(135deg, #0f172a, #1f2937 45%, #0b1120 100%);
+  color: #f8fafc;
 }
 
 .dashboard-header {
-  position: relative;
-  border-radius: calc(var(--brand-radius) + 12px);
-  padding: 28px clamp(20px, 4vw, 36px);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95) 0%, rgba(124, 58, 237, 0.85) 100%);
-  color: #fff;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  box-shadow: 0 28px 48px rgba(37, 99, 235, 0.25);
-  overflow: hidden;
-}
-
-.dashboard-header::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(600px circle at 90% 10%, rgba(255, 255, 255, 0.18), transparent 60%);
-  z-index: 0;
-}
-
-.dashboard-header > * {
-  position: relative;
-  z-index: 1;
+  margin-bottom: 2rem;
 }
 
 .dashboard-title {
-  margin: 0;
-  font-size: clamp(28px, 2.5vw + 12px, 36px);
+  font-size: 2.4rem;
   font-weight: 700;
+  margin: 0;
 }
 
 .dashboard-subtitle {
-  margin-top: 8px;
-  font-size: 15px;
-  opacity: 0.85;
+  margin-top: 0.75rem;
+  color: rgba(226, 232, 240, 0.75);
+  font-size: 1.05rem;
 }
 
 .header-actions {
   display: flex;
+  gap: 1rem;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  background: rgba(15, 23, 42, 0.25);
-  border-radius: 999px;
-  backdrop-filter: blur(12px);
-}
-
-.welcome {
-  font-weight: 600;
-}
-
-.wallet {
-  font-weight: 700;
-  color: #facc15;
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.8);
 }
 
 .logout-button {
-  padding: 8px 18px;
+  padding: 0.5rem 1.25rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(15, 23, 42, 0.25);
-  color: #fff;
-  cursor: pointer;
-  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.logout-button:hover {
-  transform: translateY(-1px);
-  background: rgba(15, 23, 42, 0.4);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.25);
+  background: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #f8fafc;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
 }
 
 .stat-card {
-  padding: 20px;
-  border-radius: calc(var(--brand-radius) + 4px);
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding: 1.75rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.35);
   position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(12px);
 }
 
-.stat-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(240px circle at 85% 15%, rgba(255, 255, 255, 0.25), transparent 60%);
-  z-index: 0;
-}
-
-.stat-card > * {
-  position: relative;
-  z-index: 1;
+.stat-card.glass {
+  border-color: rgba(125, 211, 252, 0.25);
+  background: rgba(8, 47, 73, 0.6);
 }
 
 .stat-label {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--brand-text-muted);
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.7);
+  margin: 0 0 0.5rem;
 }
 
 .stat-value {
-  font-size: 30px;
+  font-size: 2rem;
   font-weight: 700;
-  color: var(--brand-text);
+  margin: 0;
 }
 
 .stat-helper {
-  font-size: 13px;
-  color: var(--brand-text-muted);
-}
-
-.stat-card.accent {
-  background: linear-gradient(150deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.04));
-  border-color: rgba(37, 99, 235, 0.2);
-}
-
-.stat-card.primary {
-  background: linear-gradient(150deg, rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.04));
-  border-color: rgba(59, 130, 246, 0.2);
-}
-
-.stat-card.success {
-  background: linear-gradient(150deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04));
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.stat-card.warning {
-  background: linear-gradient(150deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
-  border-color: rgba(245, 158, 11, 0.2);
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.6);
 }
 
 .dashboard-main {
   display: grid;
-  grid-template-columns: minmax(220px, 260px) 1fr;
-  gap: 28px;
-  align-items: flex-start;
+  grid-template-columns: 260px 1fr;
+  gap: 2rem;
 }
 
 .sidebar {
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: calc(var(--brand-radius) + 2px);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(16px);
-  padding: 28px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .sidebar-item {
-  border: none;
-  background: transparent;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--brand-text-muted);
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
-}
-
-.sidebar-item .sidebar-icon {
-  font-size: 20px;
-}
-
-.sidebar-item:hover {
-  color: var(--brand-primary);
-  background: rgba(37, 99, 235, 0.08);
-  transform: translateX(4px);
+  gap: 0.75rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid transparent;
+  color: rgba(226, 232, 240, 0.75);
 }
 
 .sidebar-item.active {
-  color: var(--brand-primary);
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(37, 99, 235, 0.08));
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.2);
+  color: #0f172a;
+  background: linear-gradient(120deg, #38bdf8, #6366f1);
+  box-shadow: 0 15px 30px rgba(14, 165, 233, 0.25);
 }
 
-.content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.sidebar-icon {
+  font-size: 1.2rem;
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: calc(var(--brand-radius) + 4px);
+  padding: 2rem;
+  border-radius: 1.5rem;
+  background: rgba(15, 23, 42, 0.55);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
-  padding: 28px 32px;
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+}
+
+.immersive-panel {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(99, 102, 241, 0.15));
+  border-color: rgba(148, 163, 184, 0.25);
 }
 
 .panel-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .panel-header h2 {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 600;
 }
 
 .panel-header p {
-  margin: 8px 0 0;
-  color: var(--brand-text-muted);
-  font-size: 14px;
+  margin: 0.35rem 0 0;
+  color: rgba(226, 232, 240, 0.6);
 }
 
-.primary-button {
-  align-self: flex-start;
-  padding: 10px 18px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
-  color: #fff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.ghost-button {
+  padding: 0.55rem 1.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.3);
+  color: #e2e8f0;
 }
 
-.primary-button:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--brand-shadow-soft);
+.loading-state {
+  padding: 2.5rem;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.carousel {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.carousel-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.carousel-card {
+  border-radius: 1.1rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+
+.carousel-media {
+  flex: 1;
+  background-size: cover;
+  background-position: center;
+  min-height: 140px;
+}
+
+.carousel-body {
+  padding: 0.85rem 1rem;
+}
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.section-title h3 {
+  margin: 0;
+}
+
+.section-title p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 0.9rem;
+}
+
+.tip-list,
+.announcement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tip-list li,
+.announcement-list li {
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.tip-list strong,
+.announcement-list strong {
+  display: block;
+  margin-bottom: 0.35rem;
 }
 
 .service-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 20px;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .service-card {
-  border-radius: calc(var(--brand-radius) + 2px);
-  padding: 20px;
-  background: rgba(248, 250, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 20px 36px rgba(15, 23, 42, 0.08);
+  position: relative;
+  padding: 1.5rem;
+  border-radius: 1.2rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  gap: 1rem;
 }
 
-.service-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 28px 50px rgba(37, 99, 235, 0.18);
+.favorite-toggle {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  padding: 0.35rem 0.7rem;
+  color: rgba(248, 250, 252, 0.75);
+}
+
+.favorite-toggle.active {
+  background: rgba(248, 113, 113, 0.2);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fda4af;
 }
 
 .service-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 1.25rem;
 }
 
 .service-company {
   margin: 0;
-  font-size: 14px;
-  color: var(--brand-text-muted);
+  color: rgba(226, 232, 240, 0.6);
 }
 
 .service-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 0.75rem;
   margin: 0;
 }
 
 .service-meta dt {
-  font-size: 12px;
-  color: var(--brand-text-muted);
-}
-
-.service-meta dd {
-  margin: 2px 0 0;
-  font-size: 14px;
-  color: var(--brand-text);
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.7);
 }
 
 .service-desc {
   margin: 0;
-  color: var(--brand-text-muted);
-  line-height: 1.6;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.primary-button {
+  align-self: flex-start;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(120deg, #6366f1, #38bdf8);
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .table-wrapper {
-  overflow-x: auto;
-  border-radius: calc(var(--brand-radius) + 2px);
+  overflow: auto;
+  border-radius: 1.1rem;
   border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 .data-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  background: rgba(255, 255, 255, 0.95);
-  table-layout: fixed;
+  border-collapse: collapse;
 }
 
-.data-table thead th {
-  background: rgba(37, 99, 235, 0.08);
-  color: var(--brand-text);
-  font-weight: 600;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+.data-table th,
+.data-table td {
+  padding: 1rem 1.2rem;
   text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.data-table tbody td {
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-  vertical-align: top;
-  color: var(--brand-text);
-  text-align: left;
-}
-
-.data-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.data-table tbody tr:hover td {
-  background: rgba(37, 99, 235, 0.05);
-}
-
-.table-actions {
-  width: 150px;
+.data-table tbody tr:hover {
+  background: rgba(148, 163, 184, 0.08);
 }
 
 .order-subtext {
-  font-size: 13px;
-  color: var(--brand-text-muted);
+  color: rgba(226, 232, 240, 0.65);
+  font-size: 0.9rem;
 }
 
 .order-subtext.muted {
-  color: rgba(148, 163, 184, 0.9);
-}
-
-.order-subtext.highlight {
-  color: var(--brand-primary);
-  font-weight: 600;
+  color: rgba(148, 163, 184, 0.6);
 }
 
 .order-meta {
   display: flex;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--brand-primary);
-  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.7);
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 0.25rem 0.75rem;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.status-pending {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
 }
 
 .status-scheduled {
-  background: linear-gradient(135deg, #6366f1, #4338ca);
+  background: rgba(96, 165, 250, 0.15);
+  color: #93c5fd;
 }
 
 .status-in_progress {
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
+  background: rgba(45, 212, 191, 0.2);
+  color: #5eead4;
 }
 
 .status-completed {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
 }
 
 .status-refund_requested {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
 }
 
-.status-refund_approved {
-  background: linear-gradient(135deg, #14b8a6, #0f766e);
-}
-
-.status-refund_rejected {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+.table-actions {
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
 .link-button {
   background: none;
   border: none;
-  padding: 0;
-  color: var(--brand-primary);
-  font-weight: 600;
+  color: #38bdf8;
   cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.link-button:hover {
-  color: var(--brand-primary-dark);
-  text-decoration: underline;
-}
-
-.empty-tip,
-.empty-row {
-  text-align: center;
-  color: var(--brand-text-muted);
-  padding: 16px 0;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-field-full {
-  grid-column: 1 / -1;
-}
-
-.form-field input,
-.form-field select,
-.form-field textarea {
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: rgba(248, 250, 255, 0.9);
-  font-size: 14px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.form-field input:focus,
-.form-field select:focus,
-.form-field textarea:focus {
-  outline: none;
-  border-color: var(--brand-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
-}
-
-.form-actions {
-  grid-column: 1 / -1;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 20;
-}
-
-.dialog-card {
-  width: min(520px, 100%);
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: calc(var(--brand-radius) + 4px);
-  box-shadow: 0 32px 60px rgba(15, 23, 42, 0.35);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 28px;
-}
-
-.dialog-header h2 {
-  margin: 0 0 4px;
-}
-
-.dialog-header p {
-  margin: 0;
-  color: var(--brand-text-muted);
-  line-height: 1.6;
-}
-
-.dialog-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dialog-field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--brand-text);
-}
-
-.dialog-field input,
-.dialog-field textarea {
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: var(--brand-radius);
-  padding: 10px 12px;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
+  padding: 0;
+  font-size: 0.9rem;
 }
 
 .schedule-timeline {
-  margin-top: 24px;
-  padding: 20px;
-  border-radius: calc(var(--brand-radius) + 4px);
-  background: rgba(37, 99, 235, 0.05);
-}
-
-.schedule-timeline h3 {
-  margin: 0 0 12px;
+  margin-top: 2rem;
 }
 
 .schedule-timeline ul {
   margin: 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
 
 .schedule-timeline li {
-  padding: 12px 16px;
-  border-radius: var(--brand-radius);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.12);
 }
 
-.schedule-timeline li p {
-  margin: 8px 0 0;
-  color: var(--brand-text-muted);
+.wallet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
 }
 
-.header-actions .loyalty {
-  color: var(--brand-primary);
-  font-weight: 600;
+.wallet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-radius: 1.2rem;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.wallet-card input,
+.form-field select,
+.form-field textarea,
+.form-field input {
+  width: 100%;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+  color: #f8fafc;
+  padding: 0.55rem 0.75rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.review-list {
+  margin-top: 2rem;
+}
+
+.review-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.review-item {
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.review-rating {
+  color: #facc15;
+}
+
+.empty-tip {
+  text-align: center;
+  color: rgba(226, 232, 240, 0.6);
+  padding: 1.75rem 0;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  z-index: 30;
+}
+
+.dialog-card {
+  width: min(560px, 90%);
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 .fade-enter-active,
@@ -1145,75 +1355,24 @@ onMounted(async () => {
   opacity: 0;
 }
 
-.review-list {
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
-  padding-top: 16px;
-  margin-top: 24px;
-}
-
-.review-title {
-  margin: 0 0 12px;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.review-item {
-  padding: 12px 0;
-  border-bottom: 1px dashed rgba(148, 163, 184, 0.2);
-}
-
-.review-item:last-child {
-  border-bottom: none;
-}
-
-.review-header {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-  font-size: 14px;
-}
-
-.review-rating {
-  color: var(--brand-warning);
-  font-weight: 700;
-}
-
-.review-content {
-  margin: 8px 0 0;
-  color: var(--brand-text-muted);
-  line-height: 1.6;
-}
-
-@media (max-width: 1024px) {
-  .dashboard {
-    padding: 24px 24px 40px;
-  }
-
+@media (max-width: 1080px) {
   .dashboard-main {
     grid-template-columns: 1fr;
   }
 
   .sidebar {
     flex-direction: row;
-    overflow-x: auto;
-  }
-}
-
-@media (max-width: 720px) {
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
   }
 
-  .header-actions {
-    align-self: stretch;
-    justify-content: space-between;
+  .sidebar-item {
+    flex: 1 1 150px;
+    justify-content: center;
   }
 
-  .panel {
-    padding: 24px;
+  .discover-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
-

@@ -7,13 +7,14 @@ import lombok.Setter;
 import java.time.Instant;
 
 /**
- * 家政服务评价。
+ * 用户收藏的服务。
  */
 @Getter
 @Setter
 @Entity
-@Table(name = "service_review")
-public class ServiceReview {
+@Table(name = "service_favorite",
+    uniqueConstraints = @UniqueConstraint(name = "uk_favorite_user_service", columnNames = {"user_id", "service_id"}))
+public class ServiceFavorite {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,24 +28,6 @@ public class ServiceReview {
     @JoinColumn(name = "user_id", nullable = false)
     private UserAll user;
 
-    @Column(name = "rating", nullable = false)
-    private Integer rating;
-
-    @Column(name = "content", length = 500)
-    private String content;
-
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
-    @Column(name = "company_reply", length = 500)
-    private String companyReply;
-
-    @Column(name = "reply_at")
-    private Instant replyAt;
-
-    @Column(name = "is_pinned", nullable = false)
-    private Boolean pinned = Boolean.FALSE;
 }

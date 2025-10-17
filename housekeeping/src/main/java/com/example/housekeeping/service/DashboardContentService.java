@@ -1,5 +1,9 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.DashboardAnnouncementRequest;
+import com.example.housekeeping.dto.DashboardAnnouncementResponse;
+import com.example.housekeeping.dto.DashboardCarouselItemRequest;
+import com.example.housekeeping.dto.DashboardCarouselItemResponse;
 import com.example.housekeeping.dto.DashboardOfferItemRequest;
 import com.example.housekeeping.dto.DashboardOfferItemResponse;
 import com.example.housekeeping.dto.DashboardReviewItemRequest;
@@ -66,6 +70,38 @@ public class DashboardContentService {
                 .collect(Collectors.toList());
     }
 
+    public List<DashboardCarouselItemResponse> listCarousels() {
+        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.CAROUSEL.getValue())
+            .stream()
+            .map(item -> new DashboardCarouselItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getTag()))
+            .collect(Collectors.toList());
+    }
+
+    public DashboardCarouselItemResponse createCarousel(DashboardCarouselItemRequest request) {
+        HousekeepItem item = new HousekeepItem();
+        item.setItemType(HousekeepItemType.CAROUSEL.getValue());
+        item.setTitle(request.getTitle());
+        item.setContent(request.getImageUrl());
+        item.setTag(request.getServiceLink());
+        HousekeepItem saved = housekeepItemRepository.save(item);
+        return new DashboardCarouselItemResponse(saved.getId(), saved.getTitle(), saved.getContent(), saved.getTag());
+    }
+
+    public DashboardCarouselItemResponse updateCarousel(Long id, DashboardCarouselItemRequest request) {
+        HousekeepItem item = housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.CAROUSEL.getValue())
+            .orElseThrow(() -> new RuntimeException("轮播图不存在"));
+        item.setTitle(request.getTitle());
+        item.setContent(request.getImageUrl());
+        item.setTag(request.getServiceLink());
+        HousekeepItem saved = housekeepItemRepository.save(item);
+        return new DashboardCarouselItemResponse(saved.getId(), saved.getTitle(), saved.getContent(), saved.getTag());
+    }
+
+    public void deleteCarousel(Long id) {
+        housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.CAROUSEL.getValue())
+            .ifPresent(housekeepItemRepository::delete);
+    }
+
     public DashboardTipItemResponse createTip(DashboardTipItemRequest request) {
         HousekeepItem item = new HousekeepItem();
         item.setItemType(HousekeepItemType.TIP.getValue());
@@ -87,6 +123,36 @@ public class DashboardContentService {
     public void deleteTip(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.TIP.getValue())
                 .ifPresent(housekeepItemRepository::delete);
+    }
+
+    public List<DashboardAnnouncementResponse> listAnnouncements() {
+        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.ANNOUNCEMENT.getValue())
+            .stream()
+            .map(item -> new DashboardAnnouncementResponse(item.getId(), item.getTitle(), item.getContent()))
+            .collect(Collectors.toList());
+    }
+
+    public DashboardAnnouncementResponse createAnnouncement(DashboardAnnouncementRequest request) {
+        HousekeepItem item = new HousekeepItem();
+        item.setItemType(HousekeepItemType.ANNOUNCEMENT.getValue());
+        item.setTitle(request.getTitle());
+        item.setContent(request.getContent());
+        HousekeepItem saved = housekeepItemRepository.save(item);
+        return new DashboardAnnouncementResponse(saved.getId(), saved.getTitle(), saved.getContent());
+    }
+
+    public DashboardAnnouncementResponse updateAnnouncement(Long id, DashboardAnnouncementRequest request) {
+        HousekeepItem item = housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.ANNOUNCEMENT.getValue())
+            .orElseThrow(() -> new RuntimeException("公告不存在"));
+        item.setTitle(request.getTitle());
+        item.setContent(request.getContent());
+        HousekeepItem saved = housekeepItemRepository.save(item);
+        return new DashboardAnnouncementResponse(saved.getId(), saved.getTitle(), saved.getContent());
+    }
+
+    public void deleteAnnouncement(Long id) {
+        housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.ANNOUNCEMENT.getValue())
+            .ifPresent(housekeepItemRepository::delete);
     }
 
     public List<DashboardReviewItemResponse> listReviews() {

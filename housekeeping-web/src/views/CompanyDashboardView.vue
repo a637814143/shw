@@ -204,6 +204,29 @@
           </div>
         </section>
 
+        <CompanyReviewsPanel
+          v-else-if="activeSection === 'reviews'"
+          class="panel immersive-panel"
+          :loading="reviewsLoading"
+          :reviews="companyReviews"
+          @refresh="loadCompanyReviews"
+        />
+
+        <CompanyMessagingPanel
+          v-else-if="activeSection === 'messages'"
+          class="panel immersive-panel"
+          :conversations="conversationSummaries"
+          :loading-conversations="conversationsLoading"
+          :active-conversation-id="activeConversationId"
+          :messages="activeMessages"
+          :loading-messages="messagesLoading"
+          :sending="messageSending"
+          @refresh-conversations="handleRefreshConversations"
+          @refresh-messages="refreshActiveMessages"
+          @select-conversation="selectConversation"
+          @send-message="handleSendMessage"
+        />
+
         <section v-else class="panel">
           <header class="panel-header">
             <div>
@@ -251,7 +274,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
@@ -262,17 +285,28 @@ import {
   fetchCompanyOrders,
   fetchCompanyRefunds,
   fetchCompanyServices,
+  fetchCompanyReviews,
+  fetchCompanyConversations,
+  fetchCompanyMessages,
   handleCompanyRefund,
+  markCompanyConversationRead,
+  sendCompanyMessage,
   updateCompanyOrderProgress,
   updateCompanyService,
   type AccountProfileItem,
   type CompanyServicePayload,
+  type CompanyConversationItem,
+  type CompanyMessageItem,
   type HousekeepServiceItem,
+  type ServiceReviewItem,
   type ServiceOrderItem,
   type UpdateOrderProgressPayload,
 } from '../services/dashboard'
 
-type SectionKey = 'services' | 'appointments' | 'refunds'
+import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
+import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
+
+type SectionKey = 'services' | 'appointments' | 'reviews' | 'messages' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -290,6 +324,8 @@ const balanceText = computed(() => (account.value ? account.value.balance.toFixe
 const sections: SectionMeta[] = [
   { key: 'services', icon: '🧹', label: '服务管理' },
   { key: 'appointments', icon: '📅', label: '预约排班' },
+  { key: 'reviews', icon: '✨', label: '服务口碑' },
+  { key: 'messages', icon: '💬', label: '客户沟通' },
   { key: 'refunds', icon: '💸', label: '退款审核' },
 ]
 
@@ -312,6 +348,21 @@ const serviceForm = reactive<CompanyServicePayload>({
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
 
+const companyReviews = ref<ServiceReviewItem[]>([])
+const reviewsLoading = ref(false)
+const conversationSummaries = ref<CompanyConversationItem[]>([])
+const conversationsLoading = ref(false)
+const messagesByOrder = reactive<Record<number, CompanyMessageItem[]>>({})
+const lastMessageTimestamps = reactive<Record<number, string>>({})
+const activeConversationId = ref<number | null>(null)
+const messagesLoading = ref(false)
+const messageSending = ref(false)
+const messagePollHandle = ref<number | null>(null)
+
+const activeMessages = computed(() =>
+  activeConversationId.value != null ? messagesByOrder[activeConversationId.value] ?? [] : [],
+)
+
 const companyStats = computed(() => {
   const totalServices = services.value.length
   const pendingRefunds = refundOrders.value.length
@@ -328,16 +379,6 @@ const companyStats = computed(() => {
     upcoming,
   }
 })
-
-const switchSection = (key: SectionKey) => {
-  activeSection.value = key
-  if (key === 'refunds') {
-    loadRefunds()
-  }
-  if (key === 'appointments') {
-    loadCompanyOrders()
-  }
-}
 
 const logout = () => {
   sessionStorage.removeItem(AUTH_TOKEN_KEY)
@@ -450,6 +491,203 @@ const saveOrderProgress = async (order: ServiceOrderItem, status: ServiceOrderIt
   }
 }
 
+const updateConversationSummary = (
+  orderId: number,
+  transform: (item: CompanyConversationItem) => CompanyConversationItem,
+) => {
+  const current = conversationSummaries.value
+  const index = current.findIndex((item) => item.orderId === orderId)
+  if (index === -1) {
+    return
+  }
+  const next = [...current]
+  const target = next[index]
+  if (!target) {
+    return
+  }
+  next.splice(index, 1, transform({ ...target }))
+  conversationSummaries.value = next
+}
+
+const loadCompanyReviews = async () => {
+  reviewsLoading.value = true
+  try {
+    companyReviews.value = await fetchCompanyReviews()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    reviewsLoading.value = false
+  }
+}
+
+const loadConversationSummaries = async (): Promise<CompanyConversationItem[]> => {
+  conversationsLoading.value = true
+  try {
+    const items = await fetchCompanyConversations()
+    conversationSummaries.value = items
+    if (!items.length) {
+      activeConversationId.value = null
+      stopMessagePolling()
+    } else if (
+      activeConversationId.value == null ||
+      !items.some((item) => item.orderId === activeConversationId.value)
+    ) {
+      const first = items[0]
+      if (first) {
+        activeConversationId.value = first.orderId
+      }
+    }
+    return items
+  } catch (error) {
+    console.error(error)
+    return []
+  } finally {
+    conversationsLoading.value = false
+  }
+}
+
+const loadMessagesForOrder = async (
+  orderId: number,
+  options: { since?: string | null; silent?: boolean } = {},
+) => {
+  if (!options.silent) {
+    messagesLoading.value = true
+  }
+  try {
+    const params = options.since ? { since: options.since } : undefined
+    const fetched = await fetchCompanyMessages(orderId, params)
+    if (fetched.length) {
+      const existing = [...(messagesByOrder[orderId] ?? [])]
+      const existingIds = new Set(existing.map((item) => item.id))
+      const combined = options.since
+        ? [...existing, ...fetched.filter((item) => !existingIds.has(item.id))]
+        : fetched
+      combined.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      if (combined.length) {
+        const lastMessage = combined[combined.length - 1]
+        if (lastMessage) {
+          messagesByOrder[orderId] = combined
+          lastMessageTimestamps[orderId] = lastMessage.createdAt
+          updateConversationSummary(orderId, (item) => ({
+            ...item,
+            lastMessage: lastMessage.content,
+            lastMessageAt: lastMessage.createdAt,
+            unreadCount: 0,
+          }))
+        }
+      }
+    } else if (!messagesByOrder[orderId]) {
+      messagesByOrder[orderId] = []
+    }
+    try {
+      await markCompanyConversationRead(orderId)
+      updateConversationSummary(orderId, (item) => ({ ...item, unreadCount: 0 }))
+    } catch (error) {
+      console.error(error)
+    }
+  } catch (error) {
+    console.error(error)
+  } finally {
+    if (!options.silent) {
+      messagesLoading.value = false
+    }
+  }
+}
+
+const selectConversation = async (orderId: number) => {
+  activeConversationId.value = orderId
+  await loadMessagesForOrder(orderId)
+  startMessagePolling(orderId)
+}
+
+const refreshActiveMessages = async () => {
+  if (activeConversationId.value == null) {
+    return
+  }
+  await loadMessagesForOrder(activeConversationId.value)
+}
+
+const handleSendMessage = async (payload: { orderId: number; content: string }) => {
+  const trimmed = payload.content.trim()
+  if (!trimmed) {
+    window.alert('请输入消息内容')
+    return
+  }
+  messageSending.value = true
+  try {
+    const message = await sendCompanyMessage(payload.orderId, { content: trimmed })
+    const existing = [...(messagesByOrder[payload.orderId] ?? [])]
+    existing.push(message)
+    existing.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    messagesByOrder[payload.orderId] = existing
+    lastMessageTimestamps[payload.orderId] = message.createdAt
+    updateConversationSummary(payload.orderId, (item) => ({
+      ...item,
+      lastMessage: message.content,
+      lastMessageAt: message.createdAt,
+      unreadCount: 0,
+    }))
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '发送失败，请稍后再试')
+  } finally {
+    messageSending.value = false
+  }
+}
+
+const stopMessagePolling = () => {
+  if (messagePollHandle.value != null) {
+    window.clearInterval(messagePollHandle.value)
+    messagePollHandle.value = null
+  }
+}
+
+const startMessagePolling = (orderId: number) => {
+  stopMessagePolling()
+  messagePollHandle.value = window.setInterval(() => {
+    const since = lastMessageTimestamps[orderId]
+    if (since) {
+      loadMessagesForOrder(orderId, { since, silent: true })
+    } else {
+      loadMessagesForOrder(orderId, { silent: true })
+    }
+  }, 10000)
+}
+
+const switchSection = async (key: SectionKey) => {
+  if (activeSection.value === 'messages' && key !== 'messages') {
+    stopMessagePolling()
+  }
+  activeSection.value = key
+  if (key === 'refunds') {
+    await loadRefunds()
+  }
+  if (key === 'appointments') {
+    await loadCompanyOrders()
+  }
+  if (key === 'reviews') {
+    await loadCompanyReviews()
+  }
+  if (key === 'messages') {
+    const items = await loadConversationSummaries()
+    const target = activeConversationId.value ?? items[0]?.orderId ?? null
+    if (target != null) {
+      await selectConversation(target)
+    } else {
+      stopMessagePolling()
+    }
+  }
+}
+
+const handleRefreshConversations = async () => {
+  const items = await loadConversationSummaries()
+  if (activeSection.value === 'messages') {
+    const target = activeConversationId.value ?? items[0]?.orderId ?? null
+    if (target != null) {
+      await selectConversation(target)
+    }
+  }
+}
+
 const loadServices = async () => {
   try {
     services.value = await fetchCompanyServices()
@@ -514,6 +752,10 @@ const formatDateTime = (value: string) => {
 
 onMounted(async () => {
   await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadCompanyOrders()])
+})
+
+onUnmounted(() => {
+  stopMessagePolling()
 })
 </script>
 
@@ -745,6 +987,10 @@ onMounted(async () => {
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
   padding: 28px 32px;
   backdrop-filter: blur(14px);
+}
+
+.panel.immersive-panel {
+  padding: clamp(24px, 3vw, 36px);
 }
 
 .panel-header {

@@ -14,9 +14,14 @@ public class ServiceReviewResponse {
     private Integer rating;
     private String content;
     private Instant createdAt;
+    private Instant updatedAt;
+    private String companyReply;
+    private Instant replyAt;
+    private Boolean pinned;
 
     public ServiceReviewResponse(Long id, Long serviceId, String serviceName, String username, Integer rating,
-                                 String content, Instant createdAt) {
+                                 String content, Instant createdAt, Instant updatedAt, String companyReply,
+                                 Instant replyAt, Boolean pinned) {
         this.id = id;
         this.serviceId = serviceId;
         this.serviceName = serviceName;
@@ -24,6 +29,10 @@ public class ServiceReviewResponse {
         this.rating = rating;
         this.content = content;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.companyReply = companyReply;
+        this.replyAt = replyAt;
+        this.pinned = pinned;
     }
 
     public Long getId() {
@@ -52,5 +61,21 @@ public class ServiceReviewResponse {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public String getCompanyReply() {
+        return companyReply;
+    }
+
+    public Instant getReplyAt() {
+        return replyAt;
+    }
+
+    public Boolean getPinned() {
+        return pinned;
     }
 }
