@@ -3,7 +3,7 @@
     <header class="dashboard-header">
       <div>
         <h1 class="dashboard-title">家政公司工作台</h1>
-        <p class="dashboard-subtitle">维护服务项目并及时处理用户退款</p>
+        <p class="dashboard-subtitle">维护服务项目、安排预约并及时处理用户退款</p>
       </div>
       <div class="header-actions">
         <span class="welcome">您好，{{ username }}！</span>
@@ -18,15 +18,15 @@
         <p class="stat-value">{{ companyStats.totalServices }}</p>
         <p class="stat-helper">向平台展示您的服务能力</p>
       </article>
+      <article class="stat-card primary">
+        <p class="stat-label">待执行预约</p>
+        <p class="stat-value">{{ companyStats.upcoming }}</p>
+        <p class="stat-helper">提前规划人手与物料</p>
+      </article>
       <article class="stat-card warning">
         <p class="stat-label">待处理退款</p>
         <p class="stat-value">{{ companyStats.pendingRefunds }}</p>
         <p class="stat-helper">及时响应守护用户体验</p>
-      </article>
-      <article class="stat-card primary">
-        <p class="stat-label">平均定价</p>
-        <p class="stat-value">¥{{ companyStats.avgPrice.toFixed(2) }}</p>
-        <p class="stat-helper">以数据优化您的定价策略</p>
       </article>
       <article class="stat-card success">
         <p class="stat-label">账户余额</p>
@@ -55,7 +55,7 @@
           <header class="panel-header">
             <div>
               <h2>服务项目管理</h2>
-              <p>完善服务信息让用户更了解您的优势。</p>
+              <p>完善服务信息让用户更了解您的优势。当前平均定价 ¥{{ companyStats.avgPrice.toFixed(2) }}</p>
             </div>
             <button type="button" class="primary-button" @click="openServiceForm()">新增服务</button>
           </header>
@@ -124,6 +124,86 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'appointments'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>预约排班</h2>
+              <p>掌握近期预约并同步上门进度，合理安排师傅日程。</p>
+            </div>
+            <button type="button" class="secondary-button" @click="loadCompanyOrders">刷新预约</button>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>预约时间</th>
+                  <th>用户</th>
+                  <th>状态</th>
+                  <th>进度备注</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="order in companyOrders" :key="order.id">
+                  <td>
+                    <strong>{{ order.serviceName }}</strong>
+                    <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
+                    <div class="order-subtext">联系方式：{{ order.contact }}</div>
+                    <div v-if="order.specialRequest" class="order-subtext highlight">
+                      用户需求：{{ order.specialRequest }}
+                    </div>
+                  </td>
+                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
+                  <td>{{ order.username }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
+                      {{ statusText(order.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <input
+                      v-model="progressNoteEdits[order.id]"
+                      type="text"
+                      class="progress-input"
+                      placeholder="填写最新进度"
+                    />
+                  </td>
+                  <td class="table-actions actions-inline">
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="progressSaving[order.id]"
+                      @click="saveOrderProgress(order, 'SCHEDULED')"
+                    >
+                      重置
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="progressSaving[order.id]"
+                      @click="saveOrderProgress(order, 'IN_PROGRESS')"
+                    >
+                      服务中
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="progressSaving[order.id]"
+                      @click="saveOrderProgress(order, 'COMPLETED')"
+                    >
+                      完成
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!companyOrders.length">
+                  <td colspan="6" class="empty-row">暂无预约记录，用户预约后会自动出现在此处。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else class="panel">
           <header class="panel-header">
             <div>
@@ -150,7 +230,7 @@
                   </td>
                   <td>{{ order.username }}</td>
                   <td>{{ order.refundReason }}</td>
-                  <td>{{ formatDate(order.updatedAt) }}</td>
+                  <td>{{ formatDateTime(order.updatedAt) }}</td>
                   <td class="table-actions actions-inline">
                     <button type="button" class="link-button" @click="handleRefund(order, true)">同意</button>
                     <button type="button" class="link-button danger" @click="handleRefund(order, false)">
@@ -179,17 +259,20 @@ import {
   fetchCurrentAccount,
   createCompanyService,
   deleteCompanyService,
+  fetchCompanyOrders,
   fetchCompanyRefunds,
   fetchCompanyServices,
   handleCompanyRefund,
+  updateCompanyOrderProgress,
   updateCompanyService,
   type AccountProfileItem,
   type CompanyServicePayload,
   type HousekeepServiceItem,
   type ServiceOrderItem,
+  type UpdateOrderProgressPayload,
 } from '../services/dashboard'
 
-type SectionKey = 'services' | 'refunds'
+type SectionKey = 'services' | 'appointments' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -206,15 +289,19 @@ const balanceText = computed(() => (account.value ? account.value.balance.toFixe
 
 const sections: SectionMeta[] = [
   { key: 'services', icon: '🧹', label: '服务管理' },
+  { key: 'appointments', icon: '📅', label: '预约排班' },
   { key: 'refunds', icon: '💸', label: '退款审核' },
 ]
 
 const activeSection = ref<SectionKey>('services')
 const services = ref<HousekeepServiceItem[]>([])
 const refundOrders = ref<ServiceOrderItem[]>([])
+const companyOrders = ref<ServiceOrderItem[]>([])
 const serviceFormVisible = ref(false)
 const serviceSaving = ref(false)
 const editingServiceId = ref<number | null>(null)
+const progressNoteEdits = reactive<Record<number, string>>({})
+const progressSaving = reactive<Record<number, boolean>>({})
 const serviceForm = reactive<CompanyServicePayload>({
   name: '',
   unit: '',
@@ -232,11 +319,13 @@ const companyStats = computed(() => {
     ? services.value.reduce((sum, item) => sum + item.price, 0) / totalServices
     : 0
   const balance = account.value?.balance ?? 0
+  const upcoming = companyOrders.value.length
   return {
     totalServices,
     pendingRefunds,
     avgPrice,
     balance,
+    upcoming,
   }
 })
 
@@ -244,6 +333,9 @@ const switchSection = (key: SectionKey) => {
   activeSection.value = key
   if (key === 'refunds') {
     loadRefunds()
+  }
+  if (key === 'appointments') {
+    loadCompanyOrders()
   }
 }
 
@@ -337,6 +429,27 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
   }
 }
 
+const saveOrderProgress = async (order: ServiceOrderItem, status: ServiceOrderItem['status']) => {
+  progressSaving[order.id] = true
+  try {
+    const payload: UpdateOrderProgressPayload = {
+      status,
+      progressNote: progressNoteEdits[order.id]?.trim() || undefined,
+    }
+    const updated = await updateCompanyOrderProgress(order.id, payload)
+    const index = companyOrders.value.findIndex((item) => item.id === updated.id)
+    if (index >= 0) {
+      companyOrders.value.splice(index, 1, updated)
+    }
+    progressNoteEdits[updated.id] = updated.progressNote || ''
+    window.alert('预约进度已更新')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '更新失败，请稍后再试')
+  } finally {
+    progressSaving[order.id] = false
+  }
+}
+
 const loadServices = async () => {
   try {
     services.value = await fetchCompanyServices()
@@ -353,6 +466,18 @@ const loadRefunds = async () => {
   }
 }
 
+const loadCompanyOrders = async () => {
+  try {
+    const result = await fetchCompanyOrders()
+    companyOrders.value = result
+    result.forEach((item) => {
+      progressNoteEdits[item.id] = item.progressNote || ''
+    })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 const loadAccount = async () => {
   try {
     account.value = await fetchCurrentAccount()
@@ -361,13 +486,34 @@ const loadAccount = async () => {
   }
 }
 
-const formatDate = (value: string) => {
+const statusText = (status: ServiceOrderItem['status']) => {
+  switch (status) {
+    case 'SCHEDULED':
+      return '待上门'
+    case 'IN_PROGRESS':
+      return '服务中'
+    case 'PENDING':
+      return '等待用户安排'
+    case 'COMPLETED':
+      return '已完成'
+    case 'REFUND_REQUESTED':
+      return '退款审核中'
+    case 'REFUND_APPROVED':
+      return '已退款'
+    case 'REFUND_REJECTED':
+      return '退款被拒'
+    default:
+      return status
+  }
+}
+
+const formatDateTime = (value: string) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadRefunds()])
+  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadCompanyOrders()])
 })
 </script>
 
@@ -699,6 +845,58 @@ onMounted(async () => {
   color: var(--brand-text-muted);
 }
 
+.order-subtext.highlight {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.progress-input {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--brand-radius);
+  padding: 8px 10px;
+  font-size: 13px;
+  background: rgba(248, 250, 255, 0.92);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.status-scheduled {
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+}
+
+.status-in_progress {
+  background: linear-gradient(135deg, #14b8a6, #0f766e);
+}
+
+.status-pending {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.status-completed {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.status-refund_requested {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.status-refund_approved {
+  background: linear-gradient(135deg, #14b8a6, #0f766e);
+}
+
+.status-refund_rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
 .table-wrapper {
   overflow-x: auto;
   border-radius: calc(var(--brand-radius) + 2px);
@@ -710,6 +908,7 @@ onMounted(async () => {
   border-collapse: separate;
   border-spacing: 0;
   background: rgba(255, 255, 255, 0.95);
+  table-layout: fixed;
 }
 
 .data-table thead th {
@@ -718,6 +917,7 @@ onMounted(async () => {
   font-weight: 600;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
 }
 
 .data-table tbody td {
@@ -725,6 +925,7 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
   vertical-align: top;
   color: var(--brand-text);
+  text-align: left;
 }
 
 .data-table tbody tr:last-child td {
@@ -736,12 +937,13 @@ onMounted(async () => {
 }
 
 .table-actions {
-  width: 150px;
+  width: 220px;
 }
 
 .actions-inline {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .link-button {

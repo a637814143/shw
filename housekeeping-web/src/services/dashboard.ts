@@ -54,6 +54,8 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 
 export type ServiceOrderStatus =
   | 'PENDING'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
   | 'COMPLETED'
   | 'REFUND_REQUESTED'
   | 'REFUND_APPROVED'
@@ -80,6 +82,10 @@ export interface ServiceOrderItem {
   companyName: string
   username: string
   status: ServiceOrderStatus
+  scheduledAt: string
+  specialRequest?: string | null
+  progressNote?: string | null
+  loyaltyPoints: number
   refundReason?: string | null
   refundResponse?: string | null
   handledBy?: string | null
@@ -102,6 +108,7 @@ export interface UserAccountItem {
   username: string
   role: string
   balance: number
+  loyaltyPoints: number
 }
 
 export interface AccountProfileItem {
@@ -109,10 +116,13 @@ export interface AccountProfileItem {
   username: string
   role: string
   balance: number
+  loyaltyPoints: number
 }
 
 export interface CreateOrderPayload {
   serviceId: number
+  scheduledAt: string
+  specialRequest?: string
 }
 
 export interface RefundPayload {
@@ -144,6 +154,15 @@ export interface UpdateWalletPayload {
 
 export interface UpdatePasswordPayload {
   password: string
+}
+
+export interface UpdateLoyaltyPayload {
+  loyaltyPoints: number
+}
+
+export interface UpdateOrderProgressPayload {
+  status: ServiceOrderStatus
+  progressNote?: string
 }
 
 // 公共接口
@@ -245,6 +264,22 @@ export const handleCompanyRefund = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
+export const fetchCompanyOrders = async (): Promise<ServiceOrderItem[]> => {
+  const response = await fetch(buildUrl('/api/company/services/orders'), withAuthHeaders())
+  return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const updateCompanyOrderProgress = async (
+  orderId: number,
+  payload: UpdateOrderProgressPayload,
+): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/company/services/orders/${orderId}/progress`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ServiceOrderItem>(response)
+}
+
 // 管理员接口
 export const fetchAdminUsers = async (): Promise<UserAccountItem[]> => {
   const response = await fetch(buildUrl('/api/admin/users'), withAuthHeaders())
@@ -256,6 +291,17 @@ export const updateAdminWallet = async (
   payload: UpdateWalletPayload,
 ): Promise<UserAccountItem> => {
   const response = await fetch(buildUrl(`/api/admin/users/${userId}/wallet`), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<UserAccountItem>(response)
+}
+
+export const updateAdminLoyalty = async (
+  userId: number,
+  payload: UpdateLoyaltyPayload,
+): Promise<UserAccountItem> => {
+  const response = await fetch(buildUrl(`/api/admin/users/${userId}/loyalty`), {
     ...withAuthHeaders({ method: 'PUT' }),
     body: JSON.stringify(payload),
   })

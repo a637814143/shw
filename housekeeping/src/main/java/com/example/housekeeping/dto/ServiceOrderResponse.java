@@ -19,6 +19,10 @@ public class ServiceOrderResponse {
     private String companyName;
     private String username;
     private ServiceOrderStatus status;
+    private Instant scheduledAt;
+    private String specialRequest;
+    private String progressNote;
+    private Integer loyaltyPoints;
     private String refundReason;
     private String refundResponse;
     private String handledBy;
@@ -27,6 +31,7 @@ public class ServiceOrderResponse {
 
     public ServiceOrderResponse(Long id, Long serviceId, String serviceName, String unit, BigDecimal price,
                                 String contact, String companyName, String username, ServiceOrderStatus status,
+                                Instant scheduledAt, String specialRequest, String progressNote, Integer loyaltyPoints,
                                 String refundReason, String refundResponse, String handledBy,
                                 Instant createdAt, Instant updatedAt) {
         this.id = id;
@@ -38,6 +43,10 @@ public class ServiceOrderResponse {
         this.companyName = companyName;
         this.username = username;
         this.status = status;
+        this.scheduledAt = scheduledAt;
+        this.specialRequest = specialRequest;
+        this.progressNote = progressNote;
+        this.loyaltyPoints = loyaltyPoints;
         this.refundReason = refundReason;
         this.refundResponse = refundResponse;
         this.handledBy = handledBy;
@@ -79,6 +88,22 @@ public class ServiceOrderResponse {
 
     public ServiceOrderStatus getStatus() {
         return status;
+    }
+
+    public Instant getScheduledAt() {
+        return scheduledAt;
+    }
+
+    public String getSpecialRequest() {
+        return specialRequest;
+    }
+
+    public String getProgressNote() {
+        return progressNote;
+    }
+
+    public Integer getLoyaltyPoints() {
+        return loyaltyPoints;
     }
 
     public String getRefundReason() {

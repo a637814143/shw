@@ -48,6 +48,7 @@ public class AccountAuthService {
         account.setUsername(normalizedAccount);
         account.setPasswd(legacyPasswordEncoder.encode(request.getPassword()));
         account.setMoney(DEFAULT_BALANCE);
+        account.setLoyaltyPoints(0);
         account.setUserType(role.getLabel());
 
         UserAll saved = userAllRepository.save(account);

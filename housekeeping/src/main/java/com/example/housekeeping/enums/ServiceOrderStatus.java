@@ -5,6 +5,8 @@ package com.example.housekeeping.enums;
  */
 public enum ServiceOrderStatus {
     PENDING,
+    SCHEDULED,
+    IN_PROGRESS,
     COMPLETED,
     REFUND_REQUESTED,
     REFUND_APPROVED,

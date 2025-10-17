@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.UpdateLoyaltyRequest;
 import com.example.housekeeping.dto.UpdatePasswordRequest;
 import com.example.housekeeping.dto.UpdateWalletRequest;
 import com.example.housekeeping.dto.UserAccountResponse;
@@ -58,6 +59,17 @@ public class AdminAccountService {
         return mapToResponse(userAllRepository.save(target));
     }
 
+    @Transactional
+    public UserAccountResponse updateLoyalty(Long userId, UpdateLoyaltyRequest request) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureAdmin(admin);
+        UserAll target = userAllRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("用户不存在"));
+        Integer points = request.getLoyaltyPoints();
+        target.setLoyaltyPoints(points == null ? 0 : points);
+        return mapToResponse(userAllRepository.save(target));
+    }
+
     private void ensureAdmin(UserAll account) {
         if (!AccountRole.ADMIN.getLabel().equals(account.getUserType())) {
             throw new RuntimeException("仅管理员可操作");
@@ -70,7 +82,8 @@ public class AdminAccountService {
             user.getId(),
             user.getUsername(),
             role.getCode(),
-            user.getMoney()
+            user.getMoney(),
+            user.getLoyaltyPoints() == null ? 0 : user.getLoyaltyPoints()
         );
     }
 }

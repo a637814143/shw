@@ -25,12 +25,12 @@
       <article class="stat-card primary">
         <p class="stat-label">平台资产</p>
         <p class="stat-value">¥{{ adminStats.totalWallet.toFixed(2) }}</p>
-        <p class="stat-helper">实时汇总全部用户钱包余额</p>
+        <p class="stat-helper">人均余额 ¥{{ adminStats.avgWallet.toFixed(2) }}</p>
       </article>
       <article class="stat-card success">
-        <p class="stat-label">人均余额</p>
-        <p class="stat-value">¥{{ adminStats.avgWallet.toFixed(2) }}</p>
-        <p class="stat-helper">直观掌握平台资金健康度</p>
+        <p class="stat-label">平台积分</p>
+        <p class="stat-value">{{ adminStats.totalPoints }}</p>
+        <p class="stat-helper">鼓励用户复购与口碑传播</p>
       </article>
     </section>
 
@@ -64,7 +64,9 @@
                   <th>账号</th>
                   <th>角色</th>
                   <th>余额（¥）</th>
+                  <th>积分</th>
                   <th>设置新余额</th>
+                  <th>调整积分</th>
                   <th>重置密码</th>
                 </tr>
               </thead>
@@ -73,6 +75,7 @@
                   <td>{{ user.username }}</td>
                   <td>{{ roleText(user.role) }}</td>
                   <td>{{ user.balance.toFixed(2) }}</td>
+                  <td>{{ user.loyaltyPoints }}</td>
                   <td>
                     <div class="inline-form">
                       <input
@@ -82,6 +85,12 @@
                         step="0.01"
                       />
                       <button type="button" class="link-button" @click="saveWallet(user.id)">保存</button>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="inline-form">
+                      <input v-model.number="loyaltyEdits[user.id]" type="number" min="0" step="1" />
+                      <button type="button" class="link-button" @click="saveLoyalty(user.id)">更新</button>
                     </div>
                   </td>
                   <td>
@@ -98,7 +107,7 @@
                   </td>
                 </tr>
                 <tr v-if="!users.length">
-                  <td colspan="5" class="empty-row">暂无用户数据。</td>
+                  <td colspan="7" class="empty-row">暂无用户数据。</td>
                 </tr>
               </tbody>
             </table>
@@ -163,9 +172,11 @@ import {
   fetchAdminUsers,
   handleAdminRefund,
   updateAdminPassword,
+  updateAdminLoyalty,
   updateAdminWallet,
   type ServiceOrderItem,
   type UpdatePasswordPayload,
+  type UpdateLoyaltyPayload,
   type UpdateWalletPayload,
   type UserAccountItem,
 } from '../services/dashboard'
@@ -191,17 +202,20 @@ const users = ref<UserAccountItem[]>([])
 const refundOrders = ref<ServiceOrderItem[]>([])
 const walletEdits = reactive<Record<number, number>>({})
 const passwordEdits = reactive<Record<number, string>>({})
+const loyaltyEdits = reactive<Record<number, number>>({})
 
 const adminStats = computed(() => {
   const totalUsers = users.value.length
   const totalWallet = users.value.reduce((sum, item) => sum + item.balance, 0)
   const avgWallet = totalUsers > 0 ? totalWallet / totalUsers : 0
   const pendingRefunds = refundOrders.value.length
+  const totalPoints = users.value.reduce((sum, item) => sum + (item.loyaltyPoints ?? 0), 0)
   return {
     totalUsers,
     totalWallet,
     avgWallet,
     pendingRefunds,
+    totalPoints,
   }
 })
 
@@ -233,6 +247,12 @@ const ensurePasswordDraft = (user: UserAccountItem) => {
   }
 }
 
+const ensureLoyaltyDraft = (user: UserAccountItem) => {
+  if (loyaltyEdits[user.id] === undefined) {
+    loyaltyEdits[user.id] = user.loyaltyPoints
+  }
+}
+
 const loadUsers = async () => {
   try {
     const data = await fetchAdminUsers()
@@ -240,6 +260,7 @@ const loadUsers = async () => {
     data.forEach((user) => {
       ensureWalletDraft(user)
       ensurePasswordDraft(user)
+      ensureLoyaltyDraft(user)
     })
   } catch (error) {
     console.error(error)
@@ -281,6 +302,21 @@ const savePassword = async (userId: number) => {
     window.alert('密码已重置')
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '重置密码失败')
+  }
+}
+
+const saveLoyalty = async (userId: number) => {
+  const points = Number(loyaltyEdits[userId])
+  if (!Number.isFinite(points) || points < 0) {
+    window.alert('请输入正确的积分')
+    return
+  }
+  try {
+    await updateAdminLoyalty(userId, { loyaltyPoints: Math.floor(points) } as UpdateLoyaltyPayload)
+    await loadUsers()
+    window.alert('积分已更新')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '更新积分失败')
   }
 }
 
@@ -557,6 +593,7 @@ onMounted(async () => {
   border-collapse: separate;
   border-spacing: 0;
   background: rgba(255, 255, 255, 0.95);
+  table-layout: fixed;
 }
 
 .data-table thead th {
@@ -565,6 +602,7 @@ onMounted(async () => {
   font-weight: 600;
   padding: 14px 16px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
 }
 
 .data-table tbody td {
@@ -572,6 +610,7 @@ onMounted(async () => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
   vertical-align: top;
   color: var(--brand-text);
+  text-align: left;
 }
 
 .data-table tbody tr:last-child td {
@@ -583,12 +622,13 @@ onMounted(async () => {
 }
 
 .table-actions {
-  width: 160px;
+  width: 200px;
 }
 
 .actions-inline {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .inline-form {

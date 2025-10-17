@@ -3,6 +3,7 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.dto.UpdateLoyaltyRequest;
 import com.example.housekeeping.dto.UpdatePasswordRequest;
 import com.example.housekeeping.dto.UpdateWalletRequest;
 import com.example.housekeeping.dto.UserAccountResponse;
@@ -42,6 +43,12 @@ public class AdminManagementController {
     public Result<UserAccountResponse> updatePassword(@PathVariable Long userId,
                                                       @Valid @RequestBody UpdatePasswordRequest request) {
         return Result.success("密码已重置", adminAccountService.updatePassword(userId, request));
+    }
+
+    @PutMapping("/users/{userId}/loyalty")
+    public Result<UserAccountResponse> updateLoyalty(@PathVariable Long userId,
+                                                     @Valid @RequestBody UpdateLoyaltyRequest request) {
+        return Result.success("积分已更新", adminAccountService.updateLoyalty(userId, request));
     }
 
     @GetMapping("/refunds")

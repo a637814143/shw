@@ -11,12 +11,14 @@ public class AccountProfileResponse {
     private String username;
     private String role;
     private BigDecimal balance;
+    private Integer loyaltyPoints;
 
-    public AccountProfileResponse(Long id, String username, String role, BigDecimal balance) {
+    public AccountProfileResponse(Long id, String username, String role, BigDecimal balance, Integer loyaltyPoints) {
         this.id = id;
         this.username = username;
         this.role = role;
         this.balance = balance;
+        this.loyaltyPoints = loyaltyPoints;
     }
 
     public Long getId() {
@@ -33,5 +35,9 @@ public class AccountProfileResponse {
 
     public BigDecimal getBalance() {
         return balance;
+    }
+
+    public Integer getLoyaltyPoints() {
+        return loyaltyPoints;
     }
 }

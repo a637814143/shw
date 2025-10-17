@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
@@ -17,8 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -55,15 +59,28 @@ public class ServiceOrderService {
             throw new RuntimeException("余额不足，请先充值");
         }
 
+        Instant scheduledAt = Objects.requireNonNull(request.getScheduledAt(), "预约时间不能为空");
+        if (scheduledAt.isBefore(Instant.now().minusSeconds(60))) {
+            throw new RuntimeException("预约时间不能早于当前时间");
+        }
+
+        String specialRequest = normalizeMessage(request.getSpecialRequest());
+        int earnedPoints = calculateLoyaltyPoints(price);
+
         UserAll company = service.getCompany();
         user.setMoney(user.getMoney().subtract(price));
         company.setMoney(company.getMoney().add(price));
+        user.setLoyaltyPoints(safeLoyalty(user.getLoyaltyPoints()) + earnedPoints);
 
         ServiceOrder order = new ServiceOrder();
         order.setService(service);
         order.setUser(user);
         order.setAmount(price);
-        order.setStatus(ServiceOrderStatus.PENDING);
+        order.setStatus(ServiceOrderStatus.SCHEDULED);
+        order.setScheduledAt(scheduledAt);
+        order.setSpecialRequest(specialRequest);
+        order.setProgressNote("待上门服务");
+        order.setLoyaltyPoints(earnedPoints);
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(order.getCreatedAt());
 
@@ -79,6 +96,23 @@ public class ServiceOrderService {
         ensureRole(user, AccountRole.USER);
         return serviceOrderRepository.findByUserOrderByCreatedAtDesc(user)
             .stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceOrderResponse> listActiveOrdersForCompany() {
+        UserAll company = accountLookupService.getCurrentAccount();
+        ensureRole(company, AccountRole.COMPANY);
+        List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
+        if (services.isEmpty()) {
+            return List.of();
+        }
+        return serviceOrderRepository.findByServiceIn(services).stream()
+            .filter(order -> order.getStatus() == ServiceOrderStatus.SCHEDULED
+                || order.getStatus() == ServiceOrderStatus.IN_PROGRESS
+                || order.getStatus() == ServiceOrderStatus.PENDING)
+            .sorted(Comparator.comparing(ServiceOrder::getScheduledAt))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -100,6 +134,7 @@ public class ServiceOrderService {
         order.setRefundReason(request.getReason().trim());
         order.setRefundResponse(null);
         order.setHandledBy(null);
+        order.setProgressNote("用户申请退款");
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));
     }
@@ -116,6 +151,42 @@ public class ServiceOrderService {
             .stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public ServiceOrderResponse updateOrderProgress(Long orderId, OrderProgressUpdateRequest request) {
+        UserAll actor = accountLookupService.getCurrentAccount();
+        ServiceOrder order = serviceOrderRepository.findById(orderId)
+            .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        boolean isAdmin = AccountRole.ADMIN.getLabel().equals(actor.getUserType());
+        boolean isCompany = AccountRole.COMPANY.getLabel().equals(actor.getUserType());
+        if (!isAdmin && !isCompany) {
+            throw new RuntimeException("没有操作权限");
+        }
+        if (isCompany && !order.getService().getCompany().getId().equals(actor.getId())) {
+            throw new RuntimeException("无权管理其他公司的订单");
+        }
+        if (order.getStatus() == ServiceOrderStatus.REFUND_REQUESTED
+            || order.getStatus() == ServiceOrderStatus.REFUND_APPROVED) {
+            throw new RuntimeException("退款流程中的订单无法修改进度");
+        }
+
+        ServiceOrderStatus desiredStatus = normalizeProgressStatus(request.getStatus());
+        order.setStatus(desiredStatus);
+        String note = normalizeMessage(request.getProgressNote());
+        if (note == null) {
+            if (desiredStatus == ServiceOrderStatus.COMPLETED) {
+                note = "服务已完成";
+            } else if (desiredStatus == ServiceOrderStatus.IN_PROGRESS) {
+                note = "服务进行中";
+            } else {
+                note = order.getProgressNote();
+            }
+        }
+        order.setProgressNote(note);
+        order.setUpdatedAt(Instant.now());
+        return mapToResponse(serviceOrderRepository.save(order));
     }
 
     @Transactional(readOnly = true)
@@ -158,9 +229,13 @@ public class ServiceOrderService {
             }
             user.setMoney(user.getMoney().add(amount));
             company.setMoney(company.getMoney().subtract(amount));
+            int earned = safeLoyalty(order.getLoyaltyPoints());
+            user.setLoyaltyPoints(Math.max(0, safeLoyalty(user.getLoyaltyPoints()) - earned));
             order.setStatus(ServiceOrderStatus.REFUND_APPROVED);
+            order.setProgressNote("订单已退款");
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
+            order.setProgressNote("退款申请被拒绝");
         }
         order.setRefundResponse(normalizeMessage(request.getMessage()));
         order.setHandledBy(actor);
@@ -190,12 +265,43 @@ public class ServiceOrderService {
             service.getCompany().getUsername(),
             order.getUser().getUsername(),
             order.getStatus(),
+            order.getScheduledAt(),
+            order.getSpecialRequest(),
+            order.getProgressNote(),
+            order.getLoyaltyPoints() == null ? 0 : order.getLoyaltyPoints(),
             order.getRefundReason(),
             order.getRefundResponse(),
             order.getHandledBy() == null ? null : order.getHandledBy().getUsername(),
             order.getCreatedAt(),
             order.getUpdatedAt()
         );
+    }
+
+    private ServiceOrderStatus normalizeProgressStatus(ServiceOrderStatus status) {
+        if (status == null) {
+            return ServiceOrderStatus.SCHEDULED;
+        }
+        switch (status) {
+            case REFUND_REQUESTED:
+            case REFUND_APPROVED:
+            case REFUND_REJECTED:
+                throw new RuntimeException("无法将订单直接切换为退款状态");
+            case PENDING:
+                return ServiceOrderStatus.SCHEDULED;
+            default:
+                return status;
+        }
+    }
+
+    private int calculateLoyaltyPoints(BigDecimal amount) {
+        if (amount == null) {
+            return 0;
+        }
+        return amount.divide(BigDecimal.TEN, 0, RoundingMode.FLOOR).intValue();
+    }
+
+    private int safeLoyalty(Integer value) {
+        return value == null ? 0 : Math.max(0, value);
     }
 
     private String normalizeMessage(String message) {
