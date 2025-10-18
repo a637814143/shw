@@ -6,7 +6,8 @@
         <p class="dashboard-subtitle">精选内容、智能预约、实时沟通，沉浸式高级体验。</p>
       </div>
       <div class="header-actions">
-        <span class="welcome">您好，{{ username }}！</span>
+        <img :src="avatarSrc" alt="账号头像" class="account-avatar" />
+        <span class="welcome">您好，{{ displayName }}！</span>
         <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <span class="loyalty">积分：{{ loyaltyText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
@@ -82,7 +83,17 @@
       </aside>
 
       <main class="content">
-        <section v-if="activeSection === 'discover'" class="panel immersive-panel">
+        <section v-if="activeSection === 'profile'" class="panel profile-panel">
+          <header class="panel-header">
+            <div>
+              <h2>个人资料</h2>
+              <p>更新头像与展示名称，让服务更具个性。</p>
+            </div>
+          </header>
+          <AccountProfileEditor :account="account" @updated="handleProfileUpdated" />
+        </section>
+
+        <section v-else-if="activeSection === 'discover'" class="panel immersive-panel">
           <header class="panel-header">
             <div>
               <h2>精选推荐</h2>
@@ -401,6 +412,7 @@ import {
 } from '../services/dashboard'
 
 import UserMessagingPanel from '../pages/user/UserMessagingPanel.vue'
+import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
 interface SectionMeta {
   key: SectionKey
@@ -408,10 +420,13 @@ interface SectionMeta {
   label: string
 }
 
-type SectionKey = 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
+type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
 
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
+
+const FALLBACK_AVATAR =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
 const services = ref<HousekeepServiceItem[]>([])
 const orders = ref<ServiceOrderItem[]>([])
 const serviceReviews = ref<ServiceReviewItem[]>([])
@@ -449,6 +464,7 @@ const exchangeSaving = ref(false)
 const discoverLoading = ref(false)
 
 const sections: SectionMeta[] = [
+  { key: 'profile', icon: '👤', label: '个人资料' },
   { key: 'discover', icon: '🌟', label: '精选推荐' },
   { key: 'services', icon: '🧹', label: '选择服务' },
   { key: 'orders', icon: '📋', label: '我的订单' },
@@ -459,11 +475,19 @@ const sections: SectionMeta[] = [
 
 const activeSection = ref<SectionKey>('discover')
 
-const username = computed(
-  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '用户',
+const displayName = computed(
+  () =>
+    account.value?.displayName ||
+    account.value?.username ||
+    sessionStorage.getItem(AUTH_ACCOUNT_KEY) ||
+    '用户',
 )
 const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
 const loyaltyText = computed(() => (account.value ? account.value.loyaltyPoints.toString() : '0'))
+
+const avatarSrc = computed(
+  () => account.value?.avatarBase64 || FALLBACK_AVATAR,
+)
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
 const favoritesCount = computed(() => favorites.value.length)
@@ -511,6 +535,10 @@ const loadAccount = async () => {
   } catch (error) {
     console.error(error)
   }
+}
+
+const handleProfileUpdated = (payload: AccountProfileItem) => {
+  account.value = payload
 }
 
 const loadServices = async () => {
@@ -572,6 +600,8 @@ const switchSection = (key: SectionKey) => {
   activeSection.value = key
   if (key === 'orders') {
     loadOrders()
+    loadAccount()
+  } else if (key === 'profile') {
     loadAccount()
   } else if (key === 'messages') {
     loadConversations()
@@ -834,6 +864,15 @@ onMounted(async () => {
   color: rgba(226, 232, 240, 0.8);
 }
 
+.account-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
+  border: 2px solid rgba(148, 163, 184, 0.35);
+}
+
 .logout-button {
   padding: 0.5rem 1.25rem;
   border-radius: 999px;
@@ -922,6 +961,11 @@ onMounted(async () => {
   border: 1px solid rgba(148, 163, 184, 0.18);
   backdrop-filter: blur(18px);
   box-shadow: 0 30px 60px rgba(15, 23, 42, 0.35);
+}
+
+.profile-panel {
+  background: linear-gradient(160deg, rgba(45, 212, 191, 0.15), rgba(56, 189, 248, 0.12));
+  border-color: rgba(20, 184, 166, 0.25);
 }
 
 .immersive-panel {
@@ -1358,6 +1402,16 @@ onMounted(async () => {
 @media (max-width: 1080px) {
   .dashboard-main {
     grid-template-columns: 1fr;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .account-avatar {
+    width: 44px;
+    height: 44px;
   }
 
   .sidebar {

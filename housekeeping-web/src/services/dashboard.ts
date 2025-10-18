@@ -120,9 +120,16 @@ export interface UserAccountItem {
 export interface AccountProfileItem {
   id: number
   username: string
+  displayName: string
   role: string
   balance: number
   loyaltyPoints: number
+  avatarBase64: string
+}
+
+export interface UpdateAccountProfilePayload {
+  displayName: string
+  avatarBase64?: string
 }
 
 export interface CreateOrderPayload {
@@ -580,6 +587,16 @@ export const handleAdminRefund = async (
 
 export const fetchCurrentAccount = async (): Promise<AccountProfileItem> => {
   const response = await fetch(buildUrl('/api/account/me'), withAuthHeaders())
+  return handleResponse<AccountProfileItem>(response)
+}
+
+export const updateCurrentAccount = async (
+  payload: UpdateAccountProfilePayload,
+): Promise<AccountProfileItem> => {
+  const response = await fetch(buildUrl('/api/account/me'), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
   return handleResponse<AccountProfileItem>(response)
 }
 

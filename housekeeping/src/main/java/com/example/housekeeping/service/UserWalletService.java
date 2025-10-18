@@ -34,6 +34,9 @@ public class UserWalletService {
     @Autowired
     private AccountTransactionRepository accountTransactionRepository;
 
+    @Autowired
+    private AccountProfileService accountProfileService;
+
     @Transactional
     public AccountProfileResponse recharge(WalletRechargeRequest request) {
         UserAll user = ensureUser();
@@ -43,10 +46,10 @@ public class UserWalletService {
         }
 
         user.setMoney(user.getMoney().add(amount));
-        userAllRepository.save(user);
+        UserAll saved = userAllRepository.save(user);
 
         recordTransaction(user, AccountTransactionType.RECHARGE, amount, "用户自助充值");
-        return toProfile(user);
+        return accountProfileService.buildResponse(saved);
     }
 
     @Transactional
@@ -67,10 +70,10 @@ public class UserWalletService {
         BigDecimal amount = new BigDecimal(points).multiply(POINT_TO_CNY_RATIO).setScale(2, RoundingMode.HALF_UP);
         user.setLoyaltyPoints(currentPoints - points);
         user.setMoney(user.getMoney().add(amount));
-        userAllRepository.save(user);
+        UserAll saved = userAllRepository.save(user);
 
         recordTransaction(user, AccountTransactionType.ADJUST, amount, "积分兑换余额");
-        return toProfile(user);
+        return accountProfileService.buildResponse(saved);
     }
 
     private UserAll ensureUser() {
@@ -91,13 +94,4 @@ public class UserWalletService {
         accountTransactionRepository.save(txn);
     }
 
-    private AccountProfileResponse toProfile(UserAll user) {
-        return new AccountProfileResponse(
-            user.getId(),
-            user.getUsername(),
-            AccountRole.USER.getCode(),
-            user.getMoney(),
-            user.getLoyaltyPoints() == null ? 0 : user.getLoyaltyPoints()
-        );
-    }
 }

@@ -33,4 +33,11 @@ public class UserAll {
 
     @Column(name = "usertype", nullable = false, length = 32)
     private String userType;
+
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    @Lob
+    @Column(name = "avatar_base64", nullable = false, columnDefinition = "LONGTEXT")
+    private String avatarBase64;
 }

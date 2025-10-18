@@ -6,7 +6,8 @@
         <p class="dashboard-subtitle">维护服务项目、安排预约并及时处理用户退款</p>
       </div>
       <div class="header-actions">
-        <span class="welcome">您好，{{ username }}！</span>
+        <img :src="avatarSrc" alt="账号头像" class="account-avatar" />
+        <span class="welcome">您好，{{ displayName }}！</span>
         <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
       </div>
@@ -51,7 +52,17 @@
       </aside>
 
       <main class="content">
-        <section v-if="activeSection === 'services'" class="panel">
+        <section v-if="activeSection === 'profile'" class="panel profile-panel">
+          <header class="panel-header">
+            <div>
+              <h2>企业资料</h2>
+              <p>维护公司展示名称与头像，让客户快速识别您的品牌。</p>
+            </div>
+          </header>
+          <AccountProfileEditor :account="account" @updated="handleProfileUpdated" />
+        </section>
+
+        <section v-else-if="activeSection === 'services'" class="panel">
           <header class="panel-header">
             <div>
               <h2>服务项目管理</h2>
@@ -305,8 +316,9 @@ import {
 
 import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
+import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
-type SectionKey = 'services' | 'appointments' | 'reviews' | 'messages' | 'refunds'
+type SectionKey = 'profile' | 'services' | 'appointments' | 'reviews' | 'messages' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -316,12 +328,22 @@ interface SectionMeta {
 
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
-const username = computed(
-  () => account.value?.username ?? sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? '公司用户',
+
+const FALLBACK_AVATAR =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
+
+const displayName = computed(
+  () =>
+    account.value?.displayName ||
+    account.value?.username ||
+    sessionStorage.getItem(AUTH_ACCOUNT_KEY) ||
+    '公司用户',
 )
 const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
+const avatarSrc = computed(() => account.value?.avatarBase64 || FALLBACK_AVATAR)
 
 const sections: SectionMeta[] = [
+  { key: 'profile', icon: '👤', label: '企业资料' },
   { key: 'services', icon: '🧹', label: '服务管理' },
   { key: 'appointments', icon: '📅', label: '预约排班' },
   { key: 'reviews', icon: '✨', label: '服务口碑' },
@@ -358,6 +380,10 @@ const activeConversationId = ref<number | null>(null)
 const messagesLoading = ref(false)
 const messageSending = ref(false)
 const messagePollHandle = ref<number | null>(null)
+
+const handleProfileUpdated = (payload: AccountProfileItem) => {
+  account.value = payload
+}
 
 const activeMessages = computed(() =>
   activeConversationId.value != null ? messagesByOrder[activeConversationId.value] ?? [] : [],
@@ -658,6 +684,10 @@ const switchSection = async (key: SectionKey) => {
     stopMessagePolling()
   }
   activeSection.value = key
+  if (key === 'profile') {
+    await loadAccount()
+    return
+  }
   if (key === 'refunds') {
     await loadRefunds()
   }
@@ -828,6 +858,15 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
 }
 
+.account-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
 .welcome {
   font-weight: 600;
 }
@@ -987,6 +1026,11 @@ onUnmounted(() => {
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
   padding: 28px 32px;
   backdrop-filter: blur(14px);
+}
+
+.profile-panel {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.08));
+  border-color: rgba(16, 185, 129, 0.2);
 }
 
 .panel.immersive-panel {
@@ -1265,6 +1309,10 @@ onUnmounted(() => {
     flex-direction: row;
     overflow-x: auto;
   }
+
+  .header-actions {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1277,6 +1325,11 @@ onUnmounted(() => {
   .header-actions {
     align-self: stretch;
     justify-content: space-between;
+  }
+
+  .account-avatar {
+    width: 48px;
+    height: 48px;
   }
 
   .panel,

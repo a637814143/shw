@@ -8,6 +8,8 @@ CREATE TABLE `user_all` (
   `money` decimal(12,2) NOT NULL DEFAULT 1000.00 COMMENT '账户余额（CNY）',
   `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '消费累积积分',
   `usertype` varchar(32) NOT NULL COMMENT '用户类型：普通用户/家政公司/系统管理员',
+  `display_name` varchar(100) NOT NULL DEFAULT '' COMMENT '展示名称',
+  `avatar_base64` longtext NOT NULL COMMENT 'Base64 格式头像',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='统一用户账号表';
 
@@ -129,6 +131,16 @@ CREATE TABLE `company_message` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='企业与客户沟通消息表';
 
 -- 初始化系统管理员账号
-INSERT INTO `user_all` (`username`, `passwd`, `money`, `usertype`)
-VALUES ('admin', 'JIqFqTSKAQ0=', 1000.00, '系统管理员')
-ON DUPLICATE KEY UPDATE `usertype`='系统管理员';
+INSERT INTO `user_all` (`username`, `passwd`, `money`, `usertype`, `display_name`, `avatar_base64`)
+VALUES (
+  'admin',
+  'JIqFqTSKAQ0=',
+  1000.00,
+  '系统管理员',
+  '系统管理员',
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
+)
+ON DUPLICATE KEY UPDATE
+  `usertype`='系统管理员',
+  `display_name`='系统管理员',
+  `avatar_base64`='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
