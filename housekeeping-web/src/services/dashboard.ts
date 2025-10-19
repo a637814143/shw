@@ -173,6 +173,11 @@ export interface UpdateLoyaltyPayload {
   loyaltyPoints: number
 }
 
+export interface UpdateAccountPasswordPayload {
+  currentPassword: string
+  newPassword: string
+}
+
 export interface UpdateOrderProgressPayload {
   status: ServiceOrderStatus
   progressNote?: string
@@ -598,6 +603,16 @@ export const updateCurrentAccount = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<AccountProfileItem>(response)
+}
+
+export const updateCurrentPassword = async (
+  payload: UpdateAccountPasswordPayload,
+): Promise<void> => {
+  const response = await fetch(buildUrl('/api/account/password'), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  await handleResponse<void>(response)
 }
 
 export const fetchAdminOverview = async (): Promise<AdminOverviewItem> => {

@@ -63,12 +63,54 @@
             <button type="button" class="secondary-button" @click="closeBooking">取消</button>
             <button type="submit" class="primary-button">确认预约</button>
           </footer>
-        </form>
-      </div>
-    </transition>
+    </form>
+  </div>
+</transition>
 
-    <div class="dashboard-main">
-      <aside class="sidebar">
+<transition name="fade">
+  <div v-if="paymentDialogVisible" class="dialog-backdrop" @click.self="closePaymentDialog">
+    <div class="dialog-card payment-card">
+      <header class="dialog-header">
+        <h2>扫描二维码完成支付</h2>
+        <p>请使用手机扫描下方二维码，在支付页面确认后系统将自动创建订单。</p>
+      </header>
+      <div class="payment-body">
+        <img :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
+        <p class="payment-summary">
+          服务：{{ paymentServiceName || '—' }}
+          <span v-if="paymentCompanyName"> · 提供方：{{ paymentCompanyName }}</span>
+        </p>
+        <p v-if="paymentAmount !== null" class="payment-summary">金额：¥{{ paymentAmount.toFixed(2) }}</p>
+        <p class="payment-tip">
+          二维码链接：
+          <a :href="PAYMENT_QR_URL" target="_blank" rel="noopener">{{ PAYMENT_QR_URL }}</a>
+        </p>
+        <p v-if="paymentStatus === 'checking'" class="payment-status checking">正在获取支付结果，请稍候…</p>
+        <p v-else-if="paymentStatus === 'success'" class="payment-status success">{{ paymentMessage }}</p>
+        <p v-else-if="paymentStatus === 'failed'" class="payment-status error">{{ paymentError }}</p>
+        <p v-else class="payment-status">请扫码并在手机上完成支付确认。</p>
+      </div>
+      <footer class="dialog-footer">
+        <button type="button" class="secondary-button" :disabled="paymentChecking" @click="closePaymentDialog">
+          {{ paymentStatus === 'success' ? '关闭' : '取消' }}
+        </button>
+        <button
+          v-if="paymentStatus !== 'success'"
+          type="button"
+          class="primary-button"
+          :disabled="paymentChecking"
+          @click="checkPaymentResult"
+        >
+          {{ paymentChecking ? '查询中…' : '已完成支付，查询结果' }}
+        </button>
+        <button v-else type="button" class="primary-button" @click="closePaymentDialog">返回平台</button>
+      </footer>
+    </div>
+  </div>
+</transition>
+
+<div class="dashboard-main">
+  <aside class="sidebar">
         <button
           v-for="item in sections"
           :key="item.key"
@@ -399,6 +441,7 @@ import {
   sendUserMessage,
   submitUserReview,
   type AccountProfileItem,
+  type CreateOrderPayload,
   type CompanyMessageItem,
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
@@ -421,6 +464,8 @@ interface SectionMeta {
 }
 
 type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
+
+type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
@@ -448,6 +493,17 @@ const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt
   scheduledAt: '',
   specialRequest: '',
 })
+
+const PAYMENT_QR_URL = 'http://1.95.159.199/shw/check/userPay'
+const paymentDialogVisible = ref(false)
+const paymentChecking = ref(false)
+const paymentStatus = ref<PaymentStatus>('idle')
+const paymentMessage = ref('')
+const paymentError = ref('')
+const pendingOrderPayload = ref<CreateOrderPayload | null>(null)
+const paymentServiceName = ref('')
+const paymentCompanyName = ref('')
+const paymentAmount = ref<number | null>(null)
 
 const reviewForm = reactive<{ serviceId: number | ''; rating: number; content: string }>({
   serviceId: '',
@@ -491,6 +547,11 @@ const avatarSrc = computed(
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
 const favoritesCount = computed(() => favorites.value.length)
+
+const paymentQrSrc = computed(() => {
+  const base = 'https://api.qrserver.com/v1/create-qr-code/'
+  return `${base}?size=240x240&data=${encodeURIComponent(PAYMENT_QR_URL)}`
+})
 
 const orderStats = computed(() => {
   const total = orders.value.length
@@ -632,22 +693,100 @@ const closeBooking = () => {
   bookingDialogVisible.value = false
 }
 
-const submitBooking = async () => {
+const resetPaymentState = () => {
+  paymentStatus.value = 'idle'
+  paymentMessage.value = ''
+  paymentError.value = ''
+  paymentChecking.value = false
+  pendingOrderPayload.value = null
+  paymentServiceName.value = ''
+  paymentCompanyName.value = ''
+  paymentAmount.value = null
+}
+
+const submitBooking = () => {
   if (!bookingForm.service || !bookingForm.scheduledAt) {
     window.alert('请填写完整的预约信息')
     return
   }
+
+  resetPaymentState()
+  pendingOrderPayload.value = {
+    serviceId: bookingForm.service.id,
+    scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+    specialRequest: bookingForm.specialRequest,
+  }
+  paymentServiceName.value = bookingForm.service.name
+  paymentCompanyName.value = bookingForm.service.companyName
+  paymentAmount.value = bookingForm.service.price
+
+  bookingDialogVisible.value = false
+  paymentDialogVisible.value = true
+}
+
+const closePaymentDialog = () => {
+  if (paymentChecking.value) {
+    return
+  }
+  paymentDialogVisible.value = false
+  resetPaymentState()
+}
+
+const checkPaymentResult = async () => {
+  if (paymentChecking.value) {
+    return
+  }
+  if (!pendingOrderPayload.value) {
+    if (paymentStatus.value === 'success') {
+      closePaymentDialog()
+      return
+    }
+    paymentStatus.value = 'failed'
+    paymentError.value = '当前没有待支付的订单，请重新选择服务。'
+    return
+  }
+
+  paymentChecking.value = true
+  paymentStatus.value = 'checking'
+  paymentError.value = ''
+
   try {
-    await createUserOrder({
-      serviceId: bookingForm.service.id,
-      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
-      specialRequest: bookingForm.specialRequest,
-    })
-    bookingDialogVisible.value = false
-    await Promise.all([loadOrders(), loadAccount()])
-    window.alert('预约成功，系统已通知家政公司。')
+    const response = await fetch(PAYMENT_QR_URL, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new Error(response.statusText || '支付服务暂时不可用')
+    }
+    const raw = (await response.text()).trim()
+    if (raw === '1') {
+      const payload = pendingOrderPayload.value
+      try {
+        await createUserOrder(payload)
+        await Promise.all([loadOrders(), loadAccount()])
+        pendingOrderPayload.value = null
+        paymentStatus.value = 'success'
+        paymentMessage.value = '支付成功，订单已创建。'
+        bookingForm.service = null
+        bookingForm.scheduledAt = ''
+        bookingForm.specialRequest = ''
+      } catch (orderError) {
+        console.error(orderError)
+        paymentStatus.value = 'failed'
+        paymentError.value =
+          orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
+      }
+    } else if (raw === '0') {
+      paymentStatus.value = 'failed'
+      paymentError.value = '支付未完成，请在扫码页面选择确认或重新发起支付。'
+    } else {
+      paymentStatus.value = 'failed'
+      paymentError.value = '未能识别支付结果，请稍后重试。'
+    }
   } catch (error) {
     console.error(error)
+    paymentStatus.value = 'failed'
+    paymentError.value =
+      error instanceof Error ? error.message : '获取支付结果失败，请检查网络后重试。'
+  } finally {
+    paymentChecking.value = false
   }
 }
 
@@ -1370,6 +1509,58 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.payment-card {
+  max-width: 520px;
+}
+
+.payment-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.payment-qr {
+  width: 220px;
+  height: 220px;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.payment-tip {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.payment-tip a {
+  color: #38bdf8;
+}
+
+.payment-summary {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.payment-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.payment-status.success {
+  color: #4ade80;
+}
+
+.payment-status.error {
+  color: #fca5a5;
+}
+
+.payment-status.checking {
+  color: #facc15;
 }
 
 .dialog-header h2 {
