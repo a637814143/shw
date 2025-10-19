@@ -37,6 +37,10 @@ public class UserAll {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
+    @Lob
+    @Column(name = "avatar_base64", nullable = false)
+    private String avatarBase64;
+
     @Column(name = "contact_number", length = 100)
     private String contactNumber;
 

@@ -1,5 +1,6 @@
 package com.example.housekeeping.config;
 
+import com.example.housekeeping.common.AvatarConstants;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -40,6 +41,9 @@ public class AccountInitializer implements ApplicationRunner {
                     if (existing.getDisplayName() == null || existing.getDisplayName().isBlank()) {
                         existing.setDisplayName("系统管理员");
                     }
+                    if (existing.getAvatarBase64() == null || existing.getAvatarBase64().isBlank()) {
+                        existing.setAvatarBase64(AvatarConstants.DEFAULT_AVATAR_BASE64);
+                    }
                     userAllRepository.save(existing);
                 },
                 () -> {
@@ -50,6 +54,7 @@ public class AccountInitializer implements ApplicationRunner {
                     admin.setLoyaltyPoints(0);
                     admin.setUserType(AccountRole.ADMIN.getLabel());
                     admin.setDisplayName("系统管理员");
+                    admin.setAvatarBase64(AvatarConstants.DEFAULT_AVATAR_BASE64);
                     userAllRepository.save(admin);
                 }
         );

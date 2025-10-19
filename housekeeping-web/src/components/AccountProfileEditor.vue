@@ -7,33 +7,58 @@
       </div>
     </header>
     <form class="profile-form" @submit.prevent="submitProfile">
-      <div class="form-grid">
-        <label class="form-field">
-          <span>展示名称</span>
-          <input v-model.trim="profileForm.displayName" type="text" maxlength="100" required />
-        </label>
-        <label class="form-field">
-          <span>常用联系方式</span>
-          <input v-model.trim="profileForm.contactNumber" type="text" maxlength="100" placeholder="手机号或微信号" />
-        </label>
-        <label class="form-field form-field-full">
-          <span>常用地址</span>
-          <input v-model.trim="profileForm.address" type="text" maxlength="255" placeholder="示例：上海市浦东新区世纪大道 100 号" />
-        </label>
-        <template v-if="isCompany">
+      <div class="profile-layout">
+        <div class="profile-visual">
+          <img :src="previewAvatarUrl" alt="头像预览" class="profile-avatar" />
+          <div class="visual-actions">
+            <button type="button" class="primary-button" @click="triggerFileSelect">上传头像</button>
+            <button
+              v-if="profileForm.avatarBase64 && profileForm.avatarBase64 !== defaultAvatarDataUrl"
+              type="button"
+              class="ghost-button"
+              @click="resetAvatar"
+            >
+              恢复默认
+            </button>
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/*"
+              class="sr-only"
+              @change="handleFileChange"
+            />
+          </div>
+          <p class="avatar-hint">支持 PNG/JPEG/GIF，建议 512KB 以内。</p>
+        </div>
+
+        <div class="form-grid">
           <label class="form-field">
-            <span>公司联系电话</span>
-            <input v-model.trim="profileForm.companyPhone" type="text" maxlength="100" placeholder="用于客户联系" />
+            <span>展示名称</span>
+            <input v-model.trim="profileForm.displayName" type="text" maxlength="100" required />
           </label>
           <label class="form-field">
-            <span>公司地址</span>
-            <input v-model.trim="profileForm.companyAddress" type="text" maxlength="255" placeholder="用于展示给客户" />
+            <span>常用联系方式</span>
+            <input v-model.trim="profileForm.contactNumber" type="text" maxlength="100" placeholder="手机号或微信号" />
           </label>
           <label class="form-field form-field-full">
-            <span>公司简介</span>
-            <textarea v-model.trim="profileForm.companyDescription" rows="3" maxlength="1000" placeholder="突出公司优势、服务范围或团队特色"></textarea>
+            <span>常用地址</span>
+            <input v-model.trim="profileForm.address" type="text" maxlength="255" placeholder="示例：上海市浦东新区世纪大道 100 号" />
           </label>
-        </template>
+          <template v-if="isCompany">
+            <label class="form-field">
+              <span>公司联系电话</span>
+              <input v-model.trim="profileForm.companyPhone" type="text" maxlength="100" placeholder="用于客户联系" />
+            </label>
+            <label class="form-field">
+              <span>公司地址</span>
+              <input v-model.trim="profileForm.companyAddress" type="text" maxlength="255" placeholder="用于展示给客户" />
+            </label>
+            <label class="form-field form-field-full">
+              <span>公司简介</span>
+              <textarea v-model.trim="profileForm.companyDescription" rows="3" maxlength="1000" placeholder="突出公司优势、服务范围或团队特色"></textarea>
+            </label>
+          </template>
+        </div>
       </div>
       <div class="form-actions">
         <button type="submit" class="primary-button" :disabled="saving">
@@ -71,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 import {
   type AccountProfileItem,
@@ -80,6 +105,10 @@ import {
   updateCurrentAccount,
   updateCurrentPassword,
 } from '../services/dashboard'
+import { createObjectUrlFromDataUrl, revokeObjectUrl } from '../utils/image'
+
+const FALLBACK_AVATAR =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
 
 const props = defineProps<{
   account: AccountProfileItem | null
@@ -87,8 +116,19 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'updated', payload: AccountProfileItem): void }>()
 
-const profileForm = reactive<Required<UpdateAccountProfilePayload>>({
+type ProfileFormState = {
+  displayName: string
+  avatarBase64: string
+  contactNumber: string
+  address: string
+  companyPhone: string
+  companyAddress: string
+  companyDescription: string
+}
+
+const profileForm = reactive<ProfileFormState>({
   displayName: '',
+  avatarBase64: '',
   contactNumber: '',
   address: '',
   companyPhone: '',
@@ -102,16 +142,47 @@ const passwordForm = reactive<{ currentPassword: string; newPassword: string; co
   confirmPassword: '',
 })
 
+const fileInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const passwordSaving = ref(false)
 
 const isCompany = computed(() => props.account?.role === 'COMPANY')
+
+const defaultAvatarDataUrl = computed(() => props.account?.avatarBase64 || FALLBACK_AVATAR)
+
+const previewAvatarUrl = ref<string>('')
+let lastPreviewObjectUrl: string | null = null
+
+const updatePreviewAvatar = (dataUrl: string) => {
+  const nextUrl = createObjectUrlFromDataUrl(dataUrl || FALLBACK_AVATAR)
+  if (lastPreviewObjectUrl && lastPreviewObjectUrl !== nextUrl) {
+    revokeObjectUrl(lastPreviewObjectUrl)
+  }
+  previewAvatarUrl.value = nextUrl
+  lastPreviewObjectUrl = nextUrl.startsWith('blob:') ? nextUrl : null
+}
+
+watch(
+  () => [profileForm.avatarBase64, defaultAvatarDataUrl.value],
+  () => {
+    updatePreviewAvatar(profileForm.avatarBase64 || defaultAvatarDataUrl.value)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  if (lastPreviewObjectUrl) {
+    revokeObjectUrl(lastPreviewObjectUrl)
+    lastPreviewObjectUrl = null
+  }
+})
 
 watch(
   () => props.account,
   (account) => {
     if (!account) {
       profileForm.displayName = ''
+      profileForm.avatarBase64 = ''
       profileForm.contactNumber = ''
       profileForm.address = ''
       profileForm.companyPhone = ''
@@ -120,6 +191,7 @@ watch(
       return
     }
     profileForm.displayName = account.displayName
+    profileForm.avatarBase64 = account.avatarBase64
     profileForm.contactNumber = account.contactNumber || ''
     profileForm.address = account.address || ''
     profileForm.companyPhone = account.companyPhone || ''
@@ -128,6 +200,35 @@ watch(
   },
   { immediate: true },
 )
+
+const triggerFileSelect = () => {
+  fileInput.value?.click()
+}
+
+const resetAvatar = () => {
+  profileForm.avatarBase64 = ''
+}
+
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement | null
+  if (!target || !target.files || !target.files.length) {
+    return
+  }
+
+  const file = target.files.item(0)
+  if (!file) {
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    profileForm.avatarBase64 = typeof reader.result === 'string' ? reader.result : ''
+  }
+  reader.onerror = () => {
+    alert('读取头像文件失败，请重试')
+  }
+  reader.readAsDataURL(file)
+  target.value = ''
+}
 
 const submitProfile = async () => {
   if (!profileForm.displayName.trim()) {
@@ -138,6 +239,7 @@ const submitProfile = async () => {
   try {
     const payload: UpdateAccountProfilePayload = {
       displayName: profileForm.displayName.trim(),
+      avatarBase64: profileForm.avatarBase64?.trim() || defaultAvatarDataUrl.value,
       contactNumber: profileForm.contactNumber?.trim() || undefined,
       address: profileForm.address?.trim() || undefined,
     }
@@ -147,6 +249,7 @@ const submitProfile = async () => {
       payload.companyDescription = profileForm.companyDescription?.trim() || undefined
     }
     const updated = await updateCurrentAccount(payload)
+    profileForm.avatarBase64 = updated.avatarBase64
     emit('updated', updated)
     alert('个人资料已更新')
   } catch (error) {
@@ -199,6 +302,40 @@ const submitPassword = async () => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+
+.profile-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.profile-visual {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+}
+
+.visual-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.avatar-hint {
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.6);
+  text-align: center;
 }
 
 .form-grid {
@@ -265,6 +402,15 @@ const submitPassword = async () => {
   .profile-card,
   .password-card {
     padding: 1.5rem;
+  }
+
+  .profile-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .profile-visual {
+    align-self: center;
   }
 }
 </style>

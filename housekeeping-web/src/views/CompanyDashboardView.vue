@@ -6,7 +6,10 @@
         <p class="dashboard-subtitle">维护服务项目、安排预约并及时处理用户退款</p>
       </div>
       <div class="header-actions">
-        <span class="account-badge" aria-hidden="true">{{ displayInitials }}</span>
+        <template v-if="avatarSrc">
+          <img :src="avatarSrc" alt="公司头像" class="account-avatar" />
+        </template>
+        <span v-else class="account-badge" aria-hidden="true">{{ displayInitials }}</span>
         <span class="welcome">您好，{{ displayName }}！</span>
         <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
@@ -377,7 +380,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
@@ -413,6 +416,8 @@ import {
   assignCompanyOrder,
 } from '../services/dashboard'
 
+import { createObjectUrlFromDataUrl, revokeObjectUrl } from '../utils/image'
+
 import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
 import AccountProfileEditor from '../components/AccountProfileEditor.vue'
@@ -428,6 +433,9 @@ interface SectionMeta {
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
 
+const FALLBACK_AVATAR =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
+
 const displayName = computed(
   () =>
     account.value?.displayName ||
@@ -436,6 +444,32 @@ const displayName = computed(
     '公司用户',
 )
 const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
+const avatarSrc = ref<string>('')
+let lastAvatarObjectUrl: string | null = null
+
+const updateAvatarSrc = (dataUrl: string) => {
+  const nextUrl = createObjectUrlFromDataUrl(dataUrl || FALLBACK_AVATAR)
+  if (lastAvatarObjectUrl && lastAvatarObjectUrl !== nextUrl) {
+    revokeObjectUrl(lastAvatarObjectUrl)
+  }
+  avatarSrc.value = nextUrl
+  lastAvatarObjectUrl = nextUrl.startsWith('blob:') ? nextUrl : null
+}
+
+watch(
+  () => account.value?.avatarBase64,
+  (dataUrl) => {
+    updateAvatarSrc(dataUrl || FALLBACK_AVATAR)
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (lastAvatarObjectUrl) {
+    revokeObjectUrl(lastAvatarObjectUrl)
+    lastAvatarObjectUrl = null
+  }
+})
 const displayInitials = computed(() => {
   const source = displayName.value?.trim()
   if (!source) {
@@ -1070,6 +1104,15 @@ onUnmounted(() => {
   background: rgba(15, 23, 42, 0.25);
   border-radius: 999px;
   backdrop-filter: blur(12px);
+}
+
+.account-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
 .account-badge {

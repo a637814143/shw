@@ -127,6 +127,7 @@ export interface AccountProfileItem {
   role: string
   balance: number
   loyaltyPoints: number
+  avatarBase64: string
   contactNumber?: string | null
   address?: string | null
   companyPhone?: string | null
@@ -136,6 +137,7 @@ export interface AccountProfileItem {
 
 export interface UpdateAccountProfilePayload {
   displayName: string
+  avatarBase64?: string
   contactNumber?: string
   address?: string
   companyPhone?: string
