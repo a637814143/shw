@@ -422,6 +422,7 @@ import { useRouter } from 'vue-router'
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
   addUserFavorite,
+  checkQrPaymentStatus,
   fetchCurrentAccount,
   createUserOrder,
   exchangeUserPoints,
@@ -446,6 +447,7 @@ import {
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
+  type PaymentGatewayCheckResult,
   type DashboardTipItem,
   type HousekeepServiceItem,
   type ServiceFavoriteItem,
@@ -751,12 +753,12 @@ const checkPaymentResult = async () => {
   paymentError.value = ''
 
   try {
-    const response = await fetch(PAYMENT_QR_URL, { cache: 'no-store' })
-    if (!response.ok) {
-      throw new Error(response.statusText || '支付服务暂时不可用')
+    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus()
+    if (gatewayResult.rawPayload) {
+      console.debug('支付网关返回原始数据：', gatewayResult.rawPayload)
     }
-    const raw = (await response.text()).trim()
-    if (raw === '1') {
+
+    if (gatewayResult.status === 'CONFIRMED') {
       const payload = pendingOrderPayload.value
       try {
         await createUserOrder(payload)
@@ -773,12 +775,10 @@ const checkPaymentResult = async () => {
         paymentError.value =
           orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
       }
-    } else if (raw === '0') {
-      paymentStatus.value = 'failed'
-      paymentError.value = '支付未完成，请在扫码页面选择确认或重新发起支付。'
     } else {
       paymentStatus.value = 'failed'
-      paymentError.value = '未能识别支付结果，请稍后重试。'
+      paymentError.value =
+        gatewayResult.message || '未能获取支付结果，请确认后再试。'
     }
   } catch (error) {
     console.error(error)

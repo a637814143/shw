@@ -183,6 +183,14 @@ export interface UpdateOrderProgressPayload {
   progressNote?: string
 }
 
+export type PaymentGatewayStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'ERROR'
+
+export interface PaymentGatewayCheckResult {
+  status: PaymentGatewayStatus
+  message: string
+  rawPayload?: string | null
+}
+
 export interface CompanyConversationItem {
   orderId: number
   serviceName: string
@@ -358,6 +366,11 @@ export const fetchDashboardTips = async (): Promise<DashboardTipItem[]> => {
 export const fetchDashboardAnnouncements = async (): Promise<DashboardAnnouncementItem[]> => {
   const response = await fetch(buildUrl('/api/user/dashboard/announcements'), withAuthHeaders())
   return handleResponse<DashboardAnnouncementItem[]>(response)
+}
+
+export const checkQrPaymentStatus = async (): Promise<PaymentGatewayCheckResult> => {
+  const response = await fetch(buildUrl('/api/user/payments/qr/status'), withAuthHeaders())
+  return handleResponse<PaymentGatewayCheckResult>(response)
 }
 
 export const fetchUserFavorites = async (): Promise<ServiceFavoriteItem[]> => {
