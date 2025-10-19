@@ -37,6 +37,9 @@ public class AccountInitializer implements ApplicationRunner {
                     if (existing.getLoyaltyPoints() == null) {
                         existing.setLoyaltyPoints(0);
                     }
+                    if (existing.getDisplayName() == null || existing.getDisplayName().isBlank()) {
+                        existing.setDisplayName("系统管理员");
+                    }
                     userAllRepository.save(existing);
                 },
                 () -> {
@@ -46,6 +49,7 @@ public class AccountInitializer implements ApplicationRunner {
                     admin.setMoney(new BigDecimal("1000.00"));
                     admin.setLoyaltyPoints(0);
                     admin.setUserType(AccountRole.ADMIN.getLabel());
+                    admin.setDisplayName("系统管理员");
                     userAllRepository.save(admin);
                 }
         );

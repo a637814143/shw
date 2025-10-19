@@ -3,7 +3,7 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.AccountTransactionResponse;
 import com.example.housekeeping.dto.AdminOverviewResponse;
-import com.example.housekeeping.dto.AssignWorkerRequest;
+import com.example.housekeeping.dto.AssignOrderStaffRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.dto.ServiceOrderResponse;
@@ -92,7 +92,7 @@ public class AdminManagementController {
 
     @PostMapping("/orders/{orderId}/assign")
     public Result<ServiceOrderResponse> assignWorker(@PathVariable Long orderId,
-                                                     @Valid @RequestBody AssignWorkerRequest request) {
+                                                     @Valid @RequestBody AssignOrderStaffRequest request) {
         return Result.success("分配成功", serviceOrderService.assignWorker(orderId, request));
     }
 

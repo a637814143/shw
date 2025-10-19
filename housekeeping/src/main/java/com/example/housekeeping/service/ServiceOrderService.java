@@ -1,16 +1,18 @@
 package com.example.housekeeping.service;
 
-import com.example.housekeeping.dto.AssignWorkerRequest;
+import com.example.housekeeping.dto.AssignOrderStaffRequest;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.entity.CompanyStaff;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -44,6 +46,9 @@ public class ServiceOrderService {
     @Autowired
     private UserAllRepository userAllRepository;
 
+    @Autowired
+    private CompanyStaffRepository companyStaffRepository;
+
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
         UserAll user = accountLookupService.getCurrentAccount();
@@ -66,6 +71,11 @@ public class ServiceOrderService {
         }
 
         String specialRequest = normalizeMessage(request.getSpecialRequest());
+        String normalizedAddress = request.getServiceAddress() == null ? "" : request.getServiceAddress().trim();
+        if (normalizedAddress.isEmpty()) {
+            throw new RuntimeException("请填写上门地址");
+        }
+        String contactPhone = normalizeMessage(request.getContactPhone());
         int earnedPoints = calculateLoyaltyPoints(price);
 
         UserAll company = service.getCompany();
@@ -81,6 +91,8 @@ public class ServiceOrderService {
         order.setScheduledAt(scheduledAt);
         order.setSpecialRequest(specialRequest);
         order.setProgressNote("待上门服务");
+        order.setServiceAddress(normalizedAddress);
+        order.setContactPhone(contactPhone);
         order.setLoyaltyPoints(earnedPoints);
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(order.getCreatedAt());
@@ -249,23 +261,52 @@ public class ServiceOrderService {
     }
 
     @Transactional
-    public ServiceOrderResponse assignWorker(Long orderId, AssignWorkerRequest request) {
-        UserAll admin = accountLookupService.getCurrentAccount();
-        ensureRole(admin, AccountRole.ADMIN);
+    public ServiceOrderResponse assignWorker(Long orderId, AssignOrderStaffRequest request) {
+        UserAll actor = accountLookupService.getCurrentAccount();
 
         ServiceOrder order = serviceOrderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("订单不存在"));
 
-        String workerName = normalizeMessage(request.getWorkerName());
-        String workerContact = normalizeMessage(request.getWorkerContact());
-        if (workerName == null || workerContact == null) {
-            throw new RuntimeException("家政人员与联系方式不能为空");
+        boolean isAdmin = AccountRole.ADMIN.getLabel().equals(actor.getUserType());
+        boolean isCompany = AccountRole.COMPANY.getLabel().equals(actor.getUserType());
+        if (!isAdmin && !isCompany) {
+            throw new RuntimeException("没有指派权限");
+        }
+        if (isCompany && !order.getService().getCompany().getId().equals(actor.getId())) {
+            throw new RuntimeException("无权为其他公司的订单指派人员");
         }
 
-        order.setAssignedWorker(workerName);
-        order.setWorkerContact(workerContact);
+        CompanyStaff staff = null;
+        if (request.getStaffId() != null) {
+            if (isAdmin) {
+                staff = companyStaffRepository.findById(request.getStaffId())
+                    .orElseThrow(() -> new RuntimeException("家政人员不存在"));
+            } else {
+                staff = companyStaffRepository.findByIdAndCompany(request.getStaffId(), actor)
+                    .orElseThrow(() -> new RuntimeException("家政人员不存在或不属于当前公司"));
+            }
+            if (!staff.getCompany().getId().equals(order.getService().getCompany().getId())) {
+                throw new RuntimeException("所选人员不属于该家政公司");
+            }
+            order.setAssignedStaff(staff);
+            order.setAssignedWorker(staff.getStaffName());
+            order.setWorkerContact(staff.getStaffPhone());
+        } else {
+            if (!isAdmin) {
+                throw new RuntimeException("请先在人员管理中创建员工后再指派");
+            }
+            String workerName = normalizeMessage(request.getWorkerName());
+            String workerContact = normalizeMessage(request.getWorkerContact());
+            if (workerName == null || workerContact == null) {
+                throw new RuntimeException("家政人员与联系方式不能为空");
+            }
+            order.setAssignedStaff(null);
+            order.setAssignedWorker(workerName);
+            order.setWorkerContact(workerContact);
+        }
+
         if (order.getStatus() == ServiceOrderStatus.SCHEDULED || order.getStatus() == ServiceOrderStatus.PENDING) {
-            order.setProgressNote("已安排 " + workerName + " 负责服务");
+            order.setProgressNote("已安排 " + order.getAssignedWorker() + " 负责服务");
         }
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));
@@ -302,12 +343,15 @@ public class ServiceOrderService {
             order.getScheduledAt(),
             order.getSpecialRequest(),
             order.getProgressNote(),
+            order.getServiceAddress(),
+            order.getContactPhone(),
             order.getLoyaltyPoints() == null ? 0 : order.getLoyaltyPoints(),
             order.getRefundReason(),
             order.getRefundResponse(),
             order.getHandledBy() == null ? null : order.getHandledBy().getUsername(),
             order.getAssignedWorker(),
             order.getWorkerContact(),
+            order.getAssignedStaff() == null ? null : order.getAssignedStaff().getId(),
             order.getCreatedAt(),
             order.getUpdatedAt()
         );

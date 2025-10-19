@@ -37,7 +37,18 @@ public class UserAll {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
-    @Lob
-    @Column(name = "avatar_base64", nullable = false, columnDefinition = "LONGTEXT")
-    private String avatarBase64;
+    @Column(name = "contact_number", length = 100)
+    private String contactNumber;
+
+    @Column(name = "address", length = 255)
+    private String address;
+
+    @Column(name = "company_phone", length = 100)
+    private String companyPhone;
+
+    @Column(name = "company_address", length = 255)
+    private String companyAddress;
+
+    @Column(name = "company_description", length = 1000)
+    private String companyDescription;
 }

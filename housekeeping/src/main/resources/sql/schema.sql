@@ -6,7 +6,14 @@ CREATE TABLE `user_all` (
   `username` varchar(64) NOT NULL UNIQUE COMMENT '登录账号',
   `passwd` varchar(255) NOT NULL COMMENT '两次Base64再ROT13加密后的密码',
   `money` decimal(12,2) NOT NULL DEFAULT 1000.00 COMMENT '账户余额（CNY）',
+  `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '消费累积积分',
   `usertype` varchar(32) NOT NULL COMMENT '用户类型：普通用户/家政公司/系统管理员',
+  `display_name` varchar(100) NOT NULL DEFAULT '' COMMENT '展示名称',
+  `contact_number` varchar(100) DEFAULT NULL COMMENT '常用联系方式',
+  `address` varchar(255) DEFAULT NULL COMMENT '常用地址',
+  `company_phone` varchar(100) DEFAULT NULL COMMENT '公司电话',
+  `company_address` varchar(255) DEFAULT NULL COMMENT '公司地址',
+  `company_description` varchar(1000) DEFAULT NULL COMMENT '公司简介',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='统一用户账号表';
 
@@ -38,6 +45,20 @@ CREATE TABLE `housekeep_service` (
   CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司发布的服务';
 
+DROP TABLE IF EXISTS `company_staff`;
+CREATE TABLE `company_staff` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `company_id` bigint NOT NULL COMMENT '所属公司',
+  `staff_name` varchar(100) NOT NULL COMMENT '人员姓名',
+  `staff_phone` varchar(100) NOT NULL COMMENT '联系方式',
+  `remarks` varchar(500) DEFAULT NULL COMMENT '备注',
+  `created_at` datetime NOT NULL COMMENT '创建时间',
+  `updated_at` datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_staff_company` (`company_id`),
+  CONSTRAINT `fk_staff_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司人员';
+
 DROP TABLE IF EXISTS `service_order`;
 CREATE TABLE `service_order` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -48,20 +69,25 @@ CREATE TABLE `service_order` (
   `scheduled_at` datetime NOT NULL COMMENT '预约上门时间',
   `special_request` varchar(500) DEFAULT NULL COMMENT '用户特殊需求',
   `progress_note` varchar(500) DEFAULT NULL COMMENT '服务进度备注',
+  `service_address` varchar(255) DEFAULT NULL COMMENT '上门地址',
+  `contact_phone` varchar(100) DEFAULT NULL COMMENT '到访联系方式',
   `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '本单积分',
   `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
   `refund_response` varchar(500) DEFAULT NULL COMMENT '退款处理说明',
   `handled_by` bigint DEFAULT NULL COMMENT '处理人',
   `assigned_worker` varchar(100) DEFAULT NULL COMMENT '分配的家政人员',
   `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
+  `assigned_staff_id` bigint DEFAULT NULL COMMENT '绑定的公司人员',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_order_service` (`service_id`),
   KEY `idx_order_user` (`user_id`),
+  KEY `idx_order_staff` (`assigned_staff_id`),
   CONSTRAINT `fk_order_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
   CONSTRAINT `fk_order_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`),
-  CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`)
+  CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_order_staff` FOREIGN KEY (`assigned_staff_id`) REFERENCES `company_staff` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政服务订单表';
 
 DROP TABLE IF EXISTS `service_review`;

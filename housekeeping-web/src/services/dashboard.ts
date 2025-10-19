@@ -85,12 +85,15 @@ export interface ServiceOrderItem {
   scheduledAt: string
   specialRequest?: string | null
   progressNote?: string | null
+  serviceAddress?: string | null
+  contactPhone?: string | null
   loyaltyPoints: number
   refundReason?: string | null
   refundResponse?: string | null
   handledBy?: string | null
   assignedWorker?: string | null
   workerContact?: string | null
+  assignedStaffId?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -124,18 +127,28 @@ export interface AccountProfileItem {
   role: string
   balance: number
   loyaltyPoints: number
-  avatarBase64: string
+  contactNumber?: string | null
+  address?: string | null
+  companyPhone?: string | null
+  companyAddress?: string | null
+  companyDescription?: string | null
 }
 
 export interface UpdateAccountProfilePayload {
   displayName: string
-  avatarBase64?: string
+  contactNumber?: string
+  address?: string
+  companyPhone?: string
+  companyAddress?: string
+  companyDescription?: string
 }
 
 export interface CreateOrderPayload {
   serviceId: number
   scheduledAt: string
   specialRequest?: string
+  serviceAddress: string
+  contactPhone?: string
 }
 
 export interface RefundPayload {
@@ -310,8 +323,24 @@ export interface PointsExchangePayload {
 }
 
 export interface AssignWorkerPayload {
-  workerName: string
-  workerContact: string
+  staffId?: number
+  workerName?: string
+  workerContact?: string
+}
+
+export interface CompanyStaffItem {
+  id: number
+  staffName: string
+  staffPhone: string
+  remarks?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CompanyStaffPayload {
+  staffName: string
+  staffPhone: string
+  remarks?: string
 }
 
 // 公共接口
@@ -328,6 +357,50 @@ export const fetchServiceReviews = async (serviceId: number): Promise<ServiceRev
 export const fetchCompanyReviews = async (): Promise<ServiceReviewItem[]> => {
   const response = await fetch(buildUrl('/api/company/services/reviews'), withAuthHeaders())
   return handleResponse<ServiceReviewItem[]>(response)
+}
+
+export const fetchCompanyStaff = async (): Promise<CompanyStaffItem[]> => {
+  const response = await fetch(buildUrl('/api/company/services/staff'), withAuthHeaders())
+  return handleResponse<CompanyStaffItem[]>(response)
+}
+
+export const createCompanyStaff = async (
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl('/api/company/services/staff'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const updateCompanyStaff = async (
+  staffId: number,
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl(`/api/company/services/staff/${staffId}`), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const deleteCompanyStaff = async (staffId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/services/staff/${staffId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const assignCompanyOrder = async (
+  orderId: number,
+  payload: AssignWorkerPayload,
+): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/company/services/orders/${orderId}/assign`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ServiceOrderItem>(response)
 }
 
 // 普通用户接口

@@ -1,51 +1,47 @@
 <template>
-  <div class="profile-editor">
-    <div class="profile-visual">
-      <img :src="previewAvatar" alt="头像预览" class="profile-avatar" />
-      <div class="visual-actions">
-        <button type="button" class="primary-button" @click="triggerFileSelect">上传头像</button>
-        <button
-          v-if="profileForm.avatarBase64 && profileForm.avatarBase64 !== defaultAvatar"
-          type="button"
-          class="ghost-button"
-          @click="resetAvatar"
-        >
-          恢复默认
-        </button>
-        <input
-          ref="fileInput"
-          type="file"
-          accept="image/*"
-          class="sr-only"
-          @change="handleFileChange"
-        />
+  <section class="profile-card">
+    <header class="panel-header">
+      <div>
+        <h3>基础资料</h3>
+        <p>完善联系方式与地址信息，方便服务沟通与上门安排。</p>
       </div>
-    </div>
-
+    </header>
     <form class="profile-form" @submit.prevent="submitProfile">
-      <label class="form-field">
-        <span>展示名称</span>
-        <input v-model.trim="profileForm.displayName" type="text" maxlength="100" required />
-      </label>
-
-      <label class="form-field">
-        <span>头像数据（Base64）</span>
-        <textarea
-          v-model.trim="profileForm.avatarBase64"
-          rows="4"
-          placeholder="可直接粘贴 data:image/png;base64,..."
-        ></textarea>
-      </label>
-
-      <p class="form-hint">支持上传 PNG/JPEG/GIF，建议控制在 512KB 以内。</p>
-
+      <div class="form-grid">
+        <label class="form-field">
+          <span>展示名称</span>
+          <input v-model.trim="profileForm.displayName" type="text" maxlength="100" required />
+        </label>
+        <label class="form-field">
+          <span>常用联系方式</span>
+          <input v-model.trim="profileForm.contactNumber" type="text" maxlength="100" placeholder="手机号或微信号" />
+        </label>
+        <label class="form-field form-field-full">
+          <span>常用地址</span>
+          <input v-model.trim="profileForm.address" type="text" maxlength="255" placeholder="示例：上海市浦东新区世纪大道 100 号" />
+        </label>
+        <template v-if="isCompany">
+          <label class="form-field">
+            <span>公司联系电话</span>
+            <input v-model.trim="profileForm.companyPhone" type="text" maxlength="100" placeholder="用于客户联系" />
+          </label>
+          <label class="form-field">
+            <span>公司地址</span>
+            <input v-model.trim="profileForm.companyAddress" type="text" maxlength="255" placeholder="用于展示给客户" />
+          </label>
+          <label class="form-field form-field-full">
+            <span>公司简介</span>
+            <textarea v-model.trim="profileForm.companyDescription" rows="3" maxlength="1000" placeholder="突出公司优势、服务范围或团队特色"></textarea>
+          </label>
+        </template>
+      </div>
       <div class="form-actions">
         <button type="submit" class="primary-button" :disabled="saving">
           {{ saving ? '保存中…' : '保存个人资料' }}
         </button>
       </div>
     </form>
-  </div>
+  </section>
 
   <section class="password-card">
     <header>
@@ -85,18 +81,19 @@ import {
   updateCurrentPassword,
 } from '../services/dashboard'
 
-const FALLBACK_AVATAR =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
-
 const props = defineProps<{
   account: AccountProfileItem | null
 }>()
 
 const emit = defineEmits<{ (e: 'updated', payload: AccountProfileItem): void }>()
 
-const profileForm = reactive<UpdateAccountProfilePayload>({
+const profileForm = reactive<Required<UpdateAccountProfilePayload>>({
   displayName: '',
-  avatarBase64: '',
+  contactNumber: '',
+  address: '',
+  companyPhone: '',
+  companyAddress: '',
+  companyDescription: '',
 })
 
 const passwordForm = reactive<{ currentPassword: string; newPassword: string; confirmPassword: string }>({
@@ -105,56 +102,32 @@ const passwordForm = reactive<{ currentPassword: string; newPassword: string; co
   confirmPassword: '',
 })
 
-const fileInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const passwordSaving = ref(false)
 
-const defaultAvatar = computed(() => props.account?.avatarBase64 || FALLBACK_AVATAR)
-
-const previewAvatar = computed(() => profileForm.avatarBase64 || defaultAvatar.value)
+const isCompany = computed(() => props.account?.role === 'COMPANY')
 
 watch(
   () => props.account,
   (account) => {
     if (!account) {
       profileForm.displayName = ''
-      profileForm.avatarBase64 = ''
+      profileForm.contactNumber = ''
+      profileForm.address = ''
+      profileForm.companyPhone = ''
+      profileForm.companyAddress = ''
+      profileForm.companyDescription = ''
       return
     }
     profileForm.displayName = account.displayName
-    profileForm.avatarBase64 = account.avatarBase64
+    profileForm.contactNumber = account.contactNumber || ''
+    profileForm.address = account.address || ''
+    profileForm.companyPhone = account.companyPhone || ''
+    profileForm.companyAddress = account.companyAddress || ''
+    profileForm.companyDescription = account.companyDescription || ''
   },
   { immediate: true },
 )
-
-const triggerFileSelect = () => {
-  fileInput.value?.click()
-}
-
-const resetAvatar = () => {
-  profileForm.avatarBase64 = defaultAvatar.value
-}
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement | null
-  if (!target || !target.files || !target.files.length) {
-    return
-  }
-
-  const file = target.files.item(0)
-  if (!file) {
-    return
-  }
-  const reader = new FileReader()
-  reader.onload = () => {
-    profileForm.avatarBase64 = typeof reader.result === 'string' ? reader.result : ''
-  }
-  reader.onerror = () => {
-    alert('读取头像文件失败，请重试')
-  }
-  reader.readAsDataURL(file)
-  target.value = ''
-}
 
 const submitProfile = async () => {
   if (!profileForm.displayName.trim()) {
@@ -165,16 +138,20 @@ const submitProfile = async () => {
   try {
     const payload: UpdateAccountProfilePayload = {
       displayName: profileForm.displayName.trim(),
-      avatarBase64: profileForm.avatarBase64?.trim() || defaultAvatar.value,
+      contactNumber: profileForm.contactNumber?.trim() || undefined,
+      address: profileForm.address?.trim() || undefined,
+    }
+    if (isCompany.value) {
+      payload.companyPhone = profileForm.companyPhone?.trim() || undefined
+      payload.companyAddress = profileForm.companyAddress?.trim() || undefined
+      payload.companyDescription = profileForm.companyDescription?.trim() || undefined
     }
     const updated = await updateCurrentAccount(payload)
-    profileForm.displayName = updated.displayName
-    profileForm.avatarBase64 = updated.avatarBase64
     emit('updated', updated)
     alert('个人资料已更新')
   } catch (error) {
     console.error(error)
-    alert('保存失败，请稍后再试或检查头像数据是否有效')
+    alert(error instanceof Error ? error.message : '保存失败，请稍后再试')
   } finally {
     saving.value = false
   }
@@ -210,124 +187,84 @@ const submitPassword = async () => {
 </script>
 
 <style scoped>
-.profile-editor {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  align-items: flex-start;
-}
-
-.profile-visual {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.profile-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 4px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-}
-
-.visual-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.profile-card {
+  background: var(--surface-color, #fff);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  margin-bottom: 2rem;
 }
 
 .profile-form {
-  flex: 1;
-  min-width: 260px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.5rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
 }
 
 .form-field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  font-size: 0.95rem;
 }
 
 .form-field input,
 .form-field textarea {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 0.75rem;
   padding: 0.75rem 1rem;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 0.95rem;
+  background: rgba(15, 23, 42, 0.02);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .form-field textarea {
-  min-height: 120px;
   resize: vertical;
 }
 
-.form-hint {
-  margin: 0;
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.6);
+.form-field input:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  background: #fff;
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
 }
 
 .form-actions {
   display: flex;
-  gap: 1rem;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
+  justify-content: flex-end;
 }
 
 .password-card {
-  margin-top: 2.5rem;
-  padding: 1.75rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  color: #0f172a;
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.12);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.password-card h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1.25rem;
-}
-
-.password-card p {
-  margin: 0 0 1.25rem;
-  color: rgba(15, 23, 42, 0.65);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(56, 189, 248, 0.08));
+  border-radius: 1.5rem;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
 }
 
 .password-form {
   display: grid;
-  gap: 1rem;
-  max-width: 420px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
 }
 
-@media (max-width: 720px) {
-  .profile-editor {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .profile-visual {
-    flex-direction: row;
-    justify-content: flex-start;
-  }
-
-  .visual-actions {
-    flex-direction: row;
+@media (max-width: 640px) {
+  .profile-card,
+  .password-card {
+    padding: 1.5rem;
   }
 }
 </style>

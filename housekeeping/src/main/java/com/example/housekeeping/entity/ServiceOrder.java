@@ -45,6 +45,12 @@ public class ServiceOrder {
     @Column(name = "progress_note", length = 500)
     private String progressNote;
 
+    @Column(name = "service_address", length = 255)
+    private String serviceAddress;
+
+    @Column(name = "contact_phone", length = 100)
+    private String contactPhone;
+
     @Column(name = "loyalty_points", nullable = false)
     private Integer loyaltyPoints;
 
@@ -63,6 +69,10 @@ public class ServiceOrder {
 
     @Column(name = "worker_contact", length = 100)
     private String workerContact;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private CompanyStaff assignedStaff;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

@@ -6,7 +6,7 @@
         <p class="dashboard-subtitle">精选内容、智能预约、实时沟通，沉浸式高级体验。</p>
       </div>
       <div class="header-actions">
-        <img :src="avatarSrc" alt="账号头像" class="account-avatar" />
+        <span class="account-badge" aria-hidden="true">{{ displayInitials }}</span>
         <span class="welcome">您好，{{ displayName }}！</span>
         <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <span class="loyalty">积分：{{ loyaltyText }}</span>
@@ -48,6 +48,25 @@
             <label class="dialog-field">
               <span>预约时间</span>
               <input v-model="bookingForm.scheduledAt" type="datetime-local" required />
+            </label>
+            <label class="dialog-field">
+              <span>上门地址</span>
+              <input
+                v-model="bookingForm.serviceAddress"
+                type="text"
+                maxlength="255"
+                required
+                placeholder="请填写具体的上门地点"
+              />
+            </label>
+            <label class="dialog-field">
+              <span>到访联系方式（选填）</span>
+              <input
+                v-model="bookingForm.contactPhone"
+                type="text"
+                maxlength="100"
+                placeholder="手机或其他即时联系方式"
+              />
             </label>
             <label class="dialog-field">
               <span>特殊需求（选填）</span>
@@ -136,7 +155,7 @@
           <header class="panel-header">
             <div>
               <h2>个人资料</h2>
-              <p>更新头像与展示名称，让服务更具个性。</p>
+              <p>维护联系方式与地址信息，预约时即可一键填写。</p>
             </div>
           </header>
           <AccountProfileEditor :account="account" @updated="handleProfileUpdated" />
@@ -269,13 +288,17 @@
                       <span>¥{{ order.price.toFixed(2) }} / {{ order.unit }}</span>
                       <span>积分 +{{ order.loyaltyPoints }}</span>
                     </div>
+                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '—' }}</div>
+                    <div class="order-subtext">到访联系电话：{{ order.contactPhone || '—' }}</div>
                   </td>
                   <td>
                     <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
                   </td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
-                    <div v-if="order.assignedWorker" class="order-subtext">人员：{{ order.assignedWorker }}</div>
+                    <div v-if="order.assignedWorker" class="order-subtext">
+                      人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
+                    </div>
                   </td>
                   <td>
                     <div class="order-subtext">{{ order.progressNote || '等待家政公司更新' }}</div>
@@ -482,8 +505,6 @@ type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
 
-const FALLBACK_AVATAR =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
 const services = ref<HousekeepServiceItem[]>([])
 const orders = ref<ServiceOrderItem[]>([])
 const serviceReviews = ref<ServiceReviewItem[]>([])
@@ -500,9 +521,17 @@ const messageSending = ref(false)
 const activeConversationId = ref<number | null>(null)
 
 const bookingDialogVisible = ref(false)
-const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt: string; specialRequest: string }>({
+const bookingForm = reactive<{
+  service: HousekeepServiceItem | null
+  scheduledAt: string
+  serviceAddress: string
+  contactPhone: string
+  specialRequest: string
+}>({
   service: null,
   scheduledAt: '',
+  serviceAddress: '',
+  contactPhone: '',
   specialRequest: '',
 })
 
@@ -553,9 +582,13 @@ const displayName = computed(
 const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
 const loyaltyText = computed(() => (account.value ? account.value.loyaltyPoints.toString() : '0'))
 
-const avatarSrc = computed(
-  () => account.value?.avatarBase64 || FALLBACK_AVATAR,
-)
+const displayInitials = computed(() => {
+  const source = displayName.value?.trim()
+  if (!source) {
+    return '用'
+  }
+  return source.charAt(0).toUpperCase()
+})
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
 const favoritesCount = computed(() => favorites.value.length)
@@ -703,6 +736,8 @@ const logout = () => {
 const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.service = service
   bookingForm.scheduledAt = ''
+  bookingForm.serviceAddress = account.value?.address || ''
+  bookingForm.contactPhone = account.value?.contactNumber || ''
   bookingForm.specialRequest = ''
   bookingDialogVisible.value = true
 }
@@ -729,11 +764,20 @@ const submitBooking = async () => {
     return
   }
 
+  const normalizedAddress = bookingForm.serviceAddress.trim()
+  if (!normalizedAddress) {
+    window.alert('请填写上门地址')
+    return
+  }
+  const normalizedContact = bookingForm.contactPhone.trim()
+
   resetPaymentState()
   pendingOrderPayload.value = {
     serviceId: bookingForm.service.id,
     scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
     specialRequest: bookingForm.specialRequest,
+    serviceAddress: normalizedAddress,
+    contactPhone: normalizedContact || undefined,
   }
   paymentServiceName.value = bookingForm.service.name
   paymentCompanyName.value = bookingForm.service.companyName
@@ -816,6 +860,8 @@ const checkPaymentResult = async () => {
         paymentMessage.value = '支付成功，订单已创建。'
         bookingForm.service = null
         bookingForm.scheduledAt = ''
+        bookingForm.serviceAddress = ''
+        bookingForm.contactPhone = ''
         bookingForm.specialRequest = ''
       } catch (orderError) {
         console.error(orderError)
@@ -1054,13 +1100,21 @@ onMounted(async () => {
   color: rgba(226, 232, 240, 0.8);
 }
 
-.account-avatar {
+.account-badge {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  background: rgba(226, 232, 240, 0.2);
+  color: #f8fafc;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.35);
   border: 2px solid rgba(148, 163, 184, 0.35);
+  text-transform: uppercase;
 }
 
 .logout-button {
@@ -1661,9 +1715,10 @@ onMounted(async () => {
     justify-content: flex-end;
   }
 
-  .account-avatar {
+  .account-badge {
     width: 44px;
     height: 44px;
+    font-size: 1.1rem;
   }
 
   .sidebar {

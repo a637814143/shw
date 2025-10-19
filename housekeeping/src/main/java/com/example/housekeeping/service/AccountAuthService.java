@@ -1,6 +1,5 @@
 package com.example.housekeeping.service;
 
-import com.example.housekeeping.common.AvatarConstants;
 import com.example.housekeeping.dto.AccountLoginRequest;
 import com.example.housekeeping.dto.AccountRegisterRequest;
 import com.example.housekeeping.dto.AccountSummary;
@@ -52,7 +51,11 @@ public class AccountAuthService {
         account.setLoyaltyPoints(0);
         account.setUserType(role.getLabel());
         account.setDisplayName(normalizedAccount);
-        account.setAvatarBase64(AvatarConstants.DEFAULT_AVATAR_BASE64);
+        account.setContactNumber(null);
+        account.setAddress(null);
+        account.setCompanyPhone(null);
+        account.setCompanyAddress(null);
+        account.setCompanyDescription(null);
 
         UserAll saved = userAllRepository.save(account);
         return new AccountSummary(saved.getId(), saved.getUsername(), role.getCode());

@@ -6,7 +6,7 @@
         <p class="dashboard-subtitle">维护服务项目、安排预约并及时处理用户退款</p>
       </div>
       <div class="header-actions">
-        <img :src="avatarSrc" alt="账号头像" class="account-avatar" />
+        <span class="account-badge" aria-hidden="true">{{ displayInitials }}</span>
         <span class="welcome">您好，{{ displayName }}！</span>
         <span class="wallet">钱包余额：¥{{ balanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
@@ -56,7 +56,7 @@
           <header class="panel-header">
             <div>
               <h2>企业资料</h2>
-              <p>维护公司展示名称与头像，让客户快速识别您的品牌。</p>
+              <p>完善公司联系方式、地址与简介，帮助客户快速了解服务实力。</p>
             </div>
           </header>
           <AccountProfileEditor :account="account" @updated="handleProfileUpdated" />
@@ -151,6 +151,7 @@
                   <th>预约时间</th>
                   <th>用户</th>
                   <th>状态</th>
+                  <th>指派人员</th>
                   <th>进度备注</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -161,6 +162,8 @@
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
                     <div class="order-subtext">联系方式：{{ order.contact }}</div>
+                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '—' }}</div>
+                    <div class="order-subtext">到访联系电话：{{ order.contactPhone || '—' }}</div>
                     <div v-if="order.specialRequest" class="order-subtext highlight">
                       用户需求：{{ order.specialRequest }}
                     </div>
@@ -171,6 +174,33 @@
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
                       {{ statusText(order.status) }}
                     </span>
+                  </td>
+                  <td class="assignment-cell">
+                    <select
+                      v-model="assignmentSelections[order.id]"
+                      class="staff-select"
+                      :disabled="!staffMembers.length || assigningStaff[order.id]"
+                    >
+                      <option disabled value="">请选择人员</option>
+                      <option v-for="staff in staffMembers" :key="staff.id" :value="staff.id">
+                        {{ staff.staffName }}（{{ staff.staffPhone }}）
+                      </option>
+                    </select>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="assigningStaff[order.id]"
+                      @click="assignStaffToOrder(order)"
+                    >
+                      {{ assigningStaff[order.id] ? '指派中…' : '指派' }}
+                    </button>
+                    <div class="order-subtext">
+                      当前：
+                      <template v-if="order.assignedWorker">
+                        {{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
+                      </template>
+                      <template v-else>未指派</template>
+                    </div>
                   </td>
                   <td>
                     <input
@@ -208,7 +238,69 @@
                   </td>
                 </tr>
                 <tr v-if="!companyOrders.length">
-                  <td colspan="6" class="empty-row">暂无预约记录，用户预约后会自动出现在此处。</td>
+                  <td colspan="7" class="empty-row">暂无预约记录，用户预约后会自动出现在此处。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-else-if="activeSection === 'staff'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>人员管理</h2>
+              <p>维护上门服务人员档案，并可在预约中快速指派。</p>
+            </div>
+            <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
+          </header>
+
+          <div v-if="staffFormVisible" class="form-card">
+            <form class="form-grid" @submit.prevent="submitStaffForm">
+              <div class="form-field">
+                <label for="staff-name">姓名</label>
+                <input id="staff-name" v-model="staffForm.staffName" type="text" maxlength="100" required />
+              </div>
+              <div class="form-field">
+                <label for="staff-phone">联系方式</label>
+                <input id="staff-phone" v-model="staffForm.staffPhone" type="text" maxlength="100" required />
+              </div>
+              <div class="form-field form-field-full">
+                <label for="staff-remarks">备注（选填）</label>
+                <textarea id="staff-remarks" v-model="staffForm.remarks" rows="3" maxlength="500"></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="secondary-button" @click="closeStaffForm">取消</button>
+                <button type="submit" class="primary-button" :disabled="staffSaving">
+                  {{ staffSaving ? '保存中…' : staffSubmitText }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>联系方式</th>
+                  <th>备注</th>
+                  <th>更新时间</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="member in staffMembers" :key="member.id">
+                  <td>{{ member.staffName }}</td>
+                  <td>{{ member.staffPhone }}</td>
+                  <td>{{ member.remarks || '—' }}</td>
+                  <td>{{ formatDateTime(member.updatedAt) }}</td>
+                  <td class="table-actions">
+                    <button type="button" class="link-button" @click="openStaffForm(member)">编辑</button>
+                    <button type="button" class="link-button danger" @click="handleDeleteStaff(member)">删除</button>
+                  </td>
+                </tr>
+                <tr v-if="!staffMembers.length">
+                  <td colspan="5" class="empty-row">还没有团队成员，请点击上方按钮新增。</td>
                 </tr>
               </tbody>
             </table>
@@ -299,6 +391,7 @@ import {
   fetchCompanyReviews,
   fetchCompanyConversations,
   fetchCompanyMessages,
+  fetchCompanyStaff,
   handleCompanyRefund,
   markCompanyConversationRead,
   sendCompanyMessage,
@@ -308,17 +401,23 @@ import {
   type CompanyServicePayload,
   type CompanyConversationItem,
   type CompanyMessageItem,
+  type CompanyStaffItem,
+  type CompanyStaffPayload,
   type HousekeepServiceItem,
   type ServiceReviewItem,
   type ServiceOrderItem,
   type UpdateOrderProgressPayload,
+  createCompanyStaff,
+  updateCompanyStaff,
+  deleteCompanyStaff,
+  assignCompanyOrder,
 } from '../services/dashboard'
 
 import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
 import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
-type SectionKey = 'profile' | 'services' | 'appointments' | 'reviews' | 'messages' | 'refunds'
+type SectionKey = 'profile' | 'services' | 'staff' | 'appointments' | 'reviews' | 'messages' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -329,9 +428,6 @@ interface SectionMeta {
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
 
-const FALLBACK_AVATAR =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
-
 const displayName = computed(
   () =>
     account.value?.displayName ||
@@ -340,11 +436,18 @@ const displayName = computed(
     '公司用户',
 )
 const balanceText = computed(() => (account.value ? account.value.balance.toFixed(2) : '0.00'))
-const avatarSrc = computed(() => account.value?.avatarBase64 || FALLBACK_AVATAR)
+const displayInitials = computed(() => {
+  const source = displayName.value?.trim()
+  if (!source) {
+    return '企'
+  }
+  return source.charAt(0).toUpperCase()
+})
 
 const sections: SectionMeta[] = [
   { key: 'profile', icon: '👤', label: '企业资料' },
   { key: 'services', icon: '🧹', label: '服务管理' },
+  { key: 'staff', icon: '🧑‍🔧', label: '人员管理' },
   { key: 'appointments', icon: '📅', label: '预约排班' },
   { key: 'reviews', icon: '✨', label: '服务口碑' },
   { key: 'messages', icon: '💬', label: '客户沟通' },
@@ -369,6 +472,20 @@ const serviceForm = reactive<CompanyServicePayload>({
 })
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const staffMembers = ref<CompanyStaffItem[]>([])
+const staffFormVisible = ref(false)
+const staffSaving = ref(false)
+const editingStaffId = ref<number | null>(null)
+const staffForm = reactive<CompanyStaffPayload>({
+  staffName: '',
+  staffPhone: '',
+  remarks: '',
+})
+const staffSubmitText = computed(() => (editingStaffId.value ? '保存修改' : '新增人员'))
+
+const assignmentSelections = reactive<Record<number, number | ''>>({})
+const assigningStaff = reactive<Record<number, boolean>>({})
 
 const companyReviews = ref<ServiceReviewItem[]>([])
 const reviewsLoading = ref(false)
@@ -481,6 +598,91 @@ const handleDeleteService = async (item: HousekeepServiceItem) => {
     await loadServices()
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const resetStaffForm = () => {
+  staffForm.staffName = ''
+  staffForm.staffPhone = ''
+  staffForm.remarks = ''
+  editingStaffId.value = null
+}
+
+const openStaffForm = (member?: CompanyStaffItem) => {
+  if (member) {
+    staffForm.staffName = member.staffName
+    staffForm.staffPhone = member.staffPhone
+    staffForm.remarks = member.remarks || ''
+    editingStaffId.value = member.id
+  } else {
+    resetStaffForm()
+  }
+  staffFormVisible.value = true
+}
+
+const closeStaffForm = () => {
+  staffFormVisible.value = false
+  resetStaffForm()
+}
+
+const submitStaffForm = async () => {
+  if (!staffForm.staffName.trim() || !staffForm.staffPhone.trim()) {
+    window.alert('请填写完整的人员信息')
+    return
+  }
+  staffSaving.value = true
+  try {
+    const payload: CompanyStaffPayload = {
+      staffName: staffForm.staffName.trim(),
+      staffPhone: staffForm.staffPhone.trim(),
+      remarks: staffForm.remarks?.trim() || undefined,
+    }
+    if (editingStaffId.value) {
+      await updateCompanyStaff(editingStaffId.value, payload)
+    } else {
+      await createCompanyStaff(payload)
+    }
+    await Promise.all([loadCompanyStaff(), loadCompanyOrders()])
+    window.alert('人员信息已保存')
+    closeStaffForm()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '保存人员信息失败')
+  } finally {
+    staffSaving.value = false
+  }
+}
+
+const handleDeleteStaff = async (member: CompanyStaffItem) => {
+  if (!window.confirm(`确认删除人员“${member.staffName}”？`)) return
+  try {
+    await deleteCompanyStaff(member.id)
+    await Promise.all([loadCompanyStaff(), loadCompanyOrders()])
+    window.alert('人员已删除')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败，请稍后再试')
+  }
+}
+
+const assignStaffToOrder = async (order: ServiceOrderItem) => {
+  const selected = assignmentSelections[order.id]
+  if (!selected) {
+    window.alert('请先选择要指派的人员')
+    return
+  }
+  assigningStaff[order.id] = true
+  try {
+    const updated = await assignCompanyOrder(order.id, { staffId: Number(selected) })
+    const index = companyOrders.value.findIndex((item) => item.id === updated.id)
+    if (index >= 0) {
+      companyOrders.value.splice(index, 1, updated)
+    }
+    progressNoteEdits[updated.id] = updated.progressNote || ''
+    assignmentSelections[updated.id] = updated.assignedStaffId ?? ''
+    window.alert('指派成功')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '指派失败，请稍后再试')
+  } finally {
+    assigningStaff[order.id] = false
   }
 }
 
@@ -694,6 +896,9 @@ const switchSection = async (key: SectionKey) => {
   if (key === 'appointments') {
     await loadCompanyOrders()
   }
+  if (key === 'staff') {
+    await loadCompanyStaff()
+  }
   if (key === 'reviews') {
     await loadCompanyReviews()
   }
@@ -740,7 +945,16 @@ const loadCompanyOrders = async () => {
     companyOrders.value = result
     result.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
+      assignmentSelections[item.id] = item.assignedStaffId ?? ''
     })
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const loadCompanyStaff = async () => {
+  try {
+    staffMembers.value = await fetchCompanyStaff()
   } catch (error) {
     console.error(error)
   }
@@ -781,7 +995,7 @@ const formatDateTime = (value: string) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadCompanyOrders()])
+  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadCompanyOrders(), loadCompanyStaff()])
 })
 
 onUnmounted(() => {
@@ -858,13 +1072,21 @@ onUnmounted(() => {
   backdrop-filter: blur(12px);
 }
 
-.account-avatar {
+.account-badge {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.3rem;
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.28);
   border: 2px solid rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
 }
 
 .welcome {
@@ -1149,6 +1371,26 @@ onUnmounted(() => {
   background: rgba(248, 250, 255, 0.92);
 }
 
+.assignment-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.staff-select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--brand-radius);
+  padding: 6px 10px;
+  background: rgba(248, 250, 255, 0.92);
+  font-size: 13px;
+}
+
+.staff-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -1327,9 +1569,10 @@ onUnmounted(() => {
     justify-content: space-between;
   }
 
-  .account-avatar {
+  .account-badge {
     width: 48px;
     height: 48px;
+    font-size: 1.15rem;
   }
 
   .panel,
