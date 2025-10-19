@@ -173,9 +173,37 @@ export interface UpdateLoyaltyPayload {
   loyaltyPoints: number
 }
 
+export interface UpdateAccountPasswordPayload {
+  currentPassword: string
+  newPassword: string
+}
+
 export interface UpdateOrderProgressPayload {
   status: ServiceOrderStatus
   progressNote?: string
+}
+
+export type PaymentGatewayStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'ERROR'
+
+export interface PaymentGatewayCheckResult {
+  status: PaymentGatewayStatus
+  message: string
+  rawPayload?: string | null
+  token?: string | null
+  expiresAt?: string | null
+}
+
+export interface CreatePaymentSessionPayload {
+  serviceName: string
+  companyName?: string | null
+  amount: number
+}
+
+export interface PaymentSessionInfo {
+  token: string
+  qrPath: string
+  qrUrl: string
+  expiresAt: string
 }
 
 export interface CompanyConversationItem {
@@ -353,6 +381,23 @@ export const fetchDashboardTips = async (): Promise<DashboardTipItem[]> => {
 export const fetchDashboardAnnouncements = async (): Promise<DashboardAnnouncementItem[]> => {
   const response = await fetch(buildUrl('/api/user/dashboard/announcements'), withAuthHeaders())
   return handleResponse<DashboardAnnouncementItem[]>(response)
+}
+
+export const createQrPaymentSession = async (
+  payload: CreatePaymentSessionPayload,
+): Promise<PaymentSessionInfo> => {
+  const response = await fetch(buildUrl('/api/user/payments/qr/session'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<PaymentSessionInfo>(response)
+}
+
+export const checkQrPaymentStatus = async (token: string): Promise<PaymentGatewayCheckResult> => {
+  const url = new URL(buildUrl('/api/user/payments/qr/status'))
+  url.searchParams.set('token', token)
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaymentGatewayCheckResult>(response)
 }
 
 export const fetchUserFavorites = async (): Promise<ServiceFavoriteItem[]> => {
@@ -598,6 +643,16 @@ export const updateCurrentAccount = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<AccountProfileItem>(response)
+}
+
+export const updateCurrentPassword = async (
+  payload: UpdateAccountPasswordPayload,
+): Promise<void> => {
+  const response = await fetch(buildUrl('/api/account/password'), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  await handleResponse<void>(response)
 }
 
 export const fetchAdminOverview = async (): Promise<AdminOverviewItem> => {

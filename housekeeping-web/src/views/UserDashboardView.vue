@@ -63,12 +63,61 @@
             <button type="button" class="secondary-button" @click="closeBooking">取消</button>
             <button type="submit" class="primary-button">确认预约</button>
           </footer>
-        </form>
-      </div>
-    </transition>
+    </form>
+  </div>
+</transition>
 
-    <div class="dashboard-main">
-      <aside class="sidebar">
+<transition name="fade">
+  <div v-if="paymentDialogVisible" class="dialog-backdrop" @click.self="closePaymentDialog">
+    <div class="dialog-card payment-card">
+      <header class="dialog-header">
+        <h2>扫描二维码完成支付</h2>
+        <p>请使用手机扫描下方二维码，在支付页面确认后系统将自动创建订单。</p>
+      </header>
+      <div class="payment-body">
+        <img v-if="paymentQrSrc" :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
+        <div v-else class="payment-qr placeholder">二维码生成中…</div>
+        <p class="payment-summary">
+          服务：{{ paymentServiceName || '—' }}
+          <span v-if="paymentCompanyName"> · 提供方：{{ paymentCompanyName }}</span>
+        </p>
+        <p v-if="paymentAmount !== null" class="payment-summary">金额：¥{{ paymentAmount.toFixed(2) }}</p>
+        <p v-if="paymentSession?.expiresAt" class="payment-tip">
+          二维码有效期至：{{ formatDateTime(paymentSession.expiresAt) }}
+        </p>
+        <p class="payment-tip">
+          二维码链接：
+          <template v-if="paymentQrLink">
+            <a :href="paymentQrLink" target="_blank" rel="noopener">{{ paymentQrLink }}</a>
+          </template>
+          <template v-else>—</template>
+        </p>
+        <p v-if="paymentStatus === 'checking'" class="payment-status checking">正在获取支付结果，请稍候…</p>
+        <p v-else-if="paymentStatus === 'success'" class="payment-status success">{{ paymentMessage }}</p>
+        <p v-else-if="paymentStatus === 'failed'" class="payment-status error">{{ paymentError }}</p>
+        <p v-else class="payment-status">请扫码并在手机上完成支付确认。</p>
+      </div>
+      <footer class="dialog-footer">
+        <button type="button" class="secondary-button" :disabled="paymentChecking" @click="closePaymentDialog">
+          {{ paymentStatus === 'success' ? '关闭' : '取消' }}
+        </button>
+        <button
+          v-if="paymentStatus !== 'success'"
+          type="button"
+          class="primary-button"
+          :disabled="paymentChecking"
+          @click="checkPaymentResult"
+        >
+          {{ paymentChecking ? '查询中…' : '已完成支付，查询结果' }}
+        </button>
+        <button v-else type="button" class="primary-button" @click="closePaymentDialog">返回平台</button>
+      </footer>
+    </div>
+  </div>
+</transition>
+
+<div class="dashboard-main">
+  <aside class="sidebar">
         <button
           v-for="item in sections"
           :key="item.key"
@@ -380,6 +429,8 @@ import { useRouter } from 'vue-router'
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
   addUserFavorite,
+  checkQrPaymentStatus,
+  createQrPaymentSession,
   fetchCurrentAccount,
   createUserOrder,
   exchangeUserPoints,
@@ -399,10 +450,14 @@ import {
   sendUserMessage,
   submitUserReview,
   type AccountProfileItem,
+  type CreateOrderPayload,
+  type CreatePaymentSessionPayload,
   type CompanyMessageItem,
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
+  type PaymentGatewayCheckResult,
+  type PaymentSessionInfo,
   type DashboardTipItem,
   type HousekeepServiceItem,
   type ServiceFavoriteItem,
@@ -421,6 +476,8 @@ interface SectionMeta {
 }
 
 type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
+
+type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
@@ -448,6 +505,17 @@ const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt
   scheduledAt: '',
   specialRequest: '',
 })
+
+const paymentDialogVisible = ref(false)
+const paymentChecking = ref(false)
+const paymentStatus = ref<PaymentStatus>('idle')
+const paymentMessage = ref('')
+const paymentError = ref('')
+const pendingOrderPayload = ref<CreateOrderPayload | null>(null)
+const paymentServiceName = ref('')
+const paymentCompanyName = ref('')
+const paymentAmount = ref<number | null>(null)
+const paymentSession = ref<PaymentSessionInfo | null>(null)
 
 const reviewForm = reactive<{ serviceId: number | ''; rating: number; content: string }>({
   serviceId: '',
@@ -491,6 +559,17 @@ const avatarSrc = computed(
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
 const favoritesCount = computed(() => favorites.value.length)
+
+const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
+
+const paymentQrSrc = computed(() => {
+  const link = paymentQrLink.value
+  if (!link) {
+    return ''
+  }
+  const base = 'https://api.qrserver.com/v1/create-qr-code/'
+  return `${base}?size=240x240&data=${encodeURIComponent(link)}`
+})
 
 const orderStats = computed(() => {
   const total = orders.value.length
@@ -632,22 +711,133 @@ const closeBooking = () => {
   bookingDialogVisible.value = false
 }
 
+const resetPaymentState = () => {
+  paymentStatus.value = 'idle'
+  paymentMessage.value = ''
+  paymentError.value = ''
+  paymentChecking.value = false
+  pendingOrderPayload.value = null
+  paymentServiceName.value = ''
+  paymentCompanyName.value = ''
+  paymentAmount.value = null
+  paymentSession.value = null
+}
+
 const submitBooking = async () => {
   if (!bookingForm.service || !bookingForm.scheduledAt) {
     window.alert('请填写完整的预约信息')
     return
   }
+
+  resetPaymentState()
+  pendingOrderPayload.value = {
+    serviceId: bookingForm.service.id,
+    scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+    specialRequest: bookingForm.specialRequest,
+  }
+  paymentServiceName.value = bookingForm.service.name
+  paymentCompanyName.value = bookingForm.service.companyName
+  paymentAmount.value = bookingForm.service.price
+
+  const payload: CreatePaymentSessionPayload = {
+    serviceName: bookingForm.service.name,
+    companyName: bookingForm.service.companyName,
+    amount: bookingForm.service.price,
+  }
+
   try {
-    await createUserOrder({
-      serviceId: bookingForm.service.id,
-      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
-      specialRequest: bookingForm.specialRequest,
-    })
+    const sessionInfo = await createQrPaymentSession(payload)
+    paymentSession.value = sessionInfo
     bookingDialogVisible.value = false
-    await Promise.all([loadOrders(), loadAccount()])
-    window.alert('预约成功，系统已通知家政公司。')
+    paymentDialogVisible.value = true
   } catch (error) {
     console.error(error)
+    window.alert('生成支付二维码失败，请稍后再试。')
+    resetPaymentState()
+  }
+}
+
+const closePaymentDialog = () => {
+  if (paymentChecking.value) {
+    return
+  }
+  paymentDialogVisible.value = false
+  resetPaymentState()
+}
+
+const checkPaymentResult = async () => {
+  if (paymentChecking.value) {
+    return
+  }
+  if (!pendingOrderPayload.value) {
+    if (paymentStatus.value === 'success') {
+      closePaymentDialog()
+      return
+    }
+    paymentStatus.value = 'failed'
+    paymentError.value = '当前没有待支付的订单，请重新选择服务。'
+    return
+  }
+
+  const token = paymentSession.value?.token
+  if (!token) {
+    paymentStatus.value = 'failed'
+    paymentError.value = '支付会话不存在或已过期，请重新生成二维码。'
+    return
+  }
+
+  paymentChecking.value = true
+  paymentStatus.value = 'checking'
+  paymentError.value = ''
+
+  try {
+    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus(token)
+    if (gatewayResult.rawPayload) {
+      console.debug('支付网关返回原始数据：', gatewayResult.rawPayload)
+    }
+
+    if (gatewayResult.token) {
+      const current = paymentSession.value
+      paymentSession.value = {
+        token: gatewayResult.token,
+        qrPath: current?.qrPath ?? '',
+        qrUrl: current?.qrUrl ?? '',
+        expiresAt: gatewayResult.expiresAt || current?.expiresAt || '',
+      }
+    }
+
+    if (gatewayResult.status === 'CONFIRMED') {
+      const payload = pendingOrderPayload.value
+      try {
+        await createUserOrder(payload)
+        await Promise.all([loadOrders(), loadAccount()])
+        pendingOrderPayload.value = null
+        paymentStatus.value = 'success'
+        paymentMessage.value = '支付成功，订单已创建。'
+        bookingForm.service = null
+        bookingForm.scheduledAt = ''
+        bookingForm.specialRequest = ''
+      } catch (orderError) {
+        console.error(orderError)
+        paymentStatus.value = 'failed'
+        paymentError.value =
+          orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
+      }
+    } else {
+      paymentStatus.value = 'failed'
+      paymentError.value =
+        gatewayResult.message || '未能获取支付结果，请确认后再试。'
+      if (gatewayResult.status === 'DECLINED') {
+        pendingOrderPayload.value = null
+      }
+    }
+  } catch (error) {
+    console.error(error)
+    paymentStatus.value = 'failed'
+    paymentError.value =
+      error instanceof Error ? error.message : '获取支付结果失败，请检查网络后重试。'
+  } finally {
+    paymentChecking.value = false
   }
 }
 
@@ -1370,6 +1560,68 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.payment-card {
+  max-width: 520px;
+}
+
+.payment-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.payment-qr {
+  width: 220px;
+  height: 220px;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 0.75rem;
+}
+
+.payment-qr.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  color: rgba(15, 23, 42, 0.6);
+  background: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
+}
+
+.payment-tip {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.8);
+}
+
+.payment-tip a {
+  color: #38bdf8;
+}
+
+.payment-summary {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.payment-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.payment-status.success {
+  color: #4ade80;
+}
+
+.payment-status.error {
+  color: #fca5a5;
+}
+
+.payment-status.checking {
+  color: #facc15;
 }
 
 .dialog-header h2 {
