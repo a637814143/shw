@@ -9,16 +9,28 @@ public class AccountProfileResponse {
 
     private Long id;
     private String username;
+    private String displayName;
     private String role;
     private BigDecimal balance;
     private Integer loyaltyPoints;
+    private String avatarBase64;
 
-    public AccountProfileResponse(Long id, String username, String role, BigDecimal balance, Integer loyaltyPoints) {
+    public AccountProfileResponse(
+        Long id,
+        String username,
+        String displayName,
+        String role,
+        BigDecimal balance,
+        Integer loyaltyPoints,
+        String avatarBase64
+    ) {
         this.id = id;
         this.username = username;
+        this.displayName = displayName;
         this.role = role;
         this.balance = balance;
         this.loyaltyPoints = loyaltyPoints;
+        this.avatarBase64 = avatarBase64;
     }
 
     public Long getId() {
@@ -27,6 +39,10 @@ public class AccountProfileResponse {
 
     public String getUsername() {
         return username;
+    }
+
+    public String getDisplayName() {
+        return displayName;
     }
 
     public String getRole() {
@@ -39,5 +55,9 @@ public class AccountProfileResponse {
 
     public Integer getLoyaltyPoints() {
         return loyaltyPoints;
+    }
+
+    public String getAvatarBase64() {
+        return avatarBase64;
     }
 }
