@@ -189,6 +189,21 @@ export interface PaymentGatewayCheckResult {
   status: PaymentGatewayStatus
   message: string
   rawPayload?: string | null
+  token?: string | null
+  expiresAt?: string | null
+}
+
+export interface CreatePaymentSessionPayload {
+  serviceName: string
+  companyName?: string | null
+  amount: number
+}
+
+export interface PaymentSessionInfo {
+  token: string
+  qrPath: string
+  qrUrl: string
+  expiresAt: string
 }
 
 export interface CompanyConversationItem {
@@ -368,8 +383,20 @@ export const fetchDashboardAnnouncements = async (): Promise<DashboardAnnounceme
   return handleResponse<DashboardAnnouncementItem[]>(response)
 }
 
-export const checkQrPaymentStatus = async (): Promise<PaymentGatewayCheckResult> => {
-  const response = await fetch(buildUrl('/api/user/payments/qr/status'), withAuthHeaders())
+export const createQrPaymentSession = async (
+  payload: CreatePaymentSessionPayload,
+): Promise<PaymentSessionInfo> => {
+  const response = await fetch(buildUrl('/api/user/payments/qr/session'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<PaymentSessionInfo>(response)
+}
+
+export const checkQrPaymentStatus = async (token: string): Promise<PaymentGatewayCheckResult> => {
+  const url = new URL(buildUrl('/api/user/payments/qr/status'))
+  url.searchParams.set('token', token)
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<PaymentGatewayCheckResult>(response)
 }
 

@@ -75,15 +75,22 @@
         <p>请使用手机扫描下方二维码，在支付页面确认后系统将自动创建订单。</p>
       </header>
       <div class="payment-body">
-        <img :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
+        <img v-if="paymentQrSrc" :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
+        <div v-else class="payment-qr placeholder">二维码生成中…</div>
         <p class="payment-summary">
           服务：{{ paymentServiceName || '—' }}
           <span v-if="paymentCompanyName"> · 提供方：{{ paymentCompanyName }}</span>
         </p>
         <p v-if="paymentAmount !== null" class="payment-summary">金额：¥{{ paymentAmount.toFixed(2) }}</p>
+        <p v-if="paymentSession?.expiresAt" class="payment-tip">
+          二维码有效期至：{{ formatDateTime(paymentSession.expiresAt) }}
+        </p>
         <p class="payment-tip">
           二维码链接：
-          <a :href="PAYMENT_QR_URL" target="_blank" rel="noopener">{{ PAYMENT_QR_URL }}</a>
+          <template v-if="paymentQrLink">
+            <a :href="paymentQrLink" target="_blank" rel="noopener">{{ paymentQrLink }}</a>
+          </template>
+          <template v-else>—</template>
         </p>
         <p v-if="paymentStatus === 'checking'" class="payment-status checking">正在获取支付结果，请稍候…</p>
         <p v-else-if="paymentStatus === 'success'" class="payment-status success">{{ paymentMessage }}</p>
@@ -423,6 +430,7 @@ import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/au
 import {
   addUserFavorite,
   checkQrPaymentStatus,
+  createQrPaymentSession,
   fetchCurrentAccount,
   createUserOrder,
   exchangeUserPoints,
@@ -443,11 +451,13 @@ import {
   submitUserReview,
   type AccountProfileItem,
   type CreateOrderPayload,
+  type CreatePaymentSessionPayload,
   type CompanyMessageItem,
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
   type PaymentGatewayCheckResult,
+  type PaymentSessionInfo,
   type DashboardTipItem,
   type HousekeepServiceItem,
   type ServiceFavoriteItem,
@@ -496,7 +506,6 @@ const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt
   specialRequest: '',
 })
 
-const PAYMENT_QR_URL = 'http://1.95.159.199/shw/check/userPay'
 const paymentDialogVisible = ref(false)
 const paymentChecking = ref(false)
 const paymentStatus = ref<PaymentStatus>('idle')
@@ -506,6 +515,7 @@ const pendingOrderPayload = ref<CreateOrderPayload | null>(null)
 const paymentServiceName = ref('')
 const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
+const paymentSession = ref<PaymentSessionInfo | null>(null)
 
 const reviewForm = reactive<{ serviceId: number | ''; rating: number; content: string }>({
   serviceId: '',
@@ -550,9 +560,15 @@ const avatarSrc = computed(
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
 const favoritesCount = computed(() => favorites.value.length)
 
+const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
+
 const paymentQrSrc = computed(() => {
+  const link = paymentQrLink.value
+  if (!link) {
+    return ''
+  }
   const base = 'https://api.qrserver.com/v1/create-qr-code/'
-  return `${base}?size=240x240&data=${encodeURIComponent(PAYMENT_QR_URL)}`
+  return `${base}?size=240x240&data=${encodeURIComponent(link)}`
 })
 
 const orderStats = computed(() => {
@@ -704,9 +720,10 @@ const resetPaymentState = () => {
   paymentServiceName.value = ''
   paymentCompanyName.value = ''
   paymentAmount.value = null
+  paymentSession.value = null
 }
 
-const submitBooking = () => {
+const submitBooking = async () => {
   if (!bookingForm.service || !bookingForm.scheduledAt) {
     window.alert('请填写完整的预约信息')
     return
@@ -722,8 +739,22 @@ const submitBooking = () => {
   paymentCompanyName.value = bookingForm.service.companyName
   paymentAmount.value = bookingForm.service.price
 
-  bookingDialogVisible.value = false
-  paymentDialogVisible.value = true
+  const payload: CreatePaymentSessionPayload = {
+    serviceName: bookingForm.service.name,
+    companyName: bookingForm.service.companyName,
+    amount: bookingForm.service.price,
+  }
+
+  try {
+    const sessionInfo = await createQrPaymentSession(payload)
+    paymentSession.value = sessionInfo
+    bookingDialogVisible.value = false
+    paymentDialogVisible.value = true
+  } catch (error) {
+    console.error(error)
+    window.alert('生成支付二维码失败，请稍后再试。')
+    resetPaymentState()
+  }
 }
 
 const closePaymentDialog = () => {
@@ -748,14 +779,31 @@ const checkPaymentResult = async () => {
     return
   }
 
+  const token = paymentSession.value?.token
+  if (!token) {
+    paymentStatus.value = 'failed'
+    paymentError.value = '支付会话不存在或已过期，请重新生成二维码。'
+    return
+  }
+
   paymentChecking.value = true
   paymentStatus.value = 'checking'
   paymentError.value = ''
 
   try {
-    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus()
+    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus(token)
     if (gatewayResult.rawPayload) {
       console.debug('支付网关返回原始数据：', gatewayResult.rawPayload)
+    }
+
+    if (gatewayResult.token) {
+      const current = paymentSession.value
+      paymentSession.value = {
+        token: gatewayResult.token,
+        qrPath: current?.qrPath ?? '',
+        qrUrl: current?.qrUrl ?? '',
+        expiresAt: gatewayResult.expiresAt || current?.expiresAt || '',
+      }
     }
 
     if (gatewayResult.status === 'CONFIRMED') {
@@ -779,6 +827,9 @@ const checkPaymentResult = async () => {
       paymentStatus.value = 'failed'
       paymentError.value =
         gatewayResult.message || '未能获取支付结果，请确认后再试。'
+      if (gatewayResult.status === 'DECLINED') {
+        pendingOrderPayload.value = null
+      }
     }
   } catch (error) {
     console.error(error)
@@ -1529,6 +1580,16 @@ onMounted(async () => {
   border-radius: 1rem;
   background: #fff;
   padding: 0.75rem;
+}
+
+.payment-qr.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  color: rgba(15, 23, 42, 0.6);
+  background: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
 }
 
 .payment-tip {

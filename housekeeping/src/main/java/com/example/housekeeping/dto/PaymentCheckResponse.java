@@ -29,5 +29,15 @@ public class PaymentCheckResponse {
      * 外部服务返回的原始内容，便于诊断问题。
      */
     private String rawPayload;
+
+    /**
+     * 支付会话标识，用于前端继续轮询。
+     */
+    private String token;
+
+    /**
+     * 支付会话过期时间。
+     */
+    private java.time.Instant expiresAt;
 }
 
