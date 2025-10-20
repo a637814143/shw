@@ -84,6 +84,7 @@ export interface ServiceOrderItem {
   status: ServiceOrderStatus
   scheduledAt: string
   specialRequest?: string | null
+  serviceAddress?: string | null
   progressNote?: string | null
   loyaltyPoints: number
   refundReason?: string | null
@@ -91,6 +92,8 @@ export interface ServiceOrderItem {
   handledBy?: string | null
   assignedWorker?: string | null
   workerContact?: string | null
+  customerContactPhone?: string | null
+  customerAddress?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -125,17 +128,24 @@ export interface AccountProfileItem {
   balance: number
   loyaltyPoints: number
   avatarBase64: string
+  contactPhone?: string | null
+  contactAddress?: string | null
+  companyDescription?: string | null
 }
 
 export interface UpdateAccountProfilePayload {
   displayName: string
   avatarBase64?: string
+  contactPhone?: string
+  contactAddress?: string
+  companyDescription?: string
 }
 
 export interface CreateOrderPayload {
   serviceId: number
   scheduledAt: string
   specialRequest?: string
+  serviceAddress?: string
 }
 
 export interface RefundPayload {
@@ -312,6 +322,23 @@ export interface PointsExchangePayload {
 export interface AssignWorkerPayload {
   workerName: string
   workerContact: string
+}
+
+export interface CompanyStaffItem {
+  id: number
+  name: string
+  contact: string
+  role?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CompanyStaffPayload {
+  name: string
+  contact: string
+  role?: string
+  notes?: string
 }
 
 // 公共接口
@@ -506,6 +533,50 @@ export const deleteCompanyService = async (id: number): Promise<void> => {
     ...withAuthHeaders({ method: 'DELETE' }),
   })
   await handleResponse<null>(response)
+}
+
+export const fetchCompanyStaff = async (): Promise<CompanyStaffItem[]> => {
+  const response = await fetch(buildUrl('/api/company/staff'), withAuthHeaders())
+  return handleResponse<CompanyStaffItem[]>(response)
+}
+
+export const createCompanyStaff = async (
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl('/api/company/staff'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const updateCompanyStaff = async (
+  id: number,
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${id}`), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const deleteCompanyStaff = async (id: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${id}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const assignCompanyStaff = async (
+  staffId: number,
+  orderId: number,
+): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${staffId}/assign`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify({ orderId }),
+  })
+  return handleResponse<ServiceOrderItem>(response)
 }
 
 export const fetchCompanyRefunds = async (): Promise<ServiceOrderItem[]> => {

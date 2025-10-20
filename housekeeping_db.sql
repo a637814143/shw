@@ -10,6 +10,9 @@ CREATE TABLE `user_all` (
   `usertype` varchar(32) NOT NULL COMMENT '用户类型：普通用户/家政公司/系统管理员',
   `display_name` varchar(100) NOT NULL DEFAULT '' COMMENT '展示名称',
   `avatar_base64` longtext NOT NULL COMMENT 'Base64 格式头像',
+  `contact_phone` varchar(50) DEFAULT NULL COMMENT '联系电话',
+  `contact_address` varchar(255) DEFAULT NULL COMMENT '联系地址',
+  `company_description` varchar(1000) DEFAULT NULL COMMENT '公司简介',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='统一用户账号表';
 
@@ -50,6 +53,7 @@ CREATE TABLE `service_order` (
   `status` varchar(32) NOT NULL COMMENT '订单状态',
   `scheduled_at` datetime NOT NULL COMMENT '预约上门时间',
   `special_request` varchar(500) DEFAULT NULL COMMENT '用户特殊需求',
+  `service_address` varchar(255) DEFAULT NULL COMMENT '上门地址',
   `progress_note` varchar(500) DEFAULT NULL COMMENT '服务进度备注',
   `loyalty_points` int NOT NULL DEFAULT 0 COMMENT '本单积分',
   `refund_reason` varchar(500) DEFAULT NULL COMMENT '退款原因',
@@ -129,6 +133,21 @@ CREATE TABLE `company_message` (
   CONSTRAINT `fk_message_sender` FOREIGN KEY (`sender_id`) REFERENCES `user_all` (`id`),
   CONSTRAINT `fk_message_recipient` FOREIGN KEY (`recipient_id`) REFERENCES `user_all` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='企业与客户沟通消息表';
+
+DROP TABLE IF EXISTS `company_staff`;
+CREATE TABLE `company_staff` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `company_id` bigint NOT NULL COMMENT '所属家政公司',
+  `name` varchar(100) NOT NULL COMMENT '人员姓名',
+  `contact` varchar(100) NOT NULL COMMENT '联系方式',
+  `role` varchar(100) DEFAULT NULL COMMENT '职位或技能',
+  `notes` varchar(500) DEFAULT NULL COMMENT '备注信息',
+  `created_at` datetime NOT NULL COMMENT '创建时间',
+  `updated_at` datetime NOT NULL COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_staff_company` (`company_id`),
+  CONSTRAINT `fk_staff_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司人员信息';
 
 -- 初始化系统管理员账号
 INSERT INTO `user_all` (`username`, `passwd`, `money`, `usertype`, `display_name`, `avatar_base64`)

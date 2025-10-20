@@ -48,7 +48,10 @@ public class AccountProfileService {
             role.getCode(),
             account.getMoney(),
             account.getLoyaltyPoints() == null ? 0 : account.getLoyaltyPoints(),
-            avatar
+            avatar,
+            account.getContactPhone(),
+            account.getContactAddress(),
+            role == AccountRole.COMPANY ? account.getCompanyDescription() : null
         );
     }
 
@@ -64,6 +67,16 @@ public class AccountProfileService {
 
         String normalizedAvatar = normalizeAvatar(request.getAvatarBase64());
         account.setAvatarBase64(normalizedAvatar);
+
+        account.setContactPhone(normalizeOptional(request.getContactPhone()));
+        account.setContactAddress(normalizeOptional(request.getContactAddress()));
+
+        AccountRole role = AccountRole.fromValue(account.getUserType());
+        if (role == AccountRole.COMPANY) {
+            account.setCompanyDescription(normalizeOptional(request.getCompanyDescription()));
+        } else {
+            account.setCompanyDescription(null);
+        }
 
         UserAll saved = userAllRepository.save(account);
         return buildResponse(saved);
@@ -124,5 +137,13 @@ public class AccountProfileService {
         }
 
         return candidate;
+    }
+
+    private String normalizeOptional(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

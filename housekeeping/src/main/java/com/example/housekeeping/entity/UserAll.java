@@ -40,4 +40,13 @@ public class UserAll {
     @Lob
     @Column(name = "avatar_base64", nullable = false, columnDefinition = "LONGTEXT")
     private String avatarBase64;
+
+    @Column(name = "contact_phone", length = 50)
+    private String contactPhone;
+
+    @Column(name = "contact_address", length = 255)
+    private String contactAddress;
+
+    @Column(name = "company_description", length = 1000)
+    private String companyDescription;
 }

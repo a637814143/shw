@@ -30,9 +30,9 @@
         <p class="stat-helper">及时响应守护用户体验</p>
       </article>
       <article class="stat-card success">
-        <p class="stat-label">账户余额</p>
-        <p class="stat-value">¥{{ companyStats.balance.toFixed(2) }}</p>
-        <p class="stat-helper">平台托管，资金安全透明</p>
+        <p class="stat-label">团队成员</p>
+        <p class="stat-value">{{ companyStats.staffCount }}</p>
+        <p class="stat-helper">账户余额：¥{{ companyStats.balance.toFixed(2) }}</p>
       </article>
     </section>
 
@@ -135,13 +135,81 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'staff'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>人员管理</h2>
+              <p>维护家政师傅信息，便于快速指派订单。</p>
+            </div>
+            <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
+          </header>
+
+          <div v-if="staffFormVisible" class="form-card">
+            <form class="form-grid" @submit.prevent="submitStaffForm">
+              <div class="form-field">
+                <label for="staff-name">姓名</label>
+                <input id="staff-name" v-model="staffForm.name" type="text" required />
+              </div>
+              <div class="form-field">
+                <label for="staff-contact">联系方式</label>
+                <input id="staff-contact" v-model="staffForm.contact" type="text" required />
+              </div>
+              <div class="form-field">
+                <label for="staff-role">岗位/特长</label>
+                <input id="staff-role" v-model="staffForm.role" type="text" />
+              </div>
+              <div class="form-field form-field-full">
+                <label for="staff-notes">备注</label>
+                <textarea id="staff-notes" v-model="staffForm.notes" rows="3"></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="secondary-button" @click="closeStaffForm">取消</button>
+                <button type="submit" class="primary-button" :disabled="staffSaving">
+                  {{ staffSaving ? '保存中…' : staffSubmitText }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>联系方式</th>
+                  <th>岗位</th>
+                  <th>备注</th>
+                  <th>创建时间</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in staffList" :key="item.id">
+                  <td>{{ item.name }}</td>
+                  <td>{{ item.contact }}</td>
+                  <td>{{ item.role || '—' }}</td>
+                  <td>{{ item.notes || '—' }}</td>
+                  <td>{{ formatDateTime(item.createdAt) }}</td>
+                  <td class="table-actions">
+                    <button type="button" class="link-button" @click="openStaffForm(item)">编辑</button>
+                    <button type="button" class="link-button danger" @click="handleDeleteStaff(item)">删除</button>
+                  </td>
+                </tr>
+                <tr v-if="!staffList.length">
+                  <td colspan="6" class="empty-row">还没有添加人员，点击右上角按钮即可新增。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'appointments'" class="panel">
           <header class="panel-header">
             <div>
               <h2>预约排班</h2>
               <p>掌握近期预约并同步上门进度，合理安排师傅日程。</p>
             </div>
-            <button type="button" class="secondary-button" @click="loadCompanyOrders">刷新预约</button>
+            <button type="button" class="secondary-button" @click="refreshAppointments">刷新预约</button>
           </header>
           <div class="table-wrapper">
             <table class="data-table">
@@ -152,6 +220,7 @@
                   <th>用户</th>
                   <th>状态</th>
                   <th>进度备注</th>
+                  <th>指派人员</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -161,6 +230,9 @@
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
                     <div class="order-subtext">联系方式：{{ order.contact }}</div>
+                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
+                    <div class="order-subtext">用户电话：{{ order.customerContactPhone || '未提供' }}</div>
+                    <div class="order-subtext">用户地址：{{ order.customerAddress || '—' }}</div>
                     <div v-if="order.specialRequest" class="order-subtext highlight">
                       用户需求：{{ order.specialRequest }}
                     </div>
@@ -179,6 +251,25 @@
                       class="progress-input"
                       placeholder="填写最新进度"
                     />
+                  </td>
+                  <td>
+                    <select v-model="staffAssignments[order.id]" class="staff-select">
+                      <option value="">选择人员</option>
+                      <option v-for="staff in staffList" :key="staff.id" :value="staff.id">
+                        {{ staff.name }}<span v-if="staff.role">（{{ staff.role }}）</span>
+                      </option>
+                    </select>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="staffAssignmentSaving[order.id] || !staffAssignments[order.id]"
+                      @click="assignStaffToOrder(order)"
+                    >
+                      {{ staffAssignmentSaving[order.id] ? '指派中…' : '指派' }}
+                    </button>
+                    <div v-if="order.assignedWorker" class="order-subtext">
+                      当前：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
+                    </div>
                   </td>
                   <td class="table-actions actions-inline">
                     <button
@@ -304,6 +395,11 @@ import {
   sendCompanyMessage,
   updateCompanyOrderProgress,
   updateCompanyService,
+  fetchCompanyStaff,
+  createCompanyStaff,
+  updateCompanyStaff,
+  deleteCompanyStaff,
+  assignCompanyStaff,
   type AccountProfileItem,
   type CompanyServicePayload,
   type CompanyConversationItem,
@@ -312,13 +408,15 @@ import {
   type ServiceReviewItem,
   type ServiceOrderItem,
   type UpdateOrderProgressPayload,
+  type CompanyStaffItem,
+  type CompanyStaffPayload,
 } from '../services/dashboard'
 
 import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
 import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
-type SectionKey = 'profile' | 'services' | 'appointments' | 'reviews' | 'messages' | 'refunds'
+type SectionKey = 'profile' | 'services' | 'appointments' | 'staff' | 'reviews' | 'messages' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -346,6 +444,7 @@ const sections: SectionMeta[] = [
   { key: 'profile', icon: '👤', label: '企业资料' },
   { key: 'services', icon: '🧹', label: '服务管理' },
   { key: 'appointments', icon: '📅', label: '预约排班' },
+  { key: 'staff', icon: '🧑\u200d🤝\u200d🧑', label: '人员管理' },
   { key: 'reviews', icon: '✨', label: '服务口碑' },
   { key: 'messages', icon: '💬', label: '客户沟通' },
   { key: 'refunds', icon: '💸', label: '退款审核' },
@@ -368,7 +467,22 @@ const serviceForm = reactive<CompanyServicePayload>({
   description: '',
 })
 
+const staffList = ref<CompanyStaffItem[]>([])
+const staffFormVisible = ref(false)
+const staffSaving = ref(false)
+const editingStaffId = ref<number | null>(null)
+const staffForm = reactive<CompanyStaffPayload>({
+  name: '',
+  contact: '',
+  role: '',
+  notes: '',
+})
+const staffAssignments = reactive<Record<number, number | ''>>({})
+const staffAssignmentSaving = reactive<Record<number, boolean>>({})
+
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
 const companyReviews = ref<ServiceReviewItem[]>([])
 const reviewsLoading = ref(false)
@@ -397,12 +511,14 @@ const companyStats = computed(() => {
     : 0
   const balance = account.value?.balance ?? 0
   const upcoming = companyOrders.value.length
+  const staffCount = staffList.value.length
   return {
     totalServices,
     pendingRefunds,
     avgPrice,
     balance,
     upcoming,
+    staffCount,
   }
 })
 
@@ -482,6 +598,96 @@ const handleDeleteService = async (item: HousekeepServiceItem) => {
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '删除失败')
   }
+}
+
+const resetStaffForm = () => {
+  staffForm.name = ''
+  staffForm.contact = ''
+  staffForm.role = ''
+  staffForm.notes = ''
+  editingStaffId.value = null
+}
+
+const openStaffForm = (item?: CompanyStaffItem) => {
+  if (item) {
+    staffForm.name = item.name
+    staffForm.contact = item.contact
+    staffForm.role = item.role || ''
+    staffForm.notes = item.notes || ''
+    editingStaffId.value = item.id
+  } else {
+    resetStaffForm()
+  }
+  staffFormVisible.value = true
+}
+
+const closeStaffForm = () => {
+  staffFormVisible.value = false
+  resetStaffForm()
+}
+
+const submitStaffForm = async () => {
+  if (!staffForm.name.trim() || !staffForm.contact.trim()) {
+    window.alert('请填写完整的人员姓名和联系方式')
+    return
+  }
+  staffSaving.value = true
+  try {
+    const payload: CompanyStaffPayload = {
+      name: staffForm.name.trim(),
+      contact: staffForm.contact.trim(),
+      role: staffForm.role?.trim() || undefined,
+      notes: staffForm.notes?.trim() || undefined,
+    }
+    if (editingStaffId.value) {
+      await updateCompanyStaff(editingStaffId.value, payload)
+    } else {
+      await createCompanyStaff(payload)
+    }
+    await loadStaff()
+    closeStaffForm()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '保存人员信息失败')
+  } finally {
+    staffSaving.value = false
+  }
+}
+
+const handleDeleteStaff = async (item: CompanyStaffItem) => {
+  if (!window.confirm(`确认移除人员“${item.name}”？`)) return
+  try {
+    await deleteCompanyStaff(item.id)
+    await loadStaff()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const assignStaffToOrder = async (order: ServiceOrderItem) => {
+  const selected = staffAssignments[order.id]
+  if (!selected) {
+    window.alert('请选择要指派的人员')
+    return
+  }
+  staffAssignmentSaving[order.id] = true
+  try {
+    const updated = await assignCompanyStaff(Number(selected), order.id)
+    const index = companyOrders.value.findIndex((item) => item.id === updated.id)
+    if (index >= 0) {
+      companyOrders.value.splice(index, 1, updated)
+    }
+    staffAssignments[order.id] = ''
+    progressNoteEdits[updated.id] = updated.progressNote || ''
+    window.alert('已指派人员')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '指派失败，请稍后再试')
+  } finally {
+    staffAssignmentSaving[order.id] = false
+  }
+}
+
+const refreshAppointments = async () => {
+  await Promise.all([loadCompanyOrders(), loadStaff()])
 }
 
 const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
@@ -692,7 +898,10 @@ const switchSection = async (key: SectionKey) => {
     await loadRefunds()
   }
   if (key === 'appointments') {
-    await loadCompanyOrders()
+    await refreshAppointments()
+  }
+  if (key === 'staff') {
+    await loadStaff()
   }
   if (key === 'reviews') {
     await loadCompanyReviews()
@@ -726,6 +935,15 @@ const loadServices = async () => {
   }
 }
 
+const loadStaff = async () => {
+  try {
+    staffList.value = await fetchCompanyStaff()
+  } catch (error) {
+    console.error(error)
+    staffList.value = []
+  }
+}
+
 const loadRefunds = async () => {
   try {
     refundOrders.value = await fetchCompanyRefunds()
@@ -740,6 +958,8 @@ const loadCompanyOrders = async () => {
     companyOrders.value = result
     result.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
+      staffAssignments[item.id] = ''
+      staffAssignmentSaving[item.id] = false
     })
   } catch (error) {
     console.error(error)
@@ -781,7 +1001,8 @@ const formatDateTime = (value: string) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadCompanyOrders()])
+  await Promise.all([loadAccount(), loadServices(), loadRefunds()])
+  await refreshAppointments()
 })
 
 onUnmounted(() => {
@@ -1147,6 +1368,16 @@ onUnmounted(() => {
   padding: 8px 10px;
   font-size: 13px;
   background: rgba(248, 250, 255, 0.92);
+}
+
+.staff-select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--brand-radius);
+  padding: 8px 10px;
+  font-size: 13px;
+  background: rgba(248, 250, 255, 0.92);
+  margin-bottom: 6px;
 }
 
 .status-badge {

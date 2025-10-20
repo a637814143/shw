@@ -50,6 +50,16 @@
               <input v-model="bookingForm.scheduledAt" type="datetime-local" required />
             </label>
             <label class="dialog-field">
+              <span>服务地址</span>
+              <input
+                v-model.trim="bookingForm.serviceAddress"
+                type="text"
+                maxlength="255"
+                placeholder="请输入或确认上门地址"
+                required
+              />
+            </label>
+            <label class="dialog-field">
               <span>特殊需求（选填）</span>
               <textarea
                 v-model="bookingForm.specialRequest"
@@ -269,6 +279,7 @@
                       <span>¥{{ order.price.toFixed(2) }} / {{ order.unit }}</span>
                       <span>积分 +{{ order.loyaltyPoints }}</span>
                     </div>
+                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
                   </td>
                   <td>
                     <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
@@ -276,6 +287,7 @@
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
                     <div v-if="order.assignedWorker" class="order-subtext">人员：{{ order.assignedWorker }}</div>
+                    <div v-if="order.workerContact" class="order-subtext">联系方式：{{ order.workerContact }}</div>
                   </td>
                   <td>
                     <div class="order-subtext">{{ order.progressNote || '等待家政公司更新' }}</div>
@@ -500,10 +512,16 @@ const messageSending = ref(false)
 const activeConversationId = ref<number | null>(null)
 
 const bookingDialogVisible = ref(false)
-const bookingForm = reactive<{ service: HousekeepServiceItem | null; scheduledAt: string; specialRequest: string }>({
+const bookingForm = reactive<{
+  service: HousekeepServiceItem | null
+  scheduledAt: string
+  specialRequest: string
+  serviceAddress: string
+}>({
   service: null,
   scheduledAt: '',
   specialRequest: '',
+  serviceAddress: '',
 })
 
 const paymentDialogVisible = ref(false)
@@ -704,11 +722,13 @@ const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.service = service
   bookingForm.scheduledAt = ''
   bookingForm.specialRequest = ''
+  bookingForm.serviceAddress = account.value?.contactAddress || ''
   bookingDialogVisible.value = true
 }
 
 const closeBooking = () => {
   bookingDialogVisible.value = false
+  bookingForm.serviceAddress = ''
 }
 
 const resetPaymentState = () => {
@@ -724,7 +744,7 @@ const resetPaymentState = () => {
 }
 
 const submitBooking = async () => {
-  if (!bookingForm.service || !bookingForm.scheduledAt) {
+  if (!bookingForm.service || !bookingForm.scheduledAt || !bookingForm.serviceAddress.trim()) {
     window.alert('请填写完整的预约信息')
     return
   }
@@ -734,6 +754,7 @@ const submitBooking = async () => {
     serviceId: bookingForm.service.id,
     scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
     specialRequest: bookingForm.specialRequest,
+    serviceAddress: bookingForm.serviceAddress.trim(),
   }
   paymentServiceName.value = bookingForm.service.name
   paymentCompanyName.value = bookingForm.service.companyName
@@ -817,6 +838,7 @@ const checkPaymentResult = async () => {
         bookingForm.service = null
         bookingForm.scheduledAt = ''
         bookingForm.specialRequest = ''
+        bookingForm.serviceAddress = ''
       } catch (orderError) {
         console.error(orderError)
         paymentStatus.value = 'failed'

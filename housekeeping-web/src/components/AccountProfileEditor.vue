@@ -29,15 +29,36 @@
       </label>
 
       <label class="form-field">
-        <span>头像数据（Base64）</span>
+        <span>联系电话</span>
+        <input
+          v-model.trim="profileForm.contactPhone"
+          type="text"
+          maxlength="50"
+          placeholder="请输入联系电话"
+        />
+      </label>
+
+      <label class="form-field">
+        <span>联系地址</span>
+        <input
+          v-model.trim="profileForm.contactAddress"
+          type="text"
+          maxlength="255"
+          placeholder="请输入详细地址"
+        />
+      </label>
+
+      <label v-if="isCompany" class="form-field">
+        <span>公司简介</span>
         <textarea
-          v-model.trim="profileForm.avatarBase64"
+          v-model.trim="profileForm.companyDescription"
           rows="4"
-          placeholder="可直接粘贴 data:image/png;base64,..."
+          maxlength="1000"
+          placeholder="向客户介绍公司的服务特色"
         ></textarea>
       </label>
 
-      <p class="form-hint">支持上传 PNG/JPEG/GIF，建议控制在 512KB 以内。</p>
+      <p class="form-hint">支持上传 PNG/JPEG/GIF，建议控制在 512KB 以内。联系方式和地址将用于快速沟通及预约信息。</p>
 
       <div class="form-actions">
         <button type="submit" class="primary-button" :disabled="saving">
@@ -97,6 +118,9 @@ const emit = defineEmits<{ (e: 'updated', payload: AccountProfileItem): void }>(
 const profileForm = reactive<UpdateAccountProfilePayload>({
   displayName: '',
   avatarBase64: '',
+  contactPhone: '',
+  contactAddress: '',
+  companyDescription: '',
 })
 
 const passwordForm = reactive<{ currentPassword: string; newPassword: string; confirmPassword: string }>({
@@ -111,6 +135,8 @@ const passwordSaving = ref(false)
 
 const defaultAvatar = computed(() => props.account?.avatarBase64 || FALLBACK_AVATAR)
 
+const isCompany = computed(() => props.account?.role === 'company')
+
 const previewAvatar = computed(() => profileForm.avatarBase64 || defaultAvatar.value)
 
 watch(
@@ -119,10 +145,16 @@ watch(
     if (!account) {
       profileForm.displayName = ''
       profileForm.avatarBase64 = ''
+      profileForm.contactPhone = ''
+      profileForm.contactAddress = ''
+      profileForm.companyDescription = ''
       return
     }
     profileForm.displayName = account.displayName
     profileForm.avatarBase64 = account.avatarBase64
+    profileForm.contactPhone = account.contactPhone || ''
+    profileForm.contactAddress = account.contactAddress || ''
+    profileForm.companyDescription = account.companyDescription || ''
   },
   { immediate: true },
 )
@@ -166,10 +198,18 @@ const submitProfile = async () => {
     const payload: UpdateAccountProfilePayload = {
       displayName: profileForm.displayName.trim(),
       avatarBase64: profileForm.avatarBase64?.trim() || defaultAvatar.value,
+      contactPhone: profileForm.contactPhone?.trim() || undefined,
+      contactAddress: profileForm.contactAddress?.trim() || undefined,
+      companyDescription: isCompany.value
+        ? profileForm.companyDescription?.trim() || undefined
+        : undefined,
     }
     const updated = await updateCurrentAccount(payload)
     profileForm.displayName = updated.displayName
     profileForm.avatarBase64 = updated.avatarBase64
+    profileForm.contactPhone = updated.contactPhone || ''
+    profileForm.contactAddress = updated.contactAddress || ''
+    profileForm.companyDescription = updated.companyDescription || ''
     emit('updated', updated)
     alert('个人资料已更新')
   } catch (error) {

@@ -15,6 +15,15 @@ public class AccountProfileUpdateRequest {
     @Size(max = 524288, message = "头像数据过大，请控制在512KB以内")
     private String avatarBase64;
 
+    @Size(max = 50, message = "联系电话长度不得超过50个字符")
+    private String contactPhone;
+
+    @Size(max = 255, message = "联系地址长度不得超过255个字符")
+    private String contactAddress;
+
+    @Size(max = 1000, message = "公司简介长度不得超过1000个字符")
+    private String companyDescription;
+
     public String getDisplayName() {
         return displayName;
     }
@@ -29,5 +38,29 @@ public class AccountProfileUpdateRequest {
 
     public void setAvatarBase64(String avatarBase64) {
         this.avatarBase64 = avatarBase64;
+    }
+
+    public String getContactPhone() {
+        return contactPhone;
+    }
+
+    public void setContactPhone(String contactPhone) {
+        this.contactPhone = contactPhone;
+    }
+
+    public String getContactAddress() {
+        return contactAddress;
+    }
+
+    public void setContactAddress(String contactAddress) {
+        this.contactAddress = contactAddress;
+    }
+
+    public String getCompanyDescription() {
+        return companyDescription;
+    }
+
+    public void setCompanyDescription(String companyDescription) {
+        this.companyDescription = companyDescription;
     }
 }

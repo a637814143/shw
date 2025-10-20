@@ -21,6 +21,9 @@ public class ServiceOrderRequest {
     @Size(max = 500, message = "特殊需求过长")
     private String specialRequest;
 
+    @Size(max = 255, message = "地址过长")
+    private String serviceAddress;
+
     public Long getServiceId() {
         return serviceId;
     }
@@ -43,5 +46,13 @@ public class ServiceOrderRequest {
 
     public void setSpecialRequest(String specialRequest) {
         this.specialRequest = specialRequest;
+    }
+
+    public String getServiceAddress() {
+        return serviceAddress;
+    }
+
+    public void setServiceAddress(String serviceAddress) {
+        this.serviceAddress = serviceAddress;
     }
 }
