@@ -57,6 +57,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/user/messages/**").hasRole("USER")
                 .requestMatchers("/api/user/wallet/**").hasRole("USER")
                 .requestMatchers("/api/company/services/**").hasRole("COMPANY")
+                .requestMatchers("/api/company/staff/**").hasRole("COMPANY")
+                .requestMatchers("/api/company/messages/**").hasRole("COMPANY")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
