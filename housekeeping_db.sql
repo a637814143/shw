@@ -138,7 +138,7 @@ DROP TABLE IF EXISTS `company_staff`;
 CREATE TABLE `company_staff` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `company_id` bigint NOT NULL COMMENT '所属家政公司',
-  `name` varchar(100) NOT NULL COMMENT '人员姓名',
+  `staff_name` varchar(100) NOT NULL COMMENT '人员姓名',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `role` varchar(100) DEFAULT NULL COMMENT '职位或技能',
   `notes` varchar(500) DEFAULT NULL COMMENT '备注信息',

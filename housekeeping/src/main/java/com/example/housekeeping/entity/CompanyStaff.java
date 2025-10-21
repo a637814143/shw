@@ -23,7 +23,7 @@ public class CompanyStaff {
     @JoinColumn(name = "company_id", nullable = false)
     private UserAll company;
 
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(name = "staff_name", nullable = false, length = 100)
     private String name;
 
     @Column(name = "contact", nullable = false, length = 100)
