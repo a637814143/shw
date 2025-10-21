@@ -17,9 +17,12 @@ import com.example.housekeeping.enums.HousekeepItemType;
 import com.example.housekeeping.repository.HousekeepItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -31,11 +34,10 @@ public class DashboardContentService {
     @Autowired
     private HousekeepItemRepository housekeepItemRepository;
 
-    public List<DashboardServiceItemResponse> listServices() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.SERVICE.getValue())
-                .stream()
-                .map(item -> new DashboardServiceItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getIcon()))
-                .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public List<DashboardServiceItemResponse> listServices(String keyword) {
+        return loadItems(HousekeepItemType.SERVICE.getValue(), keyword,
+            item -> new DashboardServiceItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getIcon()));
     }
 
     public DashboardServiceItemResponse createService(DashboardServiceItemRequest request) {
@@ -58,23 +60,27 @@ public class DashboardContentService {
         return new DashboardServiceItemResponse(saved.getId(), saved.getTitle(), saved.getContent(), saved.getIcon());
     }
 
+    @Transactional
     public void deleteService(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.SERVICE.getValue())
                 .ifPresent(housekeepItemRepository::delete);
     }
 
-    public List<DashboardTipItemResponse> listTips() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.TIP.getValue())
-                .stream()
-                .map(item -> new DashboardTipItemResponse(item.getId(), item.getTitle(), item.getContent()))
-                .collect(Collectors.toList());
+    @Transactional
+    public void deleteServices(List<Long> ids) {
+        deleteItems(HousekeepItemType.SERVICE.getValue(), ids);
     }
 
-    public List<DashboardCarouselItemResponse> listCarousels() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.CAROUSEL.getValue())
-            .stream()
-            .map(item -> new DashboardCarouselItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getTag()))
-            .collect(Collectors.toList());
+    @Transactional(readOnly = true)
+    public List<DashboardTipItemResponse> listTips(String keyword) {
+        return loadItems(HousekeepItemType.TIP.getValue(), keyword,
+            item -> new DashboardTipItemResponse(item.getId(), item.getTitle(), item.getContent()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<DashboardCarouselItemResponse> listCarousels(String keyword) {
+        return loadItems(HousekeepItemType.CAROUSEL.getValue(), keyword,
+            item -> new DashboardCarouselItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getTag()));
     }
 
     public DashboardCarouselItemResponse createCarousel(DashboardCarouselItemRequest request) {
@@ -97,9 +103,15 @@ public class DashboardContentService {
         return new DashboardCarouselItemResponse(saved.getId(), saved.getTitle(), saved.getContent(), saved.getTag());
     }
 
+    @Transactional
     public void deleteCarousel(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.CAROUSEL.getValue())
             .ifPresent(housekeepItemRepository::delete);
+    }
+
+    @Transactional
+    public void deleteCarousels(List<Long> ids) {
+        deleteItems(HousekeepItemType.CAROUSEL.getValue(), ids);
     }
 
     public DashboardTipItemResponse createTip(DashboardTipItemRequest request) {
@@ -120,16 +132,21 @@ public class DashboardContentService {
         return new DashboardTipItemResponse(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
+    @Transactional
     public void deleteTip(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.TIP.getValue())
                 .ifPresent(housekeepItemRepository::delete);
     }
 
-    public List<DashboardAnnouncementResponse> listAnnouncements() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.ANNOUNCEMENT.getValue())
-            .stream()
-            .map(item -> new DashboardAnnouncementResponse(item.getId(), item.getTitle(), item.getContent()))
-            .collect(Collectors.toList());
+    @Transactional
+    public void deleteTips(List<Long> ids) {
+        deleteItems(HousekeepItemType.TIP.getValue(), ids);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DashboardAnnouncementResponse> listAnnouncements(String keyword) {
+        return loadItems(HousekeepItemType.ANNOUNCEMENT.getValue(), keyword,
+            item -> new DashboardAnnouncementResponse(item.getId(), item.getTitle(), item.getContent()));
     }
 
     public DashboardAnnouncementResponse createAnnouncement(DashboardAnnouncementRequest request) {
@@ -150,21 +167,26 @@ public class DashboardContentService {
         return new DashboardAnnouncementResponse(saved.getId(), saved.getTitle(), saved.getContent());
     }
 
+    @Transactional
     public void deleteAnnouncement(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.ANNOUNCEMENT.getValue())
             .ifPresent(housekeepItemRepository::delete);
     }
 
-    public List<DashboardReviewItemResponse> listReviews() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.REVIEW.getValue())
-                .stream()
-                .map(item -> new DashboardReviewItemResponse(
-                        item.getId(),
-                        item.getAuthor(),
-                        item.getServiceName(),
-                        item.getRating() == null ? 0.0 : item.getRating().doubleValue(),
-                        item.getContent()))
-                .collect(Collectors.toList());
+    @Transactional
+    public void deleteAnnouncements(List<Long> ids) {
+        deleteItems(HousekeepItemType.ANNOUNCEMENT.getValue(), ids);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DashboardReviewItemResponse> listReviews(String keyword) {
+        return loadItems(HousekeepItemType.REVIEW.getValue(), keyword,
+            item -> new DashboardReviewItemResponse(
+                    item.getId(),
+                    item.getAuthor(),
+                    item.getServiceName(),
+                    item.getRating() == null ? 0.0 : item.getRating().doubleValue(),
+                    item.getContent()));
     }
 
     public DashboardReviewItemResponse createReview(DashboardReviewItemRequest request) {
@@ -199,16 +221,21 @@ public class DashboardContentService {
                 saved.getContent());
     }
 
+    @Transactional
     public void deleteReview(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.REVIEW.getValue())
                 .ifPresent(housekeepItemRepository::delete);
     }
 
-    public List<DashboardOfferItemResponse> listOffers() {
-        return housekeepItemRepository.findByItemTypeOrderByIdAsc(HousekeepItemType.OFFER.getValue())
-                .stream()
-                .map(item -> new DashboardOfferItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getTag()))
-                .collect(Collectors.toList());
+    @Transactional
+    public void deleteReviews(List<Long> ids) {
+        deleteItems(HousekeepItemType.REVIEW.getValue(), ids);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DashboardOfferItemResponse> listOffers(String keyword) {
+        return loadItems(HousekeepItemType.OFFER.getValue(), keyword,
+            item -> new DashboardOfferItemResponse(item.getId(), item.getTitle(), item.getContent(), item.getTag()));
     }
 
     public DashboardOfferItemResponse createOffer(DashboardOfferItemRequest request) {
@@ -231,8 +258,50 @@ public class DashboardContentService {
         return new DashboardOfferItemResponse(saved.getId(), saved.getTitle(), saved.getContent(), saved.getTag());
     }
 
+    @Transactional
     public void deleteOffer(Long id) {
         housekeepItemRepository.findByIdAndItemType(id, HousekeepItemType.OFFER.getValue())
                 .ifPresent(housekeepItemRepository::delete);
+    }
+
+    @Transactional
+    public void deleteOffers(List<Long> ids) {
+        deleteItems(HousekeepItemType.OFFER.getValue(), ids);
+    }
+
+    private <T> List<T> loadItems(String itemType, String keyword, Function<HousekeepItem, T> mapper) {
+        String normalized = normalizeKeyword(keyword);
+        List<HousekeepItem> items = normalized == null
+            ? housekeepItemRepository.findByItemTypeOrderByIdAsc(itemType)
+            : housekeepItemRepository.searchByItemTypeAndKeyword(itemType, normalized);
+        return items.stream()
+            .map(mapper)
+            .collect(Collectors.toList());
+    }
+
+    private void deleteItems(String itemType, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        List<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.toList());
+        if (distinct.isEmpty()) {
+            return;
+        }
+        List<HousekeepItem> items = housekeepItemRepository.findByItemTypeAndIdIn(itemType, distinct);
+        if (items.size() != distinct.size()) {
+            throw new RuntimeException("部分内容不存在或已被删除");
+        }
+        housekeepItemRepository.deleteAll(items);
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

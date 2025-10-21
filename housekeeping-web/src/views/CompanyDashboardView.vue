@@ -209,7 +209,35 @@
               <h2>人员管理</h2>
               <p>维护家政师傅信息，便于快速指派订单。</p>
             </div>
-            <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
+            <div class="staff-actions">
+              <label class="visually-hidden" for="staff-search">搜索人员</label>
+              <input
+                id="staff-search"
+                v-model="staffSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索姓名、联系方式、岗位或备注"
+                :disabled="staffLoading"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasStaffSelection || staffLoading"
+                @click="handleBulkDeleteStaff"
+              >
+                删除选中<span v-if="selectedStaffCount">（{{ selectedStaffCount }}）</span>
+              </button>
+              <button
+                v-if="hasStaffFilter"
+                type="button"
+                class="ghost-button"
+                :disabled="staffLoading"
+                @click="clearStaffFilter"
+              >
+                清除筛选
+              </button>
+              <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
+            </div>
           </header>
 
           <div v-if="staffFormVisible" class="form-card">
@@ -243,6 +271,15 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allStaffSelected"
+                      :disabled="staffLoading || !staffList.length"
+                      @change="toggleSelectAllStaff(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选人员"
+                    />
+                  </th>
                   <th>姓名</th>
                   <th>联系方式</th>
                   <th>岗位</th>
@@ -253,6 +290,15 @@
               </thead>
               <tbody>
                 <tr v-for="item in staffList" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedStaffIds.has(item.id)"
+                      :disabled="staffLoading"
+                      @change="toggleStaffSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择人员 ${item.name}`"
+                    />
+                  </td>
                   <td>{{ item.name }}</td>
                   <td>{{ item.contact }}</td>
                   <td>{{ item.role || '—' }}</td>
@@ -264,7 +310,10 @@
                   </td>
                 </tr>
                 <tr v-if="!staffList.length">
-                  <td colspan="6" class="empty-row">还没有添加人员，点击右上角按钮即可新增。</td>
+                  <td colspan="7" class="empty-row">
+                    <span v-if="hasStaffFilter">未找到匹配的人员，尝试调整搜索条件。</span>
+                    <span v-else>还没有添加人员，点击右上角按钮即可新增。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -468,6 +517,7 @@ import {
   createCompanyStaff,
   updateCompanyStaff,
   deleteCompanyStaff,
+  deleteCompanyStaffBatch,
   assignCompanyStaff,
   type AccountProfileItem,
   type CompanyServicePayload,
@@ -545,6 +595,10 @@ const serviceForm = reactive<CompanyServicePayload>({
 })
 
 const staffList = ref<CompanyStaffItem[]>([])
+const staffSearch = ref('')
+const staffLoading = ref(false)
+const selectedStaffIds = ref<Set<number>>(new Set())
+let staffSearchTimer: ReturnType<typeof setTimeout> | null = null
 const staffFormVisible = ref(false)
 const staffSaving = ref(false)
 const editingStaffId = ref<number | null>(null)
@@ -560,6 +614,13 @@ const staffAssignmentSaving = reactive<Record<number, boolean>>({})
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
+
+const hasStaffSelection = computed(() => selectedStaffIds.value.size > 0)
+const allStaffSelected = computed(
+  () => staffList.value.length > 0 && staffList.value.every((item) => selectedStaffIds.value.has(item.id)),
+)
+const hasStaffFilter = computed(() => staffSearch.value.trim().length > 0)
+const selectedStaffCount = computed(() => selectedStaffIds.value.size)
 
 const companyReviews = ref<ServiceReviewItem[]>([])
 const reviewsLoading = ref(false)
@@ -619,16 +680,81 @@ const clearServiceSelection = () => {
   selectedServiceIds.value = new Set()
 }
 
+const pruneStaffSelection = () => {
+  if (!selectedStaffIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(staffList.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedStaffIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedStaffIds.value = next
+  }
+}
+
+const toggleStaffSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedStaffIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedStaffIds.value = next
+}
+
+const toggleSelectAllStaff = (checked: boolean) => {
+  if (!checked) {
+    selectedStaffIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedStaffIds.value)
+  staffList.value.forEach((item) => next.add(item.id))
+  selectedStaffIds.value = next
+}
+
+const clearStaffSelection = () => {
+  selectedStaffIds.value = new Set()
+}
+
 watch(serviceSearch, () => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
   }
   serviceSearchTimer = setTimeout(async () => {
-    servicePage.value = 1
-    await loadServices()
-    serviceSearchTimer = null
+  servicePage.value = 1
+  await loadServices()
+  serviceSearchTimer = null
+}, 300)
+})
+
+watch(staffSearch, () => {
+  if (staffSearchTimer) {
+    clearTimeout(staffSearchTimer)
+  }
+  staffSearchTimer = setTimeout(async () => {
+    await loadStaff()
+    staffSearchTimer = null
   }, 300)
 })
+
+const clearStaffFilter = async () => {
+  if (!staffSearch.value) {
+    return
+  }
+  staffSearch.value = ''
+  if (staffSearchTimer) {
+    clearTimeout(staffSearchTimer)
+    staffSearchTimer = null
+  }
+  await loadStaff()
+}
 
 const activeMessages = computed(() =>
   activeConversationId.value != null ? messagesByOrder[activeConversationId.value] ?? [] : [],
@@ -832,6 +958,25 @@ const handleDeleteStaff = async (item: CompanyStaffItem) => {
   if (!window.confirm(`确认移除人员“${item.name}”？`)) return
   try {
     await deleteCompanyStaff(item.id)
+    const next = new Set(selectedStaffIds.value)
+    next.delete(item.id)
+    selectedStaffIds.value = next
+    await loadStaff()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleBulkDeleteStaff = async () => {
+  if (!selectedStaffIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedStaffIds.value.size} 位人员吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyStaffBatch(Array.from(selectedStaffIds.value))
+    clearStaffSelection()
     await loadStaff()
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '删除失败')
@@ -1137,11 +1282,17 @@ const loadServices = async () => {
 }
 
 const loadStaff = async () => {
+  staffLoading.value = true
   try {
-    staffList.value = await fetchCompanyStaff()
+    const keyword = staffSearch.value.trim()
+    staffList.value = await fetchCompanyStaff(keyword ? { keyword } : undefined)
+    pruneStaffSelection()
   } catch (error) {
     console.error(error)
     staffList.value = []
+    clearStaffSelection()
+  } finally {
+    staffLoading.value = false
   }
 }
 
@@ -1202,7 +1353,7 @@ const formatDateTime = (value: string) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadRefunds()])
+  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadStaff()])
   await refreshAppointments()
 })
 
@@ -1210,6 +1361,10 @@ onUnmounted(() => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
     serviceSearchTimer = null
+  }
+  if (staffSearchTimer) {
+    clearTimeout(staffSearchTimer)
+    staffSearchTimer = null
   }
   stopMessagePolling()
 })
@@ -1496,6 +1651,14 @@ onUnmounted(() => {
 }
 
 .service-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.staff-actions {
   display: flex;
   align-items: center;
   gap: 12px;

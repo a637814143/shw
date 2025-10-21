@@ -26,7 +26,7 @@ public class HousekeepItem {
     private String title;
 
     @Lob
-    @Column(name = "content")
+    @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(name = "icon", length = 32)

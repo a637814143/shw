@@ -43,18 +43,24 @@ public class AdminManagementController {
     }
 
     @GetMapping("/users")
-    public Result<List<UserAccountResponse>> listUsers() {
-        return Result.success(adminAccountService.listUsers());
+    public Result<List<UserAccountResponse>> listUsers(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(adminAccountService.listUsers(keyword));
     }
 
     @GetMapping("/companies")
-    public Result<List<UserAccountResponse>> listCompanies() {
-        return Result.success(adminAccountService.listCompanies());
+    public Result<List<UserAccountResponse>> listCompanies(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(adminAccountService.listCompanies(keyword));
     }
 
     @GetMapping("/managers")
-    public Result<List<UserAccountResponse>> listManagers() {
-        return Result.success(adminAccountService.listAdmins());
+    public Result<List<UserAccountResponse>> listManagers(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(adminAccountService.listAdmins(keyword));
     }
 
     @PutMapping("/users/{userId}/wallet")
@@ -73,6 +79,18 @@ public class AdminManagementController {
     public Result<UserAccountResponse> updateLoyalty(@PathVariable Long userId,
                                                      @Valid @RequestBody UpdateLoyaltyRequest request) {
         return Result.success("积分已更新", adminAccountService.updateLoyalty(userId, request));
+    }
+
+    @DeleteMapping("/users/{userId}")
+    public Result<Void> deleteUser(@PathVariable Long userId) {
+        adminAccountService.deleteAccount(userId);
+        return Result.success("账号已删除", null);
+    }
+
+    @DeleteMapping("/users/batch")
+    public Result<Void> deleteUsers(@Valid @RequestBody IdListRequest request) {
+        adminAccountService.deleteAccounts(request.getIds());
+        return Result.success("账号已删除", null);
     }
 
     @GetMapping("/refunds")

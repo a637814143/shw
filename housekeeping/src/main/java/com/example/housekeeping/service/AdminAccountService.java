@@ -12,12 +12,14 @@ import com.example.housekeeping.repository.AccountTransactionRepository;
 import com.example.housekeeping.repository.UserAllRepository;
 import com.example.housekeeping.util.LegacyPasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -39,28 +41,40 @@ public class AdminAccountService {
     private AccountTransactionRepository accountTransactionRepository;
 
     @Transactional(readOnly = true)
-    public List<UserAccountResponse> listUsers() {
+    public List<UserAccountResponse> listUsers(String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureAdmin(admin);
-        return userAllRepository.findAll().stream()
+        String normalized = normalizeKeyword(keyword);
+        List<UserAll> accounts = normalized == null
+            ? userAllRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
+            : userAllRepository.searchByKeyword(normalized);
+        return accounts.stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<UserAccountResponse> listCompanies() {
+    public List<UserAccountResponse> listCompanies(String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureAdmin(admin);
-        return userAllRepository.findByUserType(AccountRole.COMPANY.getLabel()).stream()
+        String normalized = normalizeKeyword(keyword);
+        List<UserAll> accounts = normalized == null
+            ? userAllRepository.findByUserTypeOrderByIdAsc(AccountRole.COMPANY.getLabel())
+            : userAllRepository.searchByUserTypeAndKeyword(AccountRole.COMPANY.getLabel(), normalized);
+        return accounts.stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<UserAccountResponse> listAdmins() {
+    public List<UserAccountResponse> listAdmins(String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureAdmin(admin);
-        return userAllRepository.findByUserType(AccountRole.ADMIN.getLabel()).stream()
+        String normalized = normalizeKeyword(keyword);
+        List<UserAll> accounts = normalized == null
+            ? userAllRepository.findByUserTypeOrderByIdAsc(AccountRole.ADMIN.getLabel())
+            : userAllRepository.searchByUserTypeAndKeyword(AccountRole.ADMIN.getLabel(), normalized);
+        return accounts.stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -116,6 +130,45 @@ public class AdminAccountService {
         return mapToResponse(userAllRepository.save(target));
     }
 
+    @Transactional
+    public void deleteAccount(Long userId) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureAdmin(admin);
+        if (userId == null) {
+            throw new RuntimeException("请选择要删除的账号");
+        }
+        if (Objects.equals(admin.getId(), userId)) {
+            throw new RuntimeException("无法删除当前登录账号");
+        }
+        UserAll target = userAllRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("账号不存在或已被删除"));
+        userAllRepository.delete(target);
+    }
+
+    @Transactional
+    public void deleteAccounts(List<Long> ids) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureAdmin(admin);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        List<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.toList());
+        if (distinct.isEmpty()) {
+            return;
+        }
+        if (distinct.contains(admin.getId())) {
+            throw new RuntimeException("无法删除当前登录账号");
+        }
+        List<UserAll> accounts = userAllRepository.findAllById(distinct);
+        if (accounts.size() != distinct.size()) {
+            throw new RuntimeException("部分账号不存在或已被删除");
+        }
+        userAllRepository.deleteAll(accounts);
+    }
+
     private void ensureAdmin(UserAll account) {
         if (!AccountRole.ADMIN.getLabel().equals(account.getUserType())) {
             throw new RuntimeException("仅管理员可操作");
@@ -131,5 +184,13 @@ public class AdminAccountService {
             user.getMoney(),
             user.getLoyaltyPoints() == null ? 0 : user.getLoyaltyPoints()
         );
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

@@ -4,6 +4,7 @@ import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.AssignStaffRequest;
 import com.example.housekeeping.dto.CompanyStaffRequest;
 import com.example.housekeeping.dto.CompanyStaffResponse;
+import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.service.CompanyStaffService;
 import jakarta.validation.Valid;
@@ -23,8 +24,8 @@ public class CompanyStaffController {
     private CompanyStaffService companyStaffService;
 
     @GetMapping
-    public Result<List<CompanyStaffResponse>> listStaff() {
-        return Result.success(companyStaffService.listStaff());
+    public Result<List<CompanyStaffResponse>> listStaff(@RequestParam(value = "keyword", required = false) String keyword) {
+        return Result.success(companyStaffService.listStaff(keyword));
     }
 
     @PostMapping
@@ -42,6 +43,12 @@ public class CompanyStaffController {
     public Result<Void> deleteStaff(@PathVariable Long staffId) {
         companyStaffService.deleteStaff(staffId);
         return Result.success("人员已删除", null);
+    }
+
+    @DeleteMapping("/batch")
+    public Result<Void> deleteStaffBatch(@Valid @RequestBody IdListRequest request) {
+        companyStaffService.deleteStaff(request.getIds());
+        return Result.success("已删除所选人员", null);
     }
 
     @PostMapping("/{staffId}/assign")

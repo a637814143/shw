@@ -16,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -88,11 +90,42 @@ public class CompanyStaffService {
     }
 
     @Transactional
-    public List<CompanyStaffResponse> listStaff() {
+    public List<CompanyStaffResponse> listStaff(String keyword) {
         UserAll company = ensureCompanyAccount();
-        return companyStaffRepository.findByCompany(company).stream()
+        String normalized = normalizeOptional(keyword);
+        List<CompanyStaff> staff = normalized == null
+            ? companyStaffRepository.findByCompany(company)
+            : companyStaffRepository.searchByCompanyAndKeyword(company, normalized);
+        return staff.stream()
+            .sorted(Comparator.comparing(CompanyStaff::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .map(this::map)
             .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteStaff(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        UserAll company = ensureCompanyAccount();
+        List<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.toList());
+        if (distinct.isEmpty()) {
+            return;
+        }
+
+        List<CompanyStaff> staffList = companyStaffRepository.findAllById(distinct);
+        if (staffList.size() != distinct.size()) {
+            throw new RuntimeException("部分人员不存在或已被删除");
+        }
+        for (CompanyStaff staff : staffList) {
+            if (!staff.getCompany().getId().equals(company.getId())) {
+                throw new RuntimeException("无法操作其他公司的人员");
+            }
+        }
+        companyStaffRepository.deleteAll(staffList);
     }
 
     private void applyRequest(CompanyStaff staff, CompanyStaffRequest request) {

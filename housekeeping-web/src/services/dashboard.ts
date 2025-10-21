@@ -411,18 +411,30 @@ export const submitUserReview = async (payload: ReviewPayload): Promise<ServiceR
   return handleResponse<ServiceReviewItem>(response)
 }
 
-export const fetchDashboardCarousels = async (): Promise<DashboardCarouselItem[]> => {
-  const response = await fetch(buildUrl('/api/user/dashboard/carousels'), withAuthHeaders())
+export const fetchDashboardCarousels = async (params?: { keyword?: string }): Promise<DashboardCarouselItem[]> => {
+  const url = new URL(buildUrl('/api/user/dashboard/carousels'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<DashboardCarouselItem[]>(response)
 }
 
-export const fetchDashboardTips = async (): Promise<DashboardTipItem[]> => {
-  const response = await fetch(buildUrl('/api/user/dashboard/tips'), withAuthHeaders())
+export const fetchDashboardTips = async (params?: { keyword?: string }): Promise<DashboardTipItem[]> => {
+  const url = new URL(buildUrl('/api/user/dashboard/tips'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<DashboardTipItem[]>(response)
 }
 
-export const fetchDashboardAnnouncements = async (): Promise<DashboardAnnouncementItem[]> => {
-  const response = await fetch(buildUrl('/api/user/dashboard/announcements'), withAuthHeaders())
+export const fetchDashboardAnnouncements = async (params?: { keyword?: string }): Promise<DashboardAnnouncementItem[]> => {
+  const url = new URL(buildUrl('/api/user/dashboard/announcements'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<DashboardAnnouncementItem[]>(response)
 }
 
@@ -573,8 +585,12 @@ export const deleteCompanyServices = async (ids: number[]): Promise<void> => {
   await handleResponse<null>(response)
 }
 
-export const fetchCompanyStaff = async (): Promise<CompanyStaffItem[]> => {
-  const response = await fetch(buildUrl('/api/company/staff'), withAuthHeaders())
+export const fetchCompanyStaff = async (params?: { keyword?: string }): Promise<CompanyStaffItem[]> => {
+  const url = new URL(buildUrl('/api/company/staff'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<CompanyStaffItem[]>(response)
 }
 
@@ -602,6 +618,14 @@ export const updateCompanyStaff = async (
 export const deleteCompanyStaff = async (id: number): Promise<void> => {
   const response = await fetch(buildUrl(`/api/company/staff/${id}`), {
     ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteCompanyStaffBatch = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/company/staff/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
   })
   await handleResponse<null>(response)
 }
@@ -685,8 +709,12 @@ export const markCompanyConversationRead = async (orderId: number): Promise<void
 }
 
 // 管理员接口
-export const fetchAdminUsers = async (): Promise<UserAccountItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/users'), withAuthHeaders())
+export const fetchAdminUsers = async (params?: { keyword?: string }): Promise<UserAccountItem[]> => {
+  const url = new URL(buildUrl('/api/admin/users'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<UserAccountItem[]>(response)
 }
 
@@ -721,6 +749,21 @@ export const updateAdminPassword = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<UserAccountItem>(response)
+}
+
+export const deleteAdminUser = async (userId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/admin/users/${userId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteAdminUsers = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/users/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const fetchAdminRefunds = async (params?: {
@@ -849,6 +892,14 @@ export const deleteDashboardTip = async (id: number): Promise<void> => {
   await handleResponse<null>(response)
 }
 
+export const deleteDashboardTips = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/user/dashboard/tips/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
+}
+
 export const createDashboardCarousel = async (
   payload: DashboardCarouselItem,
 ): Promise<DashboardCarouselItem> => {
@@ -885,6 +936,14 @@ export const deleteDashboardCarousel = async (id: number): Promise<void> => {
   await handleResponse<null>(response)
 }
 
+export const deleteDashboardCarousels = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/user/dashboard/carousels/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
+}
+
 export const createDashboardAnnouncement = async (
   payload: DashboardAnnouncementItem,
 ): Promise<DashboardAnnouncementItem> => {
@@ -909,6 +968,14 @@ export const updateDashboardAnnouncement = async (
 export const deleteDashboardAnnouncement = async (id: number): Promise<void> => {
   const response = await fetch(buildUrl(`/api/user/dashboard/announcements/${id}`), {
     ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteDashboardAnnouncements = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/user/dashboard/announcements/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
   })
   await handleResponse<null>(response)
 }
