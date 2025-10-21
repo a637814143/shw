@@ -26,7 +26,7 @@ public class CompanyStaff {
     @Column(name = "staff_name", nullable = false, length = 100)
     private String name;
 
-    @Column(name = "staff_phone", nullable = false, length = 100)
+    @Column(name = "contact", nullable = false, length = 100)
     private String contact;
 
     @Column(name = "role", length = 100)

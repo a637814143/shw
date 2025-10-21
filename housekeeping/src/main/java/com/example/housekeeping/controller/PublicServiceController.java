@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -27,8 +28,9 @@ public class PublicServiceController {
     private ServiceReviewService serviceReviewService;
 
     @GetMapping
-    public Result<List<HousekeepServiceResponse>> listServices() {
-        return Result.success(housekeepServiceManager.listAllServices());
+    public Result<List<HousekeepServiceResponse>> listServices(@RequestParam(value = "keyword", required = false)
+                                                               String keyword) {
+        return Result.success(housekeepServiceManager.listAllServices(keyword));
     }
 
     @GetMapping("/{serviceId}/reviews")

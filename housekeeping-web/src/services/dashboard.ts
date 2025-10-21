@@ -342,8 +342,12 @@ export interface CompanyStaffPayload {
 }
 
 // 公共接口
-export const fetchPublicServices = async (): Promise<HousekeepServiceItem[]> => {
-  const response = await fetch(buildUrl('/api/public/services'))
+export const fetchPublicServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/public/services'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
@@ -358,8 +362,12 @@ export const fetchCompanyReviews = async (): Promise<ServiceReviewItem[]> => {
 }
 
 // 普通用户接口
-export const fetchUserServices = async (): Promise<HousekeepServiceItem[]> => {
-  const response = await fetch(buildUrl('/api/user/services'), withAuthHeaders())
+export const fetchUserServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/user/services'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
@@ -502,8 +510,12 @@ export const exchangeUserPoints = async (
 }
 
 // 家政公司接口
-export const fetchCompanyServices = async (): Promise<HousekeepServiceItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services'), withAuthHeaders())
+export const fetchCompanyServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/company/services'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
@@ -531,6 +543,14 @@ export const updateCompanyService = async (
 export const deleteCompanyService = async (id: number): Promise<void> => {
   const response = await fetch(buildUrl(`/api/company/services/${id}`), {
     ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteCompanyServices = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/company/services/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
   })
   await handleResponse<null>(response)
 }
