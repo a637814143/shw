@@ -20,7 +20,7 @@ import java.util.Base64;
 @Service
 public class AccountProfileService {
 
-    private static final int MAX_AVATAR_BYTES = 512 * 1024;
+    private static final int MAX_AVATAR_BYTES = 10 * 1024 * 1024;
 
     @Autowired
     private AccountLookupService accountLookupService;
@@ -130,7 +130,7 @@ public class AccountProfileService {
         try {
             byte[] decoded = Base64.getDecoder().decode(dataPart);
             if (decoded.length > MAX_AVATAR_BYTES) {
-                throw new RuntimeException("头像文件过大，请控制在 512KB 以内");
+                throw new RuntimeException("头像文件过大，请控制在 10MB 以内");
             }
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("头像数据不是有效的 Base64 编码", e);

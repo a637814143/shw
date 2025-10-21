@@ -1,6 +1,7 @@
 package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
+import com.example.housekeeping.dto.CompanyServicePageResponse;
 import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.dto.IdListRequest;
@@ -34,9 +35,12 @@ public class CompanyServiceController {
     private ServiceReviewService serviceReviewService;
 
     @GetMapping
-    public Result<List<HousekeepServiceResponse>> listCompanyServices(@RequestParam(value = "keyword", required = false)
-                                                                      String keyword) {
-        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword));
+    public Result<CompanyServicePageResponse> listCompanyServices(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "10") Integer size
+    ) {
+        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword, page == null ? 1 : page, size == null ? 10 : size));
     }
 
     @PostMapping

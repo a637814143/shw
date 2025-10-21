@@ -425,25 +425,92 @@
               <h2>全站退款处理</h2>
               <p>当公司未及时处理时，由管理员终审保障体验。</p>
             </div>
-            <button type="button" class="ghost-button" @click="loadRefunds" :disabled="refundsLoading">
-              {{ refundsLoading ? '刷新中…' : '刷新列表' }}
-            </button>
+            <div class="refund-actions">
+              <div class="stage-switch">
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: refundStage === 'pending' }"
+                  @click="changeRefundStage('pending')"
+                  :disabled="refundsLoading"
+                >
+                  待处理
+                </button>
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: refundStage === 'processed' }"
+                  @click="changeRefundStage('processed')"
+                  :disabled="refundsLoading"
+                >
+                  已处理
+                </button>
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: refundStage === 'all' }"
+                  @click="changeRefundStage('all')"
+                  :disabled="refundsLoading"
+                >
+                  全部
+                </button>
+              </div>
+              <label class="visually-hidden" for="refund-search">搜索退款记录</label>
+              <input
+                id="refund-search"
+                v-model="refundSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务/用户/公司"
+                :disabled="refundsLoading"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="refundStage !== 'processed' || !hasRefundSelection || refundsLoading"
+                @click="handleBulkDeleteRefunds"
+              >
+                删除选中<span v-if="selectedRefundIds.size">（{{ selectedRefundIds.size }}）</span>
+              </button>
+              <button type="button" class="ghost-button" @click="loadRefunds" :disabled="refundsLoading">
+                {{ refundsLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
           </header>
           <div v-if="refundsLoading" class="loading-state">正在同步退款请求…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allRefundsSelected"
+                      :disabled="refundsLoading || !selectableRefunds.length"
+                      @change="toggleSelectAllRefunds(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选可删除退款记录"
+                    />
+                  </th>
                   <th>服务</th>
                   <th>申请人</th>
                   <th>家政公司</th>
                   <th>退款原因</th>
                   <th>申请时间</th>
+                  <th>状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="order in refundOrders" :key="order.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedRefundIds.has(order.id)"
+                      :disabled="refundsLoading || !canSelectRefund(order)"
+                      @change="toggleRefundSelection(order.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择退款 ${order.serviceName}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
@@ -452,13 +519,27 @@
                   <td>{{ order.companyName }}</td>
                   <td>{{ order.refundReason }}</td>
                   <td>{{ formatDate(order.updatedAt) }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
+                      {{ statusText(order.status) }}
+                    </span>
+                  </td>
                   <td class="table-actions actions-inline">
-                    <button type="button" class="link-button" @click="handleRefund(order, true)">同意</button>
-                    <button type="button" class="link-button danger" @click="handleRefund(order, false)">拒绝</button>
+                    <template v-if="order.status === 'REFUND_REQUESTED'">
+                      <button type="button" class="link-button" @click="handleRefund(order, true)">同意</button>
+                      <button type="button" class="link-button danger" @click="handleRefund(order, false)">拒绝</button>
+                    </template>
+                    <template v-else>
+                      <button type="button" class="link-button danger" @click="handleDeleteSingleRefund(order)">删除</button>
+                    </template>
                   </td>
                 </tr>
                 <tr v-if="!refundOrders.length">
-                  <td colspan="6" class="empty-row">暂无待处理的退款申请。</td>
+                  <td colspan="8" class="empty-row">
+                    <span v-if="refundStage === 'pending'">暂无待处理的退款申请。</span>
+                    <span v-else-if="refundStage === 'processed'">暂无已处理的退款记录。</span>
+                    <span v-else>暂无相关的退款记录。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -470,7 +551,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY, ROLE_LABELS } from '../constants/auth'
@@ -486,6 +567,7 @@ import {
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
+  deleteAdminRefunds,
   fetchAdminTransactions,
   fetchAdminUsers,
   fetchDashboardAnnouncements,
@@ -553,6 +635,11 @@ const favoritesLoading = ref(false)
 
 const refundOrders = ref<ServiceOrderItem[]>([])
 const refundsLoading = ref(false)
+const pendingRefundCount = ref(0)
+const refundStage = ref<'pending' | 'processed' | 'all'>('pending')
+const refundSearch = ref('')
+const selectedRefundIds = ref<Set<number>>(new Set())
+let refundSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -599,7 +686,7 @@ const adminStats = computed(() => {
     totalAdmins: base?.totalAdmins ?? 0,
     totalRecharge: Number(base?.totalRecharge ?? 0),
     totalWithdraw: Number(base?.totalWithdraw ?? 0),
-    pendingRefunds: refundOrders.value.length,
+    pendingRefunds: pendingRefundCount.value,
   }
 })
 
@@ -618,6 +705,17 @@ const maxAppointment = computed(() => {
   const max = appointmentMetrics.value.reduce((acc, item) => Math.max(acc, item.count), 0)
   return max <= 0 ? 1 : max
 })
+
+const canSelectRefund = (order: ServiceOrderItem) =>
+  order.status === 'REFUND_APPROVED' || order.status === 'REFUND_REJECTED'
+
+const selectableRefunds = computed(() => refundOrders.value.filter((order) => canSelectRefund(order)))
+const hasRefundSelection = computed(() => selectedRefundIds.value.size > 0)
+const allRefundsSelected = computed(
+  () =>
+    selectableRefunds.value.length > 0 &&
+    selectableRefunds.value.every((order) => selectedRefundIds.value.has(order.id)),
+)
 
 const sparkStyle = (amount: number) => ({
   height: `${Math.max(12, Math.round((amount / maxWeeklyAmount.value) * 100))}%`,
@@ -770,12 +868,120 @@ const loadFavorites = async () => {
   }
 }
 
+const pruneRefundSelection = () => {
+  if (!selectedRefundIds.value.size) {
+    return
+  }
+  const allowed = new Set(selectableRefunds.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedRefundIds.value.forEach((id) => {
+    if (allowed.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedRefundIds.value = next
+  }
+}
+
+const toggleRefundSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedRefundIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedRefundIds.value = next
+}
+
+const toggleSelectAllRefunds = (checked: boolean) => {
+  if (!checked) {
+    clearRefundSelection()
+    return
+  }
+  const next = new Set(selectedRefundIds.value)
+  selectableRefunds.value.forEach((order) => next.add(order.id))
+  selectedRefundIds.value = next
+}
+
+const clearRefundSelection = () => {
+  selectedRefundIds.value = new Set()
+}
+
+const changeRefundStage = (stage: 'pending' | 'processed' | 'all') => {
+  if (refundStage.value === stage) {
+    return
+  }
+  refundStage.value = stage
+  clearRefundSelection()
+  loadRefunds()
+}
+
+const handleBulkDeleteRefunds = async () => {
+  if (refundStage.value !== 'processed' || !selectedRefundIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedRefundIds.value.size} 条退款记录？`)) {
+    return
+  }
+  try {
+    await deleteAdminRefunds(Array.from(selectedRefundIds.value))
+    clearRefundSelection()
+    await loadRefunds()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleDeleteSingleRefund = async (order: ServiceOrderItem) => {
+  if (!canSelectRefund(order)) {
+    return
+  }
+  if (!window.confirm(`确认删除退款记录“${order.serviceName}”吗？`)) {
+    return
+  }
+  try {
+    await deleteAdminRefunds([order.id])
+    if (selectedRefundIds.value.has(order.id)) {
+      const next = new Set(selectedRefundIds.value)
+      next.delete(order.id)
+      selectedRefundIds.value = next
+    }
+    await loadRefunds()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+watch(refundSearch, () => {
+  if (refundSearchTimer) {
+    clearTimeout(refundSearchTimer)
+  }
+  refundSearchTimer = setTimeout(async () => {
+    await loadRefunds()
+    refundSearchTimer = null
+  }, 300)
+})
+
 const loadRefunds = async () => {
   refundsLoading.value = true
   try {
-    refundOrders.value = await fetchAdminRefunds()
+    const keyword = refundSearch.value.trim()
+    refundOrders.value = await fetchAdminRefunds({
+      stage: refundStage.value,
+      keyword: keyword ? keyword : undefined,
+    })
+    if (refundStage.value === 'pending') {
+      pendingRefundCount.value = refundOrders.value.length
+    }
+    pruneRefundSelection()
   } catch (error) {
     console.error(error)
+    refundOrders.value = []
+    clearRefundSelection()
   } finally {
     refundsLoading.value = false
   }
@@ -853,6 +1059,11 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
   if (!window.confirm(message)) return
   try {
     await handleAdminRefund(order.id, { approve })
+    if (selectedRefundIds.value.has(order.id)) {
+      const next = new Set(selectedRefundIds.value)
+      next.delete(order.id)
+      selectedRefundIds.value = next
+    }
     await loadRefunds()
     await loadOverview()
   } catch (error) {
@@ -1574,6 +1785,55 @@ onMounted(async () => {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.refund-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.stage-switch {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.chip-button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: rgba(30, 41, 59, 0.65);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.chip-button.active {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.2));
+  color: rgba(30, 41, 59, 0.95);
+  font-weight: 600;
+}
+
+.chip-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 @media (max-width: 1080px) {

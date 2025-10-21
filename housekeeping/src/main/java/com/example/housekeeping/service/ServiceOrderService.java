@@ -11,6 +11,7 @@ import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.repository.CompanyMessageRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -43,6 +44,9 @@ public class ServiceOrderService {
 
     @Autowired
     private UserAllRepository userAllRepository;
+
+    @Autowired
+    private CompanyMessageRepository companyMessageRepository;
 
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
@@ -197,10 +201,19 @@ public class ServiceOrderService {
 
     @Transactional(readOnly = true)
     public List<ServiceOrderResponse> listRefundRequestsForAdmin() {
+        return listRefundsForAdmin("pending", null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceOrderResponse> listRefundsForAdmin(String stage, String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
+        List<ServiceOrderStatus> statuses = resolveRefundStatuses(stage);
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findAll().stream()
-            .filter(order -> order.getStatus() == ServiceOrderStatus.REFUND_REQUESTED)
+            .filter(order -> statuses.contains(order.getStatus()))
+            .filter(order -> matchesRefundKeyword(order, normalizedKeyword))
+            .sorted(Comparator.comparing(ServiceOrder::getUpdatedAt).reversed())
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -274,6 +287,36 @@ public class ServiceOrderService {
         }
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));
+    }
+
+    @Transactional
+    public void deleteProcessedRefunds(List<Long> ids) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        List<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.toList());
+        if (distinct.isEmpty()) {
+            return;
+        }
+        List<ServiceOrder> orders = serviceOrderRepository.findAllById(distinct);
+        if (orders.size() != distinct.size()) {
+            throw new RuntimeException("部分退款记录不存在或已被删除");
+        }
+        for (ServiceOrder order : orders) {
+            ServiceOrderStatus status = order.getStatus();
+            if (status != ServiceOrderStatus.REFUND_APPROVED && status != ServiceOrderStatus.REFUND_REJECTED) {
+                throw new RuntimeException("仅已处理的退款记录可以删除");
+            }
+        }
+        for (ServiceOrder order : orders) {
+            companyMessageRepository.deleteByOrder(order);
+        }
+        serviceOrderRepository.deleteAll(orders);
     }
 
     @Transactional(readOnly = true)
@@ -354,5 +397,37 @@ public class ServiceOrderService {
         }
         String trimmed = message.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeKeyword(String keyword) {
+        return normalizeMessage(keyword);
+    }
+
+    private List<ServiceOrderStatus> resolveRefundStatuses(String stage) {
+        if (stage == null) {
+            return List.of(ServiceOrderStatus.REFUND_REQUESTED);
+        }
+        String normalized = stage.trim().toLowerCase();
+        if (normalized.isEmpty() || "pending".equals(normalized)) {
+            return List.of(ServiceOrderStatus.REFUND_REQUESTED);
+        }
+        if ("processed".equals(normalized)) {
+            return List.of(ServiceOrderStatus.REFUND_APPROVED, ServiceOrderStatus.REFUND_REJECTED);
+        }
+        return List.of(
+            ServiceOrderStatus.REFUND_REQUESTED,
+            ServiceOrderStatus.REFUND_APPROVED,
+            ServiceOrderStatus.REFUND_REJECTED
+        );
+    }
+
+    private boolean matchesRefundKeyword(ServiceOrder order, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        String lower = keyword.toLowerCase();
+        return order.getService().getName().toLowerCase().contains(lower)
+            || order.getUser().getUsername().toLowerCase().contains(lower)
+            || order.getService().getCompany().getUsername().toLowerCase().contains(lower);
     }
 }

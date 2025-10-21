@@ -72,6 +72,14 @@ export interface HousekeepServiceItem {
   companyName: string
 }
 
+export interface CompanyServicePage {
+  items: HousekeepServiceItem[]
+  total: number
+  page: number
+  size: number
+  averagePrice: number
+}
+
 export interface ServiceOrderItem {
   id: number
   serviceId: number
@@ -510,13 +518,23 @@ export const exchangeUserPoints = async (
 }
 
 // 家政公司接口
-export const fetchCompanyServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+export const fetchCompanyServices = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<CompanyServicePage> => {
   const url = new URL(buildUrl('/api/company/services'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<HousekeepServiceItem[]>(response)
+  return handleResponse<CompanyServicePage>(response)
 }
 
 export const createCompanyService = async (
@@ -705,8 +723,18 @@ export const updateAdminPassword = async (
   return handleResponse<UserAccountItem>(response)
 }
 
-export const fetchAdminRefunds = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/refunds'), withAuthHeaders())
+export const fetchAdminRefunds = async (params?: {
+  stage?: 'pending' | 'processed' | 'all'
+  keyword?: string
+}): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/admin/refunds'))
+  if (params?.stage) {
+    url.searchParams.set('stage', params.stage)
+  }
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
 }
 
@@ -719,6 +747,14 @@ export const handleAdminRefund = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<ServiceOrderItem>(response)
+}
+
+export const deleteAdminRefunds = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/refunds'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const fetchCurrentAccount = async (): Promise<AccountProfileItem> => {

@@ -11,6 +11,7 @@ import com.example.housekeeping.dto.UpdateLoyaltyRequest;
 import com.example.housekeeping.dto.UpdatePasswordRequest;
 import com.example.housekeeping.dto.UpdateWalletRequest;
 import com.example.housekeeping.dto.UserAccountResponse;
+import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.service.AdminAccountService;
 import com.example.housekeeping.service.AdminInsightService;
 import com.example.housekeeping.service.ServiceOrderService;
@@ -75,14 +76,23 @@ public class AdminManagementController {
     }
 
     @GetMapping("/refunds")
-    public Result<List<ServiceOrderResponse>> listRefunds() {
-        return Result.success(serviceOrderService.listRefundRequestsForAdmin());
+    public Result<List<ServiceOrderResponse>> listRefunds(
+        @RequestParam(value = "stage", defaultValue = "pending") String stage,
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceOrderService.listRefundsForAdmin(stage, keyword));
     }
 
     @PostMapping("/refunds/{orderId}")
     public Result<ServiceOrderResponse> handleRefund(@PathVariable Long orderId,
                                                      @Valid @RequestBody RefundDecisionRequest request) {
         return Result.success("操作成功", serviceOrderService.handleRefund(orderId, request));
+    }
+
+    @DeleteMapping("/refunds")
+    public Result<Void> deleteRefunds(@Valid @RequestBody IdListRequest request) {
+        serviceOrderService.deleteProcessedRefunds(request.getIds());
+        return Result.success("删除成功", null);
     }
 
     @GetMapping("/orders")

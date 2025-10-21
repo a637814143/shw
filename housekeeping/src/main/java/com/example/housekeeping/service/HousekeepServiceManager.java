@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.CompanyServicePageResponse;
 import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.entity.HousekeepService;
@@ -7,11 +8,17 @@ import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.math.RoundingMode;
 
 /**
  * 家政服务管理逻辑。
@@ -37,16 +44,34 @@ public class HousekeepServiceManager {
     }
 
     @Transactional(readOnly = true)
-    public List<HousekeepServiceResponse> listForCurrentCompany(String keyword) {
+    public CompanyServicePageResponse listForCurrentCompany(String keyword, int page, int size) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         String normalizedKeyword = normalizeKeyword(keyword);
-        List<HousekeepService> services = normalizedKeyword == null
-            ? housekeepServiceRepository.findByCompany(company)
-            : housekeepServiceRepository.searchByCompanyAndKeyword(company, normalizedKeyword);
-        return services.stream()
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(1, size);
+        Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "id"));
+
+        Page<HousekeepService> pageResult = normalizedKeyword == null
+            ? housekeepServiceRepository.findByCompany(company, pageable)
+            : housekeepServiceRepository.searchByCompanyAndKeyword(company, normalizedKeyword, pageable);
+
+        List<HousekeepServiceResponse> items = pageResult.getContent().stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+
+        Double averagePrice = housekeepServiceRepository.findAveragePriceByCompany(company);
+        BigDecimal average = averagePrice == null
+            ? BigDecimal.ZERO
+            : BigDecimal.valueOf(averagePrice).setScale(2, RoundingMode.HALF_UP);
+
+        return new CompanyServicePageResponse(
+            items,
+            pageResult.getTotalElements(),
+            safePage,
+            safeSize,
+            average
+        );
     }
 
     @Transactional
