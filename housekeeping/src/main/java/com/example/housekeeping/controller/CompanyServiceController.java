@@ -3,6 +3,7 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
+import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
@@ -33,8 +34,9 @@ public class CompanyServiceController {
     private ServiceReviewService serviceReviewService;
 
     @GetMapping
-    public Result<List<HousekeepServiceResponse>> listCompanyServices() {
-        return Result.success(housekeepServiceManager.listForCurrentCompany());
+    public Result<List<HousekeepServiceResponse>> listCompanyServices(@RequestParam(value = "keyword", required = false)
+                                                                      String keyword) {
+        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword));
     }
 
     @PostMapping
@@ -51,6 +53,12 @@ public class CompanyServiceController {
     @DeleteMapping("/{serviceId}")
     public Result<Void> deleteService(@PathVariable Long serviceId) {
         housekeepServiceManager.deleteService(serviceId);
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/batch")
+    public Result<Void> deleteServices(@Valid @RequestBody IdListRequest request) {
+        housekeepServiceManager.deleteServices(request.getIds());
         return Result.success("删除成功", null);
     }
 

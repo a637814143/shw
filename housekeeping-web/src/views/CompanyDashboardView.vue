@@ -68,7 +68,25 @@
               <h2>服务项目管理</h2>
               <p>完善服务信息让用户更了解您的优势。当前平均定价 ¥{{ companyStats.avgPrice.toFixed(2) }}</p>
             </div>
-            <button type="button" class="primary-button" @click="openServiceForm()">新增服务</button>
+            <div class="service-actions">
+              <label class="visually-hidden" for="service-search">搜索服务</label>
+              <input
+                id="service-search"
+                v-model="serviceSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索名称、单位、联系方式或描述"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasServiceSelection"
+                @click="handleBulkDeleteServices"
+              >
+                删除选中<span v-if="selectedServiceCount">（{{ selectedServiceCount }}）</span>
+              </button>
+              <button type="button" class="primary-button" @click="openServiceForm()">新增服务</button>
+            </div>
           </header>
 
           <div v-if="serviceFormVisible" class="form-card">
@@ -106,6 +124,15 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleServicesSelected"
+                      :disabled="!services.length"
+                      @change="toggleSelectAllServices(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选当前服务"
+                    />
+                  </th>
                   <th>服务名称</th>
                   <th>价格</th>
                   <th>联系方式</th>
@@ -115,6 +142,14 @@
               </thead>
               <tbody>
                 <tr v-for="item in services" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedServiceIds.has(item.id)"
+                      @change="toggleServiceSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择服务 ${item.name}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ item.name }}</strong>
                     <div class="order-subtext">单位：{{ item.unit }}</div>
@@ -128,7 +163,10 @@
                   </td>
                 </tr>
                 <tr v-if="!services.length">
-                  <td colspan="5" class="empty-row">还没有服务内容，请点击上方按钮进行新增。</td>
+                  <td colspan="6" class="empty-row">
+                    <span v-if="hasServiceFilter && allServices.length">未找到匹配的服务，请调整搜索关键词。</span>
+                    <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -376,7 +414,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
@@ -384,6 +422,7 @@ import {
   fetchCurrentAccount,
   createCompanyService,
   deleteCompanyService,
+  deleteCompanyServices,
   fetchCompanyOrders,
   fetchCompanyRefunds,
   fetchCompanyServices,
@@ -451,7 +490,11 @@ const sections: SectionMeta[] = [
 ]
 
 const activeSection = ref<SectionKey>('services')
+const allServices = ref<HousekeepServiceItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
+const serviceSearch = ref('')
+const selectedServiceIds = ref<Set<number>>(new Set())
+let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const refundOrders = ref<ServiceOrderItem[]>([])
 const companyOrders = ref<ServiceOrderItem[]>([])
 const serviceFormVisible = ref(false)
@@ -499,15 +542,83 @@ const handleProfileUpdated = (payload: AccountProfileItem) => {
   account.value = payload
 }
 
+const pruneServiceSelection = (visibleItems: HousekeepServiceItem[]) => {
+  if (!selectedServiceIds.value.size) {
+    return
+  }
+  const allowed = new Set(visibleItems.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedServiceIds.value.forEach((id) => {
+    if (allowed.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedServiceIds.value = next
+  }
+}
+
+const applyServiceFilter = () => {
+  const keyword = serviceSearch.value.trim().toLowerCase()
+  if (!keyword) {
+    services.value = allServices.value.slice()
+    pruneServiceSelection(services.value)
+    return
+  }
+  const filtered = allServices.value.filter((item) => {
+    const fields = [item.name, item.unit, item.contact, item.description || '']
+    return fields.some((field) => field.toLowerCase().includes(keyword))
+  })
+  services.value = filtered
+  pruneServiceSelection(filtered)
+}
+
+const toggleServiceSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedServiceIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedServiceIds.value = next
+}
+
+const toggleSelectAllServices = (checked: boolean) => {
+  if (!checked) {
+    selectedServiceIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedServiceIds.value)
+  services.value.forEach((item) => next.add(item.id))
+  selectedServiceIds.value = next
+}
+
+const clearServiceSelection = () => {
+  selectedServiceIds.value = new Set()
+}
+
+watch(serviceSearch, () => {
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+  }
+  serviceSearchTimer = setTimeout(() => {
+    applyServiceFilter()
+    serviceSearchTimer = null
+  }, 300)
+})
+
 const activeMessages = computed(() =>
   activeConversationId.value != null ? messagesByOrder[activeConversationId.value] ?? [] : [],
 )
 
 const companyStats = computed(() => {
-  const totalServices = services.value.length
+  const totalServices = allServices.value.length
   const pendingRefunds = refundOrders.value.length
   const avgPrice = totalServices
-    ? services.value.reduce((sum, item) => sum + item.price, 0) / totalServices
+    ? allServices.value.reduce((sum, item) => sum + item.price, 0) / totalServices
     : 0
   const balance = account.value?.balance ?? 0
   const upcoming = companyOrders.value.length
@@ -521,6 +632,13 @@ const companyStats = computed(() => {
     staffCount,
   }
 })
+
+const selectedServiceCount = computed(() => selectedServiceIds.value.size)
+const hasServiceSelection = computed(() => selectedServiceIds.value.size > 0)
+const allVisibleServicesSelected = computed(
+  () => services.value.length > 0 && services.value.every((item) => selectedServiceIds.value.has(item.id)),
+)
+const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
 
 const logout = () => {
   sessionStorage.removeItem(AUTH_TOKEN_KEY)
@@ -594,6 +712,28 @@ const handleDeleteService = async (item: HousekeepServiceItem) => {
   if (!window.confirm(`确认删除服务“${item.name}”？`)) return
   try {
     await deleteCompanyService(item.id)
+    if (selectedServiceIds.value.has(item.id)) {
+      const next = new Set(selectedServiceIds.value)
+      next.delete(item.id)
+      selectedServiceIds.value = next
+    }
+    await loadServices()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleBulkDeleteServices = async () => {
+  if (!selectedServiceIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedServiceIds.value.size} 项服务？`)) {
+    return
+  }
+  try {
+    const ids = Array.from(selectedServiceIds.value)
+    await deleteCompanyServices(ids)
+    clearServiceSelection()
     await loadServices()
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '删除失败')
@@ -929,9 +1069,14 @@ const handleRefreshConversations = async () => {
 
 const loadServices = async () => {
   try {
-    services.value = await fetchCompanyServices()
+    const result = await fetchCompanyServices()
+    allServices.value = result
+    applyServiceFilter()
   } catch (error) {
     console.error(error)
+    allServices.value = []
+    services.value = []
+    clearServiceSelection()
   }
 }
 
@@ -1006,6 +1151,10 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+    serviceSearchTimer = null
+  }
   stopMessagePolling()
 })
 </script>
@@ -1029,6 +1178,18 @@ onUnmounted(() => {
   background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(16, 185, 129, 0.05) 45%, rgba(59, 130, 246, 0.08) 100%);
   border-radius: 40px 40px 0 0;
   z-index: -1;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .dashboard-header {
@@ -1278,6 +1439,29 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
+.service-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.search-input {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background-color: rgba(255, 255, 255, 0.9);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
 .form-card {
   margin-bottom: 24px;
   padding: 24px 28px;
@@ -1315,9 +1499,29 @@ onUnmounted(() => {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.secondary-button:hover {
+.secondary-button:enabled:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.secondary-button.danger {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--brand-danger);
+}
+
+.secondary-button.danger:enabled:hover {
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.18);
+  border-color: var(--brand-danger);
+  background: rgba(239, 68, 68, 0.14);
+  color: var(--brand-danger);
 }
 
 .service-grid {
@@ -1455,6 +1659,20 @@ onUnmounted(() => {
 
 .data-table tbody tr:hover td {
   background: rgba(16, 185, 129, 0.06);
+}
+
+.table-checkbox {
+  width: 44px;
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.table-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
 }
 
 .table-actions {

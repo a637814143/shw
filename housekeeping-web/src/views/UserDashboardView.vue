@@ -215,9 +215,23 @@
           <header class="panel-header">
             <div>
               <h2>可选家政服务</h2>
-              <p>当前可预约 {{ services.length }} 项，点击服务卡片即可填写预约时间与需求。</p>
+              <p>
+                当前可预约 {{ services.length }} 项
+                <span v-if="hasServiceFilter">（共 {{ allServices.length }} 项）</span>
+                ，点击服务卡片即可填写预约时间与需求。
+              </p>
             </div>
-            <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
+            <div class="service-actions">
+              <label class="visually-hidden" for="user-service-search">搜索服务</label>
+              <input
+                id="user-service-search"
+                v-model="serviceSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索名称、单位、联系方式或描述"
+              />
+              <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
+            </div>
           </header>
           <div class="service-grid">
             <article v-for="service in services" :key="service.id" class="service-card">
@@ -248,7 +262,10 @@
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
               <button type="button" class="primary-button" @click="handleSelectService(service)">预约服务</button>
             </article>
-            <p v-if="!services.length" class="empty-tip">暂无家政公司发布服务，稍后再来看看吧。</p>
+            <p v-if="!services.length" class="empty-tip">
+              <span v-if="hasServiceFilter && allServices.length">没有找到符合条件的服务，换个关键词试试吧。</span>
+              <span v-else>暂无家政公司发布服务，稍后再来看看吧。</span>
+            </p>
           </div>
         </section>
 
@@ -435,7 +452,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
@@ -496,7 +513,10 @@ const account = ref<AccountProfileItem | null>(null)
 
 const FALLBACK_AVATAR =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
+const allServices = ref<HousekeepServiceItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
+const serviceSearch = ref('')
+let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const orders = ref<ServiceOrderItem[]>([])
 const serviceReviews = ref<ServiceReviewItem[]>([])
 const carousels = ref<DashboardCarouselItem[]>([])
@@ -576,6 +596,7 @@ const avatarSrc = computed(
 )
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
+const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
 const favoritesCount = computed(() => favorites.value.length)
 
 const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
@@ -638,11 +659,27 @@ const handleProfileUpdated = (payload: AccountProfileItem) => {
   account.value = payload
 }
 
+const applyServiceFilter = () => {
+  const keyword = serviceSearch.value.trim().toLowerCase()
+  if (!keyword) {
+    services.value = allServices.value.slice()
+    return
+  }
+  services.value = allServices.value.filter((item) => {
+    const fields = [item.name, item.unit, item.contact, item.companyName, item.description || '']
+    return fields.some((field) => field.toLowerCase().includes(keyword))
+  })
+}
+
 const loadServices = async () => {
   try {
-    services.value = await fetchUserServices()
+    const result = await fetchUserServices()
+    allServices.value = result
+    applyServiceFilter()
   } catch (error) {
     console.error(error)
+    allServices.value = []
+    services.value = []
   }
 }
 
@@ -661,6 +698,16 @@ const loadFavorites = async () => {
     console.error(error)
   }
 }
+
+watch(serviceSearch, () => {
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+  }
+  serviceSearchTimer = setTimeout(() => {
+    applyServiceFilter()
+    serviceSearchTimer = null
+  }, 300)
+})
 
 const loadDiscover = async () => {
   discoverLoading.value = true
@@ -1037,6 +1084,13 @@ const statusText = (status: ServiceOrderItem['status']) => {
 onMounted(async () => {
   await Promise.all([loadAccount(), loadServices(), loadOrders(), loadDiscover(), loadFavorites()])
 })
+
+onUnmounted(() => {
+  if (serviceSearchTimer) {
+    clearTimeout(serviceSearchTimer)
+    serviceSearchTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -1047,6 +1101,18 @@ onMounted(async () => {
     radial-gradient(circle at bottom right, rgba(148, 163, 184, 0.18), transparent 50%),
     linear-gradient(135deg, #0f172a, #1f2937 45%, #0b1120 100%);
   color: #f8fafc;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .dashboard-header {
@@ -1202,6 +1268,35 @@ onMounted(async () => {
 .panel-header p {
   margin: 0.35rem 0 0;
   color: rgba(226, 232, 240, 0.6);
+}
+
+.service-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.search-input {
+  min-width: 220px;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.55);
+  color: #f8fafc;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(148, 163, 184, 0.65);
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.75);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+  background: rgba(15, 23, 42, 0.72);
 }
 
 .ghost-button {

@@ -38,8 +38,9 @@ public class UserServiceController {
     private ServiceFavoriteService serviceFavoriteService;
 
     @GetMapping
-    public Result<List<HousekeepServiceResponse>> listServices() {
-        return Result.success(housekeepServiceManager.listAllServices());
+    public Result<List<HousekeepServiceResponse>> listServices(@RequestParam(value = "keyword", required = false)
+                                                               String keyword) {
+        return Result.success(housekeepServiceManager.listAllServices(keyword));
     }
 
     @GetMapping("/orders")
