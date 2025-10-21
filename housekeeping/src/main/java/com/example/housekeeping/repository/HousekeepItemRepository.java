@@ -21,7 +21,7 @@ public interface HousekeepItemRepository extends JpaRepository<HousekeepItem, Lo
         SELECT i FROM HousekeepItem i
         WHERE i.itemType = :itemType AND (
             LOWER(COALESCE(i.title, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-            LOWER(COALESCE(i.content, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(CAST(COALESCE(i.content, '') AS string)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(i.tag, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(i.author, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(i.serviceName, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
