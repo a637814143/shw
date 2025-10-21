@@ -13,6 +13,7 @@ import com.example.housekeeping.dto.DashboardServiceItemRequest;
 import com.example.housekeeping.dto.DashboardServiceItemResponse;
 import com.example.housekeeping.dto.DashboardTipItemRequest;
 import com.example.housekeeping.dto.DashboardTipItemResponse;
+import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.service.DashboardContentService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,8 +32,10 @@ public class DashboardContentController {
     private DashboardContentService dashboardContentService;
 
     @GetMapping("/services")
-    public Result<List<DashboardServiceItemResponse>> listServices() {
-        return Result.success(dashboardContentService.listServices());
+    public Result<List<DashboardServiceItemResponse>> listServices(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listServices(keyword));
     }
 
     @PostMapping("/services")
@@ -52,14 +55,24 @@ public class DashboardContentController {
         return Result.success("删除成功", null);
     }
 
+    @DeleteMapping("/services/batch")
+    public Result<Void> deleteServices(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteServices(request.getIds());
+        return Result.success("删除成功", null);
+    }
+
     @GetMapping("/tips")
-    public Result<List<DashboardTipItemResponse>> listTips() {
-        return Result.success(dashboardContentService.listTips());
+    public Result<List<DashboardTipItemResponse>> listTips(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listTips(keyword));
     }
 
     @GetMapping("/carousels")
-    public Result<List<DashboardCarouselItemResponse>> listCarousels() {
-        return Result.success(dashboardContentService.listCarousels());
+    public Result<List<DashboardCarouselItemResponse>> listCarousels(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listCarousels(keyword));
     }
 
     @PostMapping("/carousels")
@@ -76,6 +89,12 @@ public class DashboardContentController {
     @DeleteMapping("/carousels/{id}")
     public Result<Void> deleteCarousel(@PathVariable Long id) {
         dashboardContentService.deleteCarousel(id);
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/carousels/batch")
+    public Result<Void> deleteCarousels(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteCarousels(request.getIds());
         return Result.success("删除成功", null);
     }
 
@@ -96,9 +115,17 @@ public class DashboardContentController {
         return Result.success("删除成功", null);
     }
 
+    @DeleteMapping("/tips/batch")
+    public Result<Void> deleteTips(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteTips(request.getIds());
+        return Result.success("删除成功", null);
+    }
+
     @GetMapping("/announcements")
-    public Result<List<DashboardAnnouncementResponse>> listAnnouncements() {
-        return Result.success(dashboardContentService.listAnnouncements());
+    public Result<List<DashboardAnnouncementResponse>> listAnnouncements(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listAnnouncements(keyword));
     }
 
     @PostMapping("/announcements")
@@ -118,9 +145,17 @@ public class DashboardContentController {
         return Result.success("删除成功", null);
     }
 
+    @DeleteMapping("/announcements/batch")
+    public Result<Void> deleteAnnouncements(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteAnnouncements(request.getIds());
+        return Result.success("删除成功", null);
+    }
+
     @GetMapping("/reviews")
-    public Result<List<DashboardReviewItemResponse>> listReviews() {
-        return Result.success(dashboardContentService.listReviews());
+    public Result<List<DashboardReviewItemResponse>> listReviews(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listReviews(keyword));
     }
 
     @PostMapping("/reviews")
@@ -140,9 +175,17 @@ public class DashboardContentController {
         return Result.success("删除成功", null);
     }
 
+    @DeleteMapping("/reviews/batch")
+    public Result<Void> deleteReviews(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteReviews(request.getIds());
+        return Result.success("删除成功", null);
+    }
+
     @GetMapping("/offers")
-    public Result<List<DashboardOfferItemResponse>> listOffers() {
-        return Result.success(dashboardContentService.listOffers());
+    public Result<List<DashboardOfferItemResponse>> listOffers(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(dashboardContentService.listOffers(keyword));
     }
 
     @PostMapping("/offers")
@@ -159,6 +202,12 @@ public class DashboardContentController {
     @DeleteMapping("/offers/{id}")
     public Result<Void> deleteOffer(@PathVariable Long id) {
         dashboardContentService.deleteOffer(id);
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/offers/batch")
+    public Result<Void> deleteOffers(@Valid @RequestBody IdListRequest request) {
+        dashboardContentService.deleteOffers(request.getIds());
         return Result.success("删除成功", null);
     }
 }

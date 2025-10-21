@@ -114,15 +114,52 @@
               <h2>用户资产与密码管理</h2>
               <p>精细化调节用户余额、积分与密码，保障账户安全。</p>
             </div>
-            <button type="button" class="ghost-button" @click="loadUsers" :disabled="usersLoading">
-              {{ usersLoading ? '刷新中…' : '刷新列表' }}
-            </button>
+            <div class="user-actions">
+              <label class="visually-hidden" for="user-search">搜索账号</label>
+              <input
+                id="user-search"
+                v-model="userSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索账号、角色、联系方式"
+                :disabled="usersLoading"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasUserSelection || usersLoading"
+                @click="handleBulkDeleteUsers"
+              >
+                删除选中<span v-if="selectedUserCount">（{{ selectedUserCount }}）</span>
+              </button>
+              <button
+                v-if="hasUserFilter"
+                type="button"
+                class="ghost-button"
+                :disabled="usersLoading"
+                @click="clearUserFilter"
+              >
+                清除筛选
+              </button>
+              <button type="button" class="ghost-button" @click="loadUsers" :disabled="usersLoading">
+                {{ usersLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
           </header>
           <div v-if="usersLoading" class="loading-state">正在获取用户信息…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allUsersSelected"
+                      :disabled="usersLoading || !users.length"
+                      @change="toggleSelectAllUsers(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选账号"
+                    />
+                  </th>
                   <th>账号</th>
                   <th>角色</th>
                   <th>余额（¥）</th>
@@ -130,10 +167,20 @@
                   <th>设置新余额</th>
                   <th>调整积分</th>
                   <th>重置密码</th>
+                  <th class="table-actions">操作</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="user in users" :key="user.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedUserIds.has(user.id)"
+                      :disabled="usersLoading || user.username === username"
+                      @change="toggleUserSelection(user.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择账号 ${user.username}`"
+                    />
+                  </td>
                   <td>{{ user.username }}</td>
                   <td>{{ roleText(user.role) }}</td>
                   <td>{{ user.balance.toFixed(2) }}</td>
@@ -156,9 +203,22 @@
                       <button type="button" class="link-button" @click="savePassword(user.id)">重置</button>
                     </div>
                   </td>
+                  <td class="table-actions">
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="usersLoading || user.username === username"
+                      @click="handleDeleteUser(user)"
+                    >
+                      删除
+                    </button>
+                  </td>
                 </tr>
                 <tr v-if="!users.length">
-                  <td colspan="7" class="empty-row">暂无用户数据。</td>
+                  <td colspan="9" class="empty-row">
+                    <span v-if="hasUserFilter">未找到匹配的账号。</span>
+                    <span v-else>暂无用户数据。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -320,9 +380,39 @@
           <div v-if="contentLoading" class="loading-state">正在同步内容配置…</div>
           <div v-else class="content-grid">
             <section class="content-card">
-              <header>
-                <h3>轮播图</h3>
-                <p>推荐焦点服务，图片支持外链。</p>
+              <header class="content-card-header">
+                <div>
+                  <h3>轮播图</h3>
+                  <p>推荐焦点服务，图片支持外链。</p>
+                </div>
+                <div class="content-toolbar">
+                  <label class="visually-hidden" for="carousel-search">搜索轮播图</label>
+                  <input
+                    id="carousel-search"
+                    v-model="carouselSearch"
+                    class="search-input"
+                    type="search"
+                    placeholder="按标题或链接搜索"
+                    :disabled="contentLoading"
+                  />
+                  <button
+                    type="button"
+                    class="secondary-button danger"
+                    :disabled="!hasCarouselSelection || contentLoading"
+                    @click="handleBulkDeleteCarousels"
+                  >
+                    删除选中<span v-if="selectedCarouselCount">（{{ selectedCarouselCount }}）</span>
+                  </button>
+                  <button
+                    v-if="hasCarouselFilter"
+                    type="button"
+                    class="ghost-button"
+                    :disabled="contentLoading"
+                    @click="clearCarouselFilter"
+                  >
+                    清除筛选
+                  </button>
+                </div>
               </header>
               <form class="content-form" @submit.prevent="submitCarousel">
                 <input v-model="carouselForm.title" type="text" placeholder="标题" required />
@@ -339,24 +429,67 @@
               </form>
               <ul class="content-list">
                 <li v-for="item in carousels" :key="item.id">
-                  <div>
-                    <strong>{{ item.title }}</strong>
-                    <p class="muted">{{ item.imageUrl }}</p>
-                    <p class="muted">{{ item.serviceLink || '无跳转' }}</p>
+                  <div class="content-item-details">
+                    <input
+                      class="content-checkbox"
+                      type="checkbox"
+                      :checked="selectedCarouselIds.has(item.id)"
+                      :disabled="contentLoading"
+                      @change="toggleCarouselSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择轮播 ${item.title}`"
+                    />
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p class="muted">{{ item.imageUrl }}</p>
+                      <p class="muted">{{ item.serviceLink || '无跳转' }}</p>
+                    </div>
                   </div>
                   <div class="list-actions">
                     <button type="button" class="link-button" @click="editCarousel(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="removeCarousel(item.id)">删除</button>
                   </div>
                 </li>
-                <li v-if="!carousels.length" class="empty-row">暂无轮播图，立即创建一个吧。</li>
+                <li v-if="!carousels.length" class="empty-row">
+                  <span v-if="hasCarouselFilter">未找到符合条件的轮播图。</span>
+                  <span v-else>暂无轮播图，立即创建一个吧。</span>
+                </li>
               </ul>
             </section>
 
             <section class="content-card">
-              <header>
-                <h3>居家贴士</h3>
-                <p>精选生活指南，提升平台温度。</p>
+              <header class="content-card-header">
+                <div>
+                  <h3>居家贴士</h3>
+                  <p>精选生活指南，提升平台温度。</p>
+                </div>
+                <div class="content-toolbar">
+                  <label class="visually-hidden" for="tip-search">搜索贴士</label>
+                  <input
+                    id="tip-search"
+                    v-model="tipSearch"
+                    class="search-input"
+                    type="search"
+                    placeholder="按标题或内容搜索"
+                    :disabled="contentLoading"
+                  />
+                  <button
+                    type="button"
+                    class="secondary-button danger"
+                    :disabled="!hasTipSelection || contentLoading"
+                    @click="handleBulkDeleteTips"
+                  >
+                    删除选中<span v-if="selectedTipCount">（{{ selectedTipCount }}）</span>
+                  </button>
+                  <button
+                    v-if="hasTipFilter"
+                    type="button"
+                    class="ghost-button"
+                    :disabled="contentLoading"
+                    @click="clearTipFilter"
+                  >
+                    清除筛选
+                  </button>
+                </div>
               </header>
               <form class="content-form" @submit.prevent="submitTip">
                 <input v-model="tipForm.title" type="text" placeholder="贴士标题" required />
@@ -372,23 +505,66 @@
               </form>
               <ul class="content-list">
                 <li v-for="item in tips" :key="item.id">
-                  <div>
-                    <strong>{{ item.title }}</strong>
-                    <p class="muted">{{ item.content }}</p>
+                  <div class="content-item-details">
+                    <input
+                      class="content-checkbox"
+                      type="checkbox"
+                      :checked="selectedTipIds.has(item.id)"
+                      :disabled="contentLoading"
+                      @change="toggleTipSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择贴士 ${item.title}`"
+                    />
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p class="muted">{{ item.content }}</p>
+                    </div>
                   </div>
                   <div class="list-actions">
                     <button type="button" class="link-button" @click="editTip(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="removeTip(item.id)">删除</button>
                   </div>
                 </li>
-                <li v-if="!tips.length" class="empty-row">还没有贴士内容。</li>
+                <li v-if="!tips.length" class="empty-row">
+                  <span v-if="hasTipFilter">未找到符合条件的贴士。</span>
+                  <span v-else>还没有贴士内容。</span>
+                </li>
               </ul>
             </section>
 
             <section class="content-card">
-              <header>
-                <h3>系统公告</h3>
-                <p>向所有用户广播平台政策与活动。</p>
+              <header class="content-card-header">
+                <div>
+                  <h3>系统公告</h3>
+                  <p>向所有用户广播平台政策与活动。</p>
+                </div>
+                <div class="content-toolbar">
+                  <label class="visually-hidden" for="announcement-search">搜索公告</label>
+                  <input
+                    id="announcement-search"
+                    v-model="announcementSearch"
+                    class="search-input"
+                    type="search"
+                    placeholder="按标题或内容搜索"
+                    :disabled="contentLoading"
+                  />
+                  <button
+                    type="button"
+                    class="secondary-button danger"
+                    :disabled="!hasAnnouncementSelection || contentLoading"
+                    @click="handleBulkDeleteAnnouncements"
+                  >
+                    删除选中<span v-if="selectedAnnouncementCount">（{{ selectedAnnouncementCount }}）</span>
+                  </button>
+                  <button
+                    v-if="hasAnnouncementFilter"
+                    type="button"
+                    class="ghost-button"
+                    :disabled="contentLoading"
+                    @click="clearAnnouncementFilter"
+                  >
+                    清除筛选
+                  </button>
+                </div>
               </header>
               <form class="content-form" @submit.prevent="submitAnnouncement">
                 <input v-model="announcementForm.title" type="text" placeholder="公告标题" required />
@@ -404,16 +580,29 @@
               </form>
               <ul class="content-list">
                 <li v-for="item in announcements" :key="item.id">
-                  <div>
-                    <strong>{{ item.title }}</strong>
-                    <p class="muted">{{ item.content }}</p>
+                  <div class="content-item-details">
+                    <input
+                      class="content-checkbox"
+                      type="checkbox"
+                      :checked="selectedAnnouncementIds.has(item.id)"
+                      :disabled="contentLoading"
+                      @change="toggleAnnouncementSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择公告 ${item.title}`"
+                    />
+                    <div>
+                      <strong>{{ item.title }}</strong>
+                      <p class="muted">{{ item.content }}</p>
+                    </div>
                   </div>
                   <div class="list-actions">
                     <button type="button" class="link-button" @click="editAnnouncement(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="removeAnnouncement(item.id)">删除</button>
                   </div>
                 </li>
-                <li v-if="!announcements.length" class="empty-row">暂无系统公告。</li>
+                <li v-if="!announcements.length" class="empty-row">
+                  <span v-if="hasAnnouncementFilter">未找到符合条件的公告。</span>
+                  <span v-else>暂无系统公告。</span>
+                </li>
               </ul>
             </section>
           </div>
@@ -551,7 +740,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY, ROLE_LABELS } from '../constants/auth'
@@ -561,8 +750,11 @@ import {
   createDashboardCarousel,
   createDashboardTip,
   deleteDashboardAnnouncement,
+  deleteDashboardAnnouncements,
   deleteDashboardCarousel,
+  deleteDashboardCarousels,
   deleteDashboardTip,
+  deleteDashboardTips,
   fetchAdminFavorites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -573,6 +765,8 @@ import {
   fetchDashboardAnnouncements,
   fetchDashboardCarousels,
   fetchDashboardTips,
+  deleteAdminUser,
+  deleteAdminUsers,
   handleAdminRefund,
   updateAdminLoyalty,
   updateAdminPassword,
@@ -623,6 +817,9 @@ const overviewLoading = ref(false)
 
 const users = ref<UserAccountItem[]>([])
 const usersLoading = ref(false)
+const userSearch = ref('')
+const selectedUserIds = ref<Set<number>>(new Set())
+let userSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const adminOrders = ref<ServiceOrderItem[]>([])
 const ordersLoading = ref(false)
@@ -641,10 +838,26 @@ const refundSearch = ref('')
 const selectedRefundIds = ref<Set<number>>(new Set())
 let refundSearchTimer: ReturnType<typeof setTimeout> | null = null
 
+const selectedUserCount = computed(() => selectedUserIds.value.size)
+const hasUserSelection = computed(() => selectedUserIds.value.size > 0)
+const allUsersSelected = computed(
+  () => users.value.length > 0 && users.value.every((user) => selectedUserIds.value.has(user.id)),
+)
+const hasUserFilter = computed(() => userSearch.value.trim().length > 0)
+
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
 const announcements = ref<DashboardAnnouncementItem[]>([])
 const contentLoading = ref(false)
+const carouselSearch = ref('')
+const tipSearch = ref('')
+const announcementSearch = ref('')
+const selectedCarouselIds = ref<Set<number>>(new Set())
+const selectedTipIds = ref<Set<number>>(new Set())
+const selectedAnnouncementIds = ref<Set<number>>(new Set())
+let carouselSearchTimer: ReturnType<typeof setTimeout> | null = null
+let tipSearchTimer: ReturnType<typeof setTimeout> | null = null
+let announcementSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const walletEdits = reactive<Record<number, number>>({})
 const loyaltyEdits = reactive<Record<number, number>>({})
@@ -677,6 +890,29 @@ const announcementEditing = ref<number | null>(null)
 const carouselSaving = ref(false)
 const tipSaving = ref(false)
 const announcementSaving = ref(false)
+
+const selectedCarouselCount = computed(() => selectedCarouselIds.value.size)
+const hasCarouselSelection = computed(() => selectedCarouselIds.value.size > 0)
+const allCarouselsSelected = computed(
+  () => carousels.value.length > 0 && carousels.value.every((item) => selectedCarouselIds.value.has(item.id)),
+)
+const hasCarouselFilter = computed(() => carouselSearch.value.trim().length > 0)
+
+const selectedTipCount = computed(() => selectedTipIds.value.size)
+const hasTipSelection = computed(() => selectedTipIds.value.size > 0)
+const allTipsSelected = computed(
+  () => tips.value.length > 0 && tips.value.every((item) => selectedTipIds.value.has(item.id)),
+)
+const hasTipFilter = computed(() => tipSearch.value.trim().length > 0)
+
+const selectedAnnouncementCount = computed(() => selectedAnnouncementIds.value.size)
+const hasAnnouncementSelection = computed(() => selectedAnnouncementIds.value.size > 0)
+const allAnnouncementsSelected = computed(
+  () =>
+    announcements.value.length > 0 &&
+    announcements.value.every((item) => selectedAnnouncementIds.value.has(item.id)),
+)
+const hasAnnouncementFilter = computed(() => announcementSearch.value.trim().length > 0)
 
 const adminStats = computed(() => {
   const base = overview.value
@@ -779,6 +1015,53 @@ const transactionText = (type: string) => {
   }
 }
 
+const pruneUserSelection = () => {
+  if (!selectedUserIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(users.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedUserIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedUserIds.value = next
+  }
+}
+
+const toggleUserSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedUserIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedUserIds.value = next
+}
+
+const toggleSelectAllUsers = (checked: boolean) => {
+  if (!checked) {
+    selectedUserIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedUserIds.value)
+  users.value.forEach((item) => {
+    if (item.username !== username.value) {
+      next.add(item.id)
+    }
+  })
+  selectedUserIds.value = next
+}
+
+const clearUserSelection = () => {
+  selectedUserIds.value = new Set()
+}
+
 const switchSection = (key: SectionKey) => {
   activeSection.value = key
   if (key === 'users') {
@@ -817,14 +1100,17 @@ const loadOverview = async () => {
 const loadUsers = async () => {
   usersLoading.value = true
   try {
-    users.value = await fetchAdminUsers()
+    const keyword = userSearch.value.trim()
+    users.value = await fetchAdminUsers(keyword ? { keyword } : undefined)
     users.value.forEach((user) => {
       if (walletEdits[user.id] === undefined) walletEdits[user.id] = user.balance
       if (loyaltyEdits[user.id] === undefined) loyaltyEdits[user.id] = user.loyaltyPoints
       if (passwordEdits[user.id] === undefined) passwordEdits[user.id] = ''
     })
+    pruneUserSelection()
   } catch (error) {
     console.error(error)
+    clearUserSelection()
   } finally {
     usersLoading.value = false
   }
@@ -956,6 +1242,94 @@ const handleDeleteSingleRefund = async (order: ServiceOrderItem) => {
   }
 }
 
+watch(userSearch, () => {
+  if (userSearchTimer) {
+    clearTimeout(userSearchTimer)
+  }
+  userSearchTimer = setTimeout(async () => {
+    await loadUsers()
+    userSearchTimer = null
+  }, 300)
+})
+
+const clearUserFilter = async () => {
+  if (!userSearch.value) {
+    return
+  }
+  userSearch.value = ''
+  if (userSearchTimer) {
+    clearTimeout(userSearchTimer)
+    userSearchTimer = null
+  }
+  await loadUsers()
+}
+
+watch(carouselSearch, () => {
+  if (carouselSearchTimer) {
+    clearTimeout(carouselSearchTimer)
+  }
+  carouselSearchTimer = setTimeout(async () => {
+    await loadContent()
+    carouselSearchTimer = null
+  }, 300)
+})
+
+watch(tipSearch, () => {
+  if (tipSearchTimer) {
+    clearTimeout(tipSearchTimer)
+  }
+  tipSearchTimer = setTimeout(async () => {
+    await loadContent()
+    tipSearchTimer = null
+  }, 300)
+})
+
+watch(announcementSearch, () => {
+  if (announcementSearchTimer) {
+    clearTimeout(announcementSearchTimer)
+  }
+  announcementSearchTimer = setTimeout(async () => {
+    await loadContent()
+    announcementSearchTimer = null
+  }, 300)
+})
+
+const clearCarouselFilter = async () => {
+  if (!carouselSearch.value) {
+    return
+  }
+  carouselSearch.value = ''
+  if (carouselSearchTimer) {
+    clearTimeout(carouselSearchTimer)
+    carouselSearchTimer = null
+  }
+  await loadContent()
+}
+
+const clearTipFilter = async () => {
+  if (!tipSearch.value) {
+    return
+  }
+  tipSearch.value = ''
+  if (tipSearchTimer) {
+    clearTimeout(tipSearchTimer)
+    tipSearchTimer = null
+  }
+  await loadContent()
+}
+
+const clearAnnouncementFilter = async () => {
+  if (!announcementSearch.value) {
+    return
+  }
+  announcementSearch.value = ''
+  if (announcementSearchTimer) {
+    clearTimeout(announcementSearchTimer)
+    announcementSearchTimer = null
+  }
+  await loadContent()
+}
+
 watch(refundSearch, () => {
   if (refundSearchTimer) {
     clearTimeout(refundSearchTimer)
@@ -987,17 +1361,145 @@ const loadRefunds = async () => {
   }
 }
 
+const pruneCarouselSelection = () => {
+  if (!selectedCarouselIds.value.size) return
+  const visibleIds = new Set(carousels.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedCarouselIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedCarouselIds.value = next
+  }
+}
+
+const toggleCarouselSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedCarouselIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedCarouselIds.value = next
+}
+
+const toggleSelectAllCarousels = (checked: boolean) => {
+  if (!checked) {
+    selectedCarouselIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedCarouselIds.value)
+  carousels.value.forEach((item) => next.add(item.id))
+  selectedCarouselIds.value = next
+}
+
+const clearCarouselSelection = () => {
+  selectedCarouselIds.value = new Set()
+}
+
+const pruneTipSelection = () => {
+  if (!selectedTipIds.value.size) return
+  const visibleIds = new Set(tips.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedTipIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedTipIds.value = next
+  }
+}
+
+const toggleTipSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedTipIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedTipIds.value = next
+}
+
+const toggleSelectAllTips = (checked: boolean) => {
+  if (!checked) {
+    selectedTipIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedTipIds.value)
+  tips.value.forEach((item) => next.add(item.id))
+  selectedTipIds.value = next
+}
+
+const clearTipSelection = () => {
+  selectedTipIds.value = new Set()
+}
+
+const pruneAnnouncementSelection = () => {
+  if (!selectedAnnouncementIds.value.size) return
+  const visibleIds = new Set(announcements.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedAnnouncementIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedAnnouncementIds.value = next
+  }
+}
+
+const toggleAnnouncementSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedAnnouncementIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedAnnouncementIds.value = next
+}
+
+const toggleSelectAllAnnouncements = (checked: boolean) => {
+  if (!checked) {
+    selectedAnnouncementIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedAnnouncementIds.value)
+  announcements.value.forEach((item) => next.add(item.id))
+  selectedAnnouncementIds.value = next
+}
+
+const clearAnnouncementSelection = () => {
+  selectedAnnouncementIds.value = new Set()
+}
+
 const loadContent = async () => {
   contentLoading.value = true
   try {
     const [carouselData, tipData, announcementData] = await Promise.all([
-      fetchDashboardCarousels(),
-      fetchDashboardTips(),
-      fetchDashboardAnnouncements(),
+      fetchDashboardCarousels(carouselSearch.value.trim() ? { keyword: carouselSearch.value.trim() } : undefined),
+      fetchDashboardTips(tipSearch.value.trim() ? { keyword: tipSearch.value.trim() } : undefined),
+      fetchDashboardAnnouncements(
+        announcementSearch.value.trim() ? { keyword: announcementSearch.value.trim() } : undefined,
+      ),
     ])
     carousels.value = carouselData
     tips.value = tipData
     announcements.value = announcementData
+    pruneCarouselSelection()
+    pruneTipSelection()
+    pruneAnnouncementSelection()
   } catch (error) {
     console.error(error)
   } finally {
@@ -1034,6 +1536,41 @@ const savePassword = async (userId: number) => {
     window.alert('密码已更新')
   } catch (error) {
     console.error(error)
+  }
+}
+
+const handleDeleteUser = async (user: UserAccountItem) => {
+  if (user.username === username.value) {
+    window.alert('不能删除当前登录账号')
+    return
+  }
+  if (!window.confirm(`确认删除账号「${user.username}」吗？`)) {
+    return
+  }
+  try {
+    await deleteAdminUser(user.id)
+    const next = new Set(selectedUserIds.value)
+    next.delete(user.id)
+    selectedUserIds.value = next
+    await loadUsers()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleBulkDeleteUsers = async () => {
+  if (!selectedUserIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedUserIds.value.size} 个账号吗？`)) {
+    return
+  }
+  try {
+    await deleteAdminUsers(Array.from(selectedUserIds.value))
+    clearUserSelection()
+    await loadUsers()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
   }
 }
 
@@ -1106,6 +1643,25 @@ const removeCarousel = async (id: number) => {
   if (!window.confirm('确定删除该轮播图？')) return
   try {
     await deleteDashboardCarousel(id)
+    const next = new Set(selectedCarouselIds.value)
+    next.delete(id)
+    selectedCarouselIds.value = next
+    await loadContent()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleBulkDeleteCarousels = async () => {
+  if (!selectedCarouselIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedCarouselIds.value.size} 个轮播图吗？`)) {
+    return
+  }
+  try {
+    await deleteDashboardCarousels(Array.from(selectedCarouselIds.value))
+    clearCarouselSelection()
     await loadContent()
   } catch (error) {
     console.error(error)
@@ -1145,6 +1701,25 @@ const removeTip = async (id: number) => {
   if (!window.confirm('确定删除该贴士？')) return
   try {
     await deleteDashboardTip(id)
+    const next = new Set(selectedTipIds.value)
+    next.delete(id)
+    selectedTipIds.value = next
+    await loadContent()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleBulkDeleteTips = async () => {
+  if (!selectedTipIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedTipIds.value.size} 条贴士吗？`)) {
+    return
+  }
+  try {
+    await deleteDashboardTips(Array.from(selectedTipIds.value))
+    clearTipSelection()
     await loadContent()
   } catch (error) {
     console.error(error)
@@ -1187,6 +1762,25 @@ const removeAnnouncement = async (id: number) => {
   if (!window.confirm('确定删除该公告？')) return
   try {
     await deleteDashboardAnnouncement(id)
+    const next = new Set(selectedAnnouncementIds.value)
+    next.delete(id)
+    selectedAnnouncementIds.value = next
+    await loadContent()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleBulkDeleteAnnouncements = async () => {
+  if (!selectedAnnouncementIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedAnnouncementIds.value.size} 条公告吗？`)) {
+    return
+  }
+  try {
+    await deleteDashboardAnnouncements(Array.from(selectedAnnouncementIds.value))
+    clearAnnouncementSelection()
     await loadContent()
   } catch (error) {
     console.error(error)
@@ -1195,6 +1789,29 @@ const removeAnnouncement = async (id: number) => {
 
 onMounted(async () => {
   await Promise.all([loadOverview(), loadUsers(), loadRefunds()])
+})
+
+onUnmounted(() => {
+  if (userSearchTimer) {
+    clearTimeout(userSearchTimer)
+    userSearchTimer = null
+  }
+  if (refundSearchTimer) {
+    clearTimeout(refundSearchTimer)
+    refundSearchTimer = null
+  }
+  if (carouselSearchTimer) {
+    clearTimeout(carouselSearchTimer)
+    carouselSearchTimer = null
+  }
+  if (tipSearchTimer) {
+    clearTimeout(tipSearchTimer)
+    tipSearchTimer = null
+  }
+  if (announcementSearchTimer) {
+    clearTimeout(announcementSearchTimer)
+    announcementSearchTimer = null
+  }
 })
 </script>
 
@@ -1393,6 +2010,30 @@ onMounted(async () => {
 .panel-header p {
   margin: 0.35rem 0 0;
   color: rgba(226, 232, 240, 0.65);
+}
+
+.user-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.search-input {
+  min-width: 220px;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.4);
+  color: #e2e8f0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.7);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
 .ghost-button {
@@ -1715,6 +2356,27 @@ onMounted(async () => {
   min-height: 100%;
 }
 
+.content-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.content-card-header > div:first-child {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.content-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .content-card header h3 {
   margin: 0;
   font-size: 1.15rem;
@@ -1754,6 +2416,27 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.content-item-details {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.content-item-details > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.content-checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.25rem;
+  accent-color: #6366f1;
+  flex-shrink: 0;
 }
 
 .content-list li > div:first-child {

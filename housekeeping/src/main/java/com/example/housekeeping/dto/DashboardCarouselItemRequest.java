@@ -13,7 +13,7 @@ public class DashboardCarouselItemRequest {
     private String title;
 
     @NotBlank(message = "图片地址不能为空")
-    @Size(max = 500, message = "图片地址过长")
+    @Size(max = 1048576, message = "图片内容过大")
     private String imageUrl;
 
     @Size(max = 200, message = "跳转信息过长")

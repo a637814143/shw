@@ -21,7 +21,7 @@ CREATE TABLE `housekeep` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `item_type` varchar(20) NOT NULL COMMENT '数据类型：service/tip/review/offer/carousel/announcement',
   `title` varchar(200) DEFAULT NULL COMMENT '标题或名称',
-  `content` text COMMENT '正文内容',
+  `content` longtext COMMENT '正文内容（可存储较大 Base64 图片）',
   `icon` varchar(32) DEFAULT NULL COMMENT '图标/标识',
   `tag` varchar(50) DEFAULT NULL COMMENT '标签',
   `author` varchar(100) DEFAULT NULL COMMENT '作者或评价人',
