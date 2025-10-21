@@ -76,15 +76,17 @@
                 class="search-input"
                 type="search"
                 placeholder="搜索名称、单位、联系方式或描述"
+                :disabled="serviceLoading"
               />
               <button
                 type="button"
                 class="secondary-button danger"
-                :disabled="!hasServiceSelection"
+                :disabled="!hasServiceSelection || serviceLoading"
                 @click="handleBulkDeleteServices"
               >
                 删除选中<span v-if="selectedServiceCount">（{{ selectedServiceCount }}）</span>
               </button>
+              <span class="service-hint">共 {{ serviceTotal }} 项，每页显示 {{ serviceSize }} 项</span>
               <button type="button" class="primary-button" @click="openServiceForm()">新增服务</button>
             </div>
           </header>
@@ -128,7 +130,7 @@
                     <input
                       type="checkbox"
                       :checked="allVisibleServicesSelected"
-                      :disabled="!services.length"
+                      :disabled="serviceLoading || !services.length"
                       @change="toggleSelectAllServices(($event.target as HTMLInputElement).checked)"
                       aria-label="全选当前服务"
                     />
@@ -146,6 +148,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedServiceIds.has(item.id)"
+                      :disabled="serviceLoading"
                       @change="toggleServiceSelection(item.id, ($event.target as HTMLInputElement).checked)"
                       :aria-label="`选择服务 ${item.name}`"
                     />
@@ -162,14 +165,41 @@
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
                   </td>
                 </tr>
-                <tr v-if="!services.length">
+                <tr v-if="serviceLoading">
+                  <td colspan="6" class="empty-row">服务加载中…</td>
+                </tr>
+                <tr v-else-if="!services.length">
                   <td colspan="6" class="empty-row">
-                    <span v-if="hasServiceFilter && allServices.length">未找到匹配的服务，请调整搜索关键词。</span>
+                    <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="serviceTotal > serviceSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="serviceLoading || servicePage === 1"
+                  @click="changeServicePage(servicePage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ servicePage }} / {{ serviceTotalPages }} 页 · 显示
+                  {{ servicePageStart }}-{{ servicePageEnd }} 项，共 {{ serviceTotal }} 项
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="serviceLoading || servicePage === serviceTotalPages"
+                  @click="changeServicePage(servicePage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -490,9 +520,13 @@ const sections: SectionMeta[] = [
 ]
 
 const activeSection = ref<SectionKey>('services')
-const allServices = ref<HousekeepServiceItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
+const servicePage = ref(1)
+const serviceSize = ref(10)
+const serviceTotal = ref(0)
+const serviceAveragePrice = ref(0)
+const serviceLoading = ref(false)
 const selectedServiceIds = ref<Set<number>>(new Set())
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const refundOrders = ref<ServiceOrderItem[]>([])
@@ -542,15 +576,15 @@ const handleProfileUpdated = (payload: AccountProfileItem) => {
   account.value = payload
 }
 
-const pruneServiceSelection = (visibleItems: HousekeepServiceItem[]) => {
+const pruneServiceSelection = () => {
   if (!selectedServiceIds.value.size) {
     return
   }
-  const allowed = new Set(visibleItems.map((item) => item.id))
+  const visibleIds = new Set(services.value.map((item) => item.id))
   let changed = false
   const next = new Set<number>()
   selectedServiceIds.value.forEach((id) => {
-    if (allowed.has(id)) {
+    if (visibleIds.has(id)) {
       next.add(id)
     } else {
       changed = true
@@ -559,21 +593,6 @@ const pruneServiceSelection = (visibleItems: HousekeepServiceItem[]) => {
   if (changed) {
     selectedServiceIds.value = next
   }
-}
-
-const applyServiceFilter = () => {
-  const keyword = serviceSearch.value.trim().toLowerCase()
-  if (!keyword) {
-    services.value = allServices.value.slice()
-    pruneServiceSelection(services.value)
-    return
-  }
-  const filtered = allServices.value.filter((item) => {
-    const fields = [item.name, item.unit, item.contact, item.description || '']
-    return fields.some((field) => field.toLowerCase().includes(keyword))
-  })
-  services.value = filtered
-  pruneServiceSelection(filtered)
 }
 
 const toggleServiceSelection = (id: number, checked: boolean) => {
@@ -604,8 +623,9 @@ watch(serviceSearch, () => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
   }
-  serviceSearchTimer = setTimeout(() => {
-    applyServiceFilter()
+  serviceSearchTimer = setTimeout(async () => {
+    servicePage.value = 1
+    await loadServices()
     serviceSearchTimer = null
   }, 300)
 })
@@ -615,11 +635,9 @@ const activeMessages = computed(() =>
 )
 
 const companyStats = computed(() => {
-  const totalServices = allServices.value.length
+  const totalServices = serviceTotal.value
   const pendingRefunds = refundOrders.value.length
-  const avgPrice = totalServices
-    ? allServices.value.reduce((sum, item) => sum + item.price, 0) / totalServices
-    : 0
+  const avgPrice = totalServices ? serviceAveragePrice.value : 0
   const balance = account.value?.balance ?? 0
   const upcoming = companyOrders.value.length
   const staffCount = staffList.value.length
@@ -639,6 +657,23 @@ const allVisibleServicesSelected = computed(
   () => services.value.length > 0 && services.value.every((item) => selectedServiceIds.value.has(item.id)),
 )
 const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
+const serviceTotalPages = computed(() => Math.max(1, Math.ceil((serviceTotal.value || 0) / serviceSize.value)))
+const servicePageStart = computed(() =>
+  serviceTotal.value === 0 ? 0 : (servicePage.value - 1) * serviceSize.value + 1,
+)
+const servicePageEnd = computed(() =>
+  serviceTotal.value === 0 ? 0 : Math.min(serviceTotal.value, servicePage.value * serviceSize.value),
+)
+
+const changeServicePage = (page: number) => {
+  const totalPages = serviceTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === servicePage.value) {
+    return
+  }
+  servicePage.value = target
+  loadServices()
+}
 
 const logout = () => {
   sessionStorage.removeItem(AUTH_TOKEN_KEY)
@@ -1067,16 +1102,37 @@ const handleRefreshConversations = async () => {
   }
 }
 
+const assignServiceData = (data: { items: HousekeepServiceItem[]; total: number; averagePrice?: number }) => {
+  services.value = data.items
+  serviceTotal.value = data.total
+  serviceAveragePrice.value = data.averagePrice ?? 0
+  pruneServiceSelection()
+}
+
 const loadServices = async () => {
+  serviceLoading.value = true
   try {
-    const result = await fetchCompanyServices()
-    allServices.value = result
-    applyServiceFilter()
+    const keyword = serviceSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: servicePage.value,
+      size: serviceSize.value,
+    }
+    let result = await fetchCompanyServices(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / serviceSize.value))
+    if (servicePage.value > totalPages) {
+      servicePage.value = totalPages
+      result = await fetchCompanyServices({ ...params, page: servicePage.value })
+    }
+    assignServiceData(result)
   } catch (error) {
     console.error(error)
-    allServices.value = []
     services.value = []
+    serviceTotal.value = 0
+    serviceAveragePrice.value = 0
     clearServiceSelection()
+  } finally {
+    serviceLoading.value = false
   }
 }
 
@@ -1743,6 +1799,31 @@ onUnmounted(() => {
   text-align: center;
   color: var(--brand-text-muted);
   padding: 16px 0;
+}
+
+.table-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  font-size: 0.95rem;
+  color: rgba(30, 41, 59, 0.7);
+}
+
+.pagination .secondary-button {
+  min-width: 88px;
+}
+
+.service-hint {
+  color: rgba(15, 23, 42, 0.55);
+  font-size: 0.9rem;
 }
 
 @media (max-width: 1024px) {
