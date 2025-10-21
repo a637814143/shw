@@ -21,6 +21,7 @@ public class ServiceOrderResponse {
     private ServiceOrderStatus status;
     private Instant scheduledAt;
     private String specialRequest;
+    private String serviceAddress;
     private String progressNote;
     private Integer loyaltyPoints;
     private String refundReason;
@@ -28,14 +29,17 @@ public class ServiceOrderResponse {
     private String handledBy;
     private String assignedWorker;
     private String workerContact;
+    private String customerContactPhone;
+    private String customerAddress;
     private Instant createdAt;
     private Instant updatedAt;
 
     public ServiceOrderResponse(Long id, Long serviceId, String serviceName, String unit, BigDecimal price,
                                 String contact, String companyName, String username, ServiceOrderStatus status,
-                                Instant scheduledAt, String specialRequest, String progressNote, Integer loyaltyPoints,
+                                Instant scheduledAt, String specialRequest, String serviceAddress, String progressNote, Integer loyaltyPoints,
                                 String refundReason, String refundResponse, String handledBy,
                                 String assignedWorker, String workerContact,
+                                String customerContactPhone, String customerAddress,
                                 Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.serviceId = serviceId;
@@ -48,6 +52,7 @@ public class ServiceOrderResponse {
         this.status = status;
         this.scheduledAt = scheduledAt;
         this.specialRequest = specialRequest;
+        this.serviceAddress = serviceAddress;
         this.progressNote = progressNote;
         this.loyaltyPoints = loyaltyPoints;
         this.refundReason = refundReason;
@@ -55,6 +60,8 @@ public class ServiceOrderResponse {
         this.handledBy = handledBy;
         this.assignedWorker = assignedWorker;
         this.workerContact = workerContact;
+        this.customerContactPhone = customerContactPhone;
+        this.customerAddress = customerAddress;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -103,6 +110,10 @@ public class ServiceOrderResponse {
         return specialRequest;
     }
 
+    public String getServiceAddress() {
+        return serviceAddress;
+    }
+
     public String getProgressNote() {
         return progressNote;
     }
@@ -129,6 +140,14 @@ public class ServiceOrderResponse {
 
     public String getWorkerContact() {
         return workerContact;
+    }
+
+    public String getCustomerContactPhone() {
+        return customerContactPhone;
+    }
+
+    public String getCustomerAddress() {
+        return customerAddress;
     }
 
     public Instant getCreatedAt() {

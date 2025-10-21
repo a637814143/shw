@@ -14,6 +14,9 @@ public class AccountProfileResponse {
     private BigDecimal balance;
     private Integer loyaltyPoints;
     private String avatarBase64;
+    private String contactPhone;
+    private String contactAddress;
+    private String companyDescription;
 
     public AccountProfileResponse(
         Long id,
@@ -22,7 +25,10 @@ public class AccountProfileResponse {
         String role,
         BigDecimal balance,
         Integer loyaltyPoints,
-        String avatarBase64
+        String avatarBase64,
+        String contactPhone,
+        String contactAddress,
+        String companyDescription
     ) {
         this.id = id;
         this.username = username;
@@ -31,6 +37,9 @@ public class AccountProfileResponse {
         this.balance = balance;
         this.loyaltyPoints = loyaltyPoints;
         this.avatarBase64 = avatarBase64;
+        this.contactPhone = contactPhone;
+        this.contactAddress = contactAddress;
+        this.companyDescription = companyDescription;
     }
 
     public Long getId() {
@@ -59,5 +68,17 @@ public class AccountProfileResponse {
 
     public String getAvatarBase64() {
         return avatarBase64;
+    }
+
+    public String getContactPhone() {
+        return contactPhone;
+    }
+
+    public String getContactAddress() {
+        return contactAddress;
+    }
+
+    public String getCompanyDescription() {
+        return companyDescription;
     }
 }

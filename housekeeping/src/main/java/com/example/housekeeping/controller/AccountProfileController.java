@@ -1,6 +1,7 @@
 package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
+import com.example.housekeeping.dto.AccountPasswordUpdateRequest;
 import com.example.housekeeping.dto.AccountProfileResponse;
 import com.example.housekeeping.dto.AccountProfileUpdateRequest;
 import com.example.housekeeping.service.AccountProfileService;
@@ -32,5 +33,11 @@ public class AccountProfileController {
     public Result<AccountProfileResponse> updateAccount(@Valid @RequestBody AccountProfileUpdateRequest request) {
         AccountProfileResponse response = accountProfileService.updateProfile(request);
         return Result.success("资料更新成功", response);
+    }
+
+    @PutMapping("/password")
+    public Result<Void> updatePassword(@Valid @RequestBody AccountPasswordUpdateRequest request) {
+        accountProfileService.updatePassword(request);
+        return Result.success("密码修改成功", null);
     }
 }

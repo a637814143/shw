@@ -84,6 +84,7 @@ export interface ServiceOrderItem {
   status: ServiceOrderStatus
   scheduledAt: string
   specialRequest?: string | null
+  serviceAddress?: string | null
   progressNote?: string | null
   loyaltyPoints: number
   refundReason?: string | null
@@ -91,6 +92,8 @@ export interface ServiceOrderItem {
   handledBy?: string | null
   assignedWorker?: string | null
   workerContact?: string | null
+  customerContactPhone?: string | null
+  customerAddress?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -125,17 +128,24 @@ export interface AccountProfileItem {
   balance: number
   loyaltyPoints: number
   avatarBase64: string
+  contactPhone?: string | null
+  contactAddress?: string | null
+  companyDescription?: string | null
 }
 
 export interface UpdateAccountProfilePayload {
   displayName: string
   avatarBase64?: string
+  contactPhone?: string
+  contactAddress?: string
+  companyDescription?: string
 }
 
 export interface CreateOrderPayload {
   serviceId: number
   scheduledAt: string
   specialRequest?: string
+  serviceAddress?: string
 }
 
 export interface RefundPayload {
@@ -173,9 +183,37 @@ export interface UpdateLoyaltyPayload {
   loyaltyPoints: number
 }
 
+export interface UpdateAccountPasswordPayload {
+  currentPassword: string
+  newPassword: string
+}
+
 export interface UpdateOrderProgressPayload {
   status: ServiceOrderStatus
   progressNote?: string
+}
+
+export type PaymentGatewayStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'ERROR'
+
+export interface PaymentGatewayCheckResult {
+  status: PaymentGatewayStatus
+  message: string
+  rawPayload?: string | null
+  token?: string | null
+  expiresAt?: string | null
+}
+
+export interface CreatePaymentSessionPayload {
+  serviceName: string
+  companyName?: string | null
+  amount: number
+}
+
+export interface PaymentSessionInfo {
+  token: string
+  qrPath: string
+  qrUrl: string
+  expiresAt: string
 }
 
 export interface CompanyConversationItem {
@@ -286,6 +324,23 @@ export interface AssignWorkerPayload {
   workerContact: string
 }
 
+export interface CompanyStaffItem {
+  id: number
+  name: string
+  contact: string
+  role?: string | null
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CompanyStaffPayload {
+  name: string
+  contact: string
+  role?: string
+  notes?: string
+}
+
 // 公共接口
 export const fetchPublicServices = async (): Promise<HousekeepServiceItem[]> => {
   const response = await fetch(buildUrl('/api/public/services'))
@@ -353,6 +408,23 @@ export const fetchDashboardTips = async (): Promise<DashboardTipItem[]> => {
 export const fetchDashboardAnnouncements = async (): Promise<DashboardAnnouncementItem[]> => {
   const response = await fetch(buildUrl('/api/user/dashboard/announcements'), withAuthHeaders())
   return handleResponse<DashboardAnnouncementItem[]>(response)
+}
+
+export const createQrPaymentSession = async (
+  payload: CreatePaymentSessionPayload,
+): Promise<PaymentSessionInfo> => {
+  const response = await fetch(buildUrl('/api/user/payments/qr/session'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<PaymentSessionInfo>(response)
+}
+
+export const checkQrPaymentStatus = async (token: string): Promise<PaymentGatewayCheckResult> => {
+  const url = new URL(buildUrl('/api/user/payments/qr/status'))
+  url.searchParams.set('token', token)
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaymentGatewayCheckResult>(response)
 }
 
 export const fetchUserFavorites = async (): Promise<ServiceFavoriteItem[]> => {
@@ -461,6 +533,50 @@ export const deleteCompanyService = async (id: number): Promise<void> => {
     ...withAuthHeaders({ method: 'DELETE' }),
   })
   await handleResponse<null>(response)
+}
+
+export const fetchCompanyStaff = async (): Promise<CompanyStaffItem[]> => {
+  const response = await fetch(buildUrl('/api/company/staff'), withAuthHeaders())
+  return handleResponse<CompanyStaffItem[]>(response)
+}
+
+export const createCompanyStaff = async (
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl('/api/company/staff'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const updateCompanyStaff = async (
+  id: number,
+  payload: CompanyStaffPayload,
+): Promise<CompanyStaffItem> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${id}`), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<CompanyStaffItem>(response)
+}
+
+export const deleteCompanyStaff = async (id: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${id}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const assignCompanyStaff = async (
+  staffId: number,
+  orderId: number,
+): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/company/staff/${staffId}/assign`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify({ orderId }),
+  })
+  return handleResponse<ServiceOrderItem>(response)
 }
 
 export const fetchCompanyRefunds = async (): Promise<ServiceOrderItem[]> => {
@@ -598,6 +714,16 @@ export const updateCurrentAccount = async (
     body: JSON.stringify(payload),
   })
   return handleResponse<AccountProfileItem>(response)
+}
+
+export const updateCurrentPassword = async (
+  payload: UpdateAccountPasswordPayload,
+): Promise<void> => {
+  const response = await fetch(buildUrl('/api/account/password'), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  await handleResponse<void>(response)
 }
 
 export const fetchAdminOverview = async (): Promise<AdminOverviewItem> => {

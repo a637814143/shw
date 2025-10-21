@@ -66,6 +66,10 @@ public class ServiceOrderService {
         }
 
         String specialRequest = normalizeMessage(request.getSpecialRequest());
+        String serviceAddress = normalizeMessage(request.getServiceAddress());
+        if (serviceAddress == null) {
+            serviceAddress = normalizeMessage(user.getContactAddress());
+        }
         int earnedPoints = calculateLoyaltyPoints(price);
 
         UserAll company = service.getCompany();
@@ -80,6 +84,7 @@ public class ServiceOrderService {
         order.setStatus(ServiceOrderStatus.SCHEDULED);
         order.setScheduledAt(scheduledAt);
         order.setSpecialRequest(specialRequest);
+        order.setServiceAddress(serviceAddress);
         order.setProgressNote("待上门服务");
         order.setLoyaltyPoints(earnedPoints);
         order.setCreatedAt(Instant.now());
@@ -287,7 +292,7 @@ public class ServiceOrderService {
         }
     }
 
-    private ServiceOrderResponse mapToResponse(ServiceOrder order) {
+    ServiceOrderResponse mapToResponse(ServiceOrder order) {
         HousekeepService service = order.getService();
         return new ServiceOrderResponse(
             order.getId(),
@@ -301,6 +306,7 @@ public class ServiceOrderService {
             order.getStatus(),
             order.getScheduledAt(),
             order.getSpecialRequest(),
+            order.getServiceAddress(),
             order.getProgressNote(),
             order.getLoyaltyPoints() == null ? 0 : order.getLoyaltyPoints(),
             order.getRefundReason(),
@@ -308,6 +314,8 @@ public class ServiceOrderService {
             order.getHandledBy() == null ? null : order.getHandledBy().getUsername(),
             order.getAssignedWorker(),
             order.getWorkerContact(),
+            order.getUser().getContactPhone(),
+            order.getUser().getContactAddress(),
             order.getCreatedAt(),
             order.getUpdatedAt()
         );

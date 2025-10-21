@@ -42,6 +42,9 @@ public class ServiceOrder {
     @Column(name = "special_request", length = 500)
     private String specialRequest;
 
+    @Column(name = "service_address", length = 255)
+    private String serviceAddress;
+
     @Column(name = "progress_note", length = 500)
     private String progressNote;
 
