@@ -2,6 +2,7 @@ package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
+import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.dto.ServiceOrderRequest;
@@ -44,8 +45,10 @@ public class UserServiceController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listOrders() {
-        return Result.success(serviceOrderService.listOrdersForCurrentUser());
+    public Result<List<ServiceOrderResponse>> listOrders(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceOrderService.listOrdersForCurrentUser(keyword));
     }
 
     @GetMapping("/favorites")
@@ -64,6 +67,18 @@ public class UserServiceController {
         return Result.success("退款申请已提交", serviceOrderService.requestRefund(orderId, request));
     }
 
+    @DeleteMapping("/orders/{orderId}")
+    public Result<Void> deleteOrder(@PathVariable Long orderId) {
+        serviceOrderService.deleteOrdersForCurrentUser(List.of(orderId));
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/orders/batch")
+    public Result<Void> deleteOrders(@Valid @RequestBody IdListRequest request) {
+        serviceOrderService.deleteOrdersForCurrentUser(request.getIds());
+        return Result.success("删除成功", null);
+    }
+
     @PostMapping("/{serviceId}/favorite")
     public Result<Void> addFavorite(@PathVariable Long serviceId) {
         serviceFavoriteService.addFavorite(serviceId);
@@ -79,5 +94,24 @@ public class UserServiceController {
     @PostMapping("/reviews")
     public Result<ServiceReviewResponse> createReview(@Valid @RequestBody ServiceReviewRequest request) {
         return Result.success("评价已提交", serviceReviewService.createReview(request));
+    }
+
+    @GetMapping("/reviews")
+    public Result<List<ServiceReviewResponse>> listReviews(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceReviewService.listReviewsForCurrentUser(keyword));
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    public Result<Void> deleteReview(@PathVariable Long reviewId) {
+        serviceReviewService.deleteReviewsForCurrentUser(List.of(reviewId));
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/reviews/batch")
+    public Result<Void> deleteReviews(@Valid @RequestBody IdListRequest request) {
+        serviceReviewService.deleteReviewsForCurrentUser(request.getIds());
+        return Result.success("删除成功", null);
     }
 }

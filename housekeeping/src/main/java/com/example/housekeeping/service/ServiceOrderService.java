@@ -23,9 +23,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 服务订单相关业务。
@@ -101,27 +105,31 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listOrdersForCurrentUser() {
+    public List<ServiceOrderResponse> listOrdersForCurrentUser(String keyword) {
         UserAll user = accountLookupService.getCurrentAccount();
         ensureRole(user, AccountRole.USER);
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findByUserOrderByCreatedAtDesc(user)
             .stream()
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listActiveOrdersForCompany() {
+    public List<ServiceOrderResponse> listActiveOrdersForCompany(String keyword) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
             return List.of();
         }
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findByServiceIn(services).stream()
             .filter(order -> order.getStatus() == ServiceOrderStatus.SCHEDULED
                 || order.getStatus() == ServiceOrderStatus.IN_PROGRESS
                 || order.getStatus() == ServiceOrderStatus.PENDING)
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceOrder::getScheduledAt))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -319,6 +327,22 @@ public class ServiceOrderService {
         serviceOrderRepository.deleteAll(orders);
     }
 
+    @Transactional
+    public void deleteOrdersForCompany(List<Long> ids) {
+        UserAll company = accountLookupService.getCurrentAccount();
+        ensureRole(company, AccountRole.COMPANY);
+        deleteOrders(ids, order -> order.getService() != null
+            && order.getService().getCompany() != null
+            && Objects.equals(order.getService().getCompany().getId(), company.getId()));
+    }
+
+    @Transactional
+    public void deleteOrdersForCurrentUser(List<Long> ids) {
+        UserAll user = accountLookupService.getCurrentAccount();
+        ensureRole(user, AccountRole.USER);
+        deleteOrders(ids, order -> order.getUser() != null && Objects.equals(order.getUser().getId(), user.getId()));
+    }
+
     @Transactional(readOnly = true)
     public List<ServiceOrderResponse> listOrdersForAdmin() {
         UserAll admin = accountLookupService.getCurrentAccount();
@@ -403,6 +427,34 @@ public class ServiceOrderService {
         return normalizeMessage(keyword);
     }
 
+    private boolean matchesOrderKeyword(ServiceOrder order, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        String lower = keyword.toLowerCase();
+        return Stream.of(
+                order.getService() != null ? order.getService().getName() : null,
+                order.getService() != null && order.getService().getCompany() != null
+                    ? order.getService().getCompany().getUsername() : null,
+                order.getService() != null && order.getService().getCompany() != null
+                    ? order.getService().getCompany().getDisplayName() : null,
+                order.getService() != null ? order.getService().getContact() : null,
+                order.getUser() != null ? order.getUser().getUsername() : null,
+                order.getUser() != null ? order.getUser().getContactPhone() : null,
+                order.getUser() != null ? order.getUser().getContactAddress() : null,
+                order.getSpecialRequest(),
+                order.getServiceAddress(),
+                order.getProgressNote(),
+                order.getRefundReason(),
+                order.getRefundResponse(),
+                order.getAssignedWorker(),
+                order.getWorkerContact()
+            )
+            .filter(Objects::nonNull)
+            .map(String::toLowerCase)
+            .anyMatch(value -> value.contains(lower));
+    }
+
     private List<ServiceOrderStatus> resolveRefundStatuses(String stage) {
         if (stage == null) {
             return List.of(ServiceOrderStatus.REFUND_REQUESTED);
@@ -429,5 +481,26 @@ public class ServiceOrderService {
         return order.getService().getName().toLowerCase().contains(lower)
             || order.getUser().getUsername().toLowerCase().contains(lower)
             || order.getService().getCompany().getUsername().toLowerCase().contains(lower);
+    }
+
+    private void deleteOrders(List<Long> ids, Predicate<ServiceOrder> allowedPredicate) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinctIds = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinctIds.isEmpty()) {
+            return;
+        }
+        List<ServiceOrder> orders = serviceOrderRepository.findAllById(distinctIds);
+        List<ServiceOrder> permitted = orders.stream()
+            .filter(allowedPredicate)
+            .collect(Collectors.toList());
+        if (permitted.isEmpty()) {
+            return;
+        }
+        permitted.forEach(companyMessageRepository::deleteByOrder);
+        serviceOrderRepository.deleteAll(permitted);
     }
 }

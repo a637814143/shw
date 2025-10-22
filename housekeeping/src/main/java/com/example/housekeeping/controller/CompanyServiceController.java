@@ -72,8 +72,22 @@ public class CompanyServiceController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listActiveOrders() {
-        return Result.success(serviceOrderService.listActiveOrdersForCompany());
+    public Result<List<ServiceOrderResponse>> listActiveOrders(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword));
+    }
+
+    @DeleteMapping("/orders/{orderId}")
+    public Result<Void> deleteOrder(@PathVariable Long orderId) {
+        serviceOrderService.deleteOrdersForCompany(List.of(orderId));
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/orders/batch")
+    public Result<Void> deleteOrders(@Valid @RequestBody IdListRequest request) {
+        serviceOrderService.deleteOrdersForCompany(request.getIds());
+        return Result.success("删除成功", null);
     }
 
     @PostMapping("/refunds/{orderId}")
@@ -89,7 +103,21 @@ public class CompanyServiceController {
     }
 
     @GetMapping("/reviews")
-    public Result<List<ServiceReviewResponse>> listServiceReviews() {
-        return Result.success(serviceReviewService.listReviewsForCurrentCompany());
+    public Result<List<ServiceReviewResponse>> listServiceReviews(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceReviewService.listReviewsForCurrentCompany(keyword));
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    public Result<Void> deleteReview(@PathVariable Long reviewId) {
+        serviceReviewService.deleteReviewsForCurrentCompany(List.of(reviewId));
+        return Result.success("删除成功", null);
+    }
+
+    @DeleteMapping("/reviews/batch")
+    public Result<Void> deleteReviews(@Valid @RequestBody IdListRequest request) {
+        serviceReviewService.deleteReviewsForCurrentCompany(request.getIds());
+        return Result.success("删除成功", null);
     }
 }
