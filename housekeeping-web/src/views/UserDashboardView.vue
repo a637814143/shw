@@ -271,13 +271,46 @@
 
         <section v-else-if="activeSection === 'orders'" class="panel">
           <header class="panel-header">
-            <h2>我的服务订单</h2>
-            <p>共 {{ orderStats.total }} 单 · 已完成 {{ orderStats.completed }} 单。</p>
+            <div>
+              <h2>我的服务订单</h2>
+              <p>共 {{ orderStats.total }} 单 · 已完成 {{ orderStats.completed }} 单。</p>
+            </div>
+            <div class="service-actions">
+              <label class="visually-hidden" for="user-order-search">搜索订单</label>
+              <input
+                id="user-order-search"
+                v-model="orderSearch"
+                class="search-input"
+                type="search"
+                :disabled="ordersLoading"
+                placeholder="搜索服务、公司、电话或备注"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasOrderSelection || ordersLoading"
+                @click="handleBulkDeleteOrders"
+              >
+                删除选中<span v-if="selectedOrderCount">（{{ selectedOrderCount }}）</span>
+              </button>
+              <button type="button" class="secondary-button" :disabled="ordersLoading" @click="loadOrders">
+                刷新订单
+              </button>
+            </div>
           </header>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleOrdersSelected"
+                      :disabled="ordersLoading || !visibleOrders.length"
+                      @change="toggleSelectAllOrders(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选订单"
+                    />
+                  </th>
                   <th>服务</th>
                   <th>预约时间</th>
                   <th>状态</th>
@@ -288,7 +321,16 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="order in orders" :key="order.id">
+                <tr v-for="order in visibleOrders" :key="order.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedOrderIds.has(order.id)"
+                      :disabled="ordersLoading"
+                      @change="toggleOrderSelection(order.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择订单 ${order.serviceName}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">{{ order.companyName }} · {{ order.contact }}</div>
@@ -337,10 +379,24 @@
                     >
                       申请退款
                     </button>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="ordersLoading"
+                      @click="handleDeleteOrder(order)"
+                    >
+                      删除
+                    </button>
                   </td>
                 </tr>
-                <tr v-if="!orders.length">
-                  <td colspan="7" class="empty-row">您还没有订单，先去选择一个服务吧。</td>
+                <tr v-if="ordersLoading">
+                  <td colspan="8" class="empty-row">订单加载中…</td>
+                </tr>
+                <tr v-else-if="!visibleOrders.length">
+                  <td colspan="8" class="empty-row">
+                    <span v-if="hasOrderFilter">没有找到匹配的订单，请尝试调整关键词。</span>
+                    <span v-else>您还没有订单，先去选择一个服务吧。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -431,20 +487,90 @@
             </div>
           </form>
 
-          <div v-if="serviceReviews.length" class="review-list">
-            <h3 class="review-title">近期评价</h3>
-            <ul>
-              <li v-for="item in serviceReviews" :key="item.id" class="review-item">
-                <div class="review-header">
-                  <strong>{{ item.username }}</strong>
-                  <span class="review-rating">{{ item.rating }} 分</span>
-                  <time>{{ formatDateTime(item.createdAt) }}</time>
-                </div>
-                <p class="review-content">{{ item.content }}</p>
-              </li>
-            </ul>
+          <div class="service-actions">
+            <label class="visually-hidden" for="user-review-search">搜索评价</label>
+            <input
+              id="user-review-search"
+              v-model="reviewSearch"
+              class="search-input"
+              type="search"
+              :disabled="userReviewsLoading"
+              placeholder="搜索服务、评分或内容关键词"
+            />
+            <button
+              type="button"
+              class="secondary-button danger"
+              :disabled="!hasUserReviewSelection || userReviewsLoading"
+              @click="handleBulkDeleteUserReviews"
+            >
+              删除选中<span v-if="selectedUserReviewCount">（{{ selectedUserReviewCount }}）</span>
+            </button>
+            <button type="button" class="secondary-button" :disabled="userReviewsLoading" @click="loadUserReviews">
+              刷新评价
+            </button>
           </div>
-          <p v-else class="empty-tip">选择服务后可查看已发布的评价。</p>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleUserReviewsSelected"
+                      :disabled="userReviewsLoading || !visibleUserReviews.length"
+                      @change="toggleSelectAllUserReviews(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选评价"
+                    />
+                  </th>
+                  <th>服务</th>
+                  <th>评分与内容</th>
+                  <th class="table-actions">时间与操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in visibleUserReviews" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedUserReviewIds.has(item.id)"
+                      :disabled="userReviewsLoading"
+                      @change="toggleUserReviewSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择评价 ${item.serviceName}`"
+                    />
+                  </td>
+                  <td>
+                    <div class="review-service">
+                      <strong>{{ item.serviceName }}</strong>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="review-rating">评分：{{ item.rating }} 分</div>
+                    <p class="review-text">{{ item.content || '暂无评价内容' }}</p>
+                  </td>
+                  <td class="table-actions actions-inline">
+                    <span class="order-subtext">发表于 {{ formatDateTime(item.createdAt) }}</span>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="userReviewsLoading"
+                      @click="handleDeleteUserReview(item)"
+                    >
+                      删除
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="userReviewsLoading">
+                  <td colspan="4" class="empty-row">评价加载中…</td>
+                </tr>
+                <tr v-else-if="!visibleUserReviews.length">
+                  <td colspan="4" class="empty-row">
+                    <span v-if="hasUserReviewFilter">没有找到相关评价，尝试调整搜索关键词。</span>
+                    <span v-else>暂无评价记录，完成订单后即可发布评价。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>
@@ -466,11 +592,11 @@ import {
   fetchDashboardAnnouncements,
   fetchDashboardCarousels,
   fetchDashboardTips,
-  fetchServiceReviews,
   fetchUserConversations,
   fetchUserFavorites,
   fetchUserMessages,
   fetchUserOrders,
+  fetchUserReviews,
   fetchUserServices,
   removeUserFavorite,
   markUserConversationRead,
@@ -478,6 +604,10 @@ import {
   requestUserRefund,
   sendUserMessage,
   submitUserReview,
+  deleteUserOrder,
+  deleteUserOrders,
+  deleteUserReview,
+  deleteUserReviews,
   type AccountProfileItem,
   type CreateOrderPayload,
   type CreatePaymentSessionPayload,
@@ -518,7 +648,13 @@ const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const orders = ref<ServiceOrderItem[]>([])
-const serviceReviews = ref<ServiceReviewItem[]>([])
+const ordersLoading = ref(false)
+const orderSearch = ref('')
+const selectedOrderIds = ref<Set<number>>(new Set())
+const userReviews = ref<ServiceReviewItem[]>([])
+const userReviewsLoading = ref(false)
+const reviewSearch = ref('')
+const selectedUserReviewIds = ref<Set<number>>(new Set())
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
 const announcements = ref<DashboardAnnouncementItem[]>([])
@@ -610,12 +746,84 @@ const paymentQrSrc = computed(() => {
   return `${base}?size=240x240&data=${encodeURIComponent(link)}`
 })
 
+const normalizeUserSearchValue = (value: unknown) => {
+  if (value == null) {
+    return ''
+  }
+  return String(value).toLowerCase()
+}
+
+const matchesUserOrderSearch = (order: ServiceOrderItem, keyword: string) => {
+  if (!keyword) {
+    return true
+  }
+  const target = keyword.toLowerCase()
+  const fields = [
+    order.serviceName,
+    order.companyName,
+    order.contact,
+    order.username,
+    order.specialRequest,
+    order.serviceAddress,
+    order.progressNote,
+    order.assignedWorker,
+    order.workerContact,
+    order.refundReason,
+  ]
+  return fields.some((field) => normalizeUserSearchValue(field).includes(target))
+}
+
+const matchesUserReviewSearch = (review: ServiceReviewItem, keyword: string) => {
+  if (!keyword) {
+    return true
+  }
+  const target = keyword.toLowerCase()
+  const fields = [review.serviceName, String(review.rating), review.content]
+  return fields.some((field) => normalizeUserSearchValue(field).includes(target))
+}
+
+const visibleOrders = computed(() => {
+  const keyword = orderSearch.value.trim()
+  if (!keyword) {
+    return orders.value
+  }
+  return orders.value.filter((order) => matchesUserOrderSearch(order, keyword))
+})
+
+const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
+
+const allVisibleOrdersSelected = computed(
+  () => visibleOrders.value.length > 0 && visibleOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
+)
+
+const selectedOrderCount = computed(() => selectedOrderIds.value.size)
+const hasOrderSelection = computed(() => selectedOrderIds.value.size > 0)
+
+const visibleUserReviews = computed(() => {
+  const keyword = reviewSearch.value.trim()
+  if (!keyword) {
+    return userReviews.value
+  }
+  return userReviews.value.filter((item) => matchesUserReviewSearch(item, keyword))
+})
+
+const hasUserReviewFilter = computed(() => reviewSearch.value.trim().length > 0)
+
+const allVisibleUserReviewsSelected = computed(
+  () =>
+    visibleUserReviews.value.length > 0 &&
+    visibleUserReviews.value.every((item) => selectedUserReviewIds.value.has(item.id)),
+)
+
+const selectedUserReviewCount = computed(() => selectedUserReviewIds.value.size)
+const hasUserReviewSelection = computed(() => selectedUserReviewIds.value.size > 0)
+
 const orderStats = computed(() => {
-  const total = orders.value.length
-  const awaiting = orders.value.filter((order) => order.status === 'SCHEDULED' || order.status === 'PENDING').length
-  const inProgress = orders.value.filter((order) => order.status === 'IN_PROGRESS').length
-  const refunding = orders.value.filter((order) => order.status === 'REFUND_REQUESTED').length
-  const completed = orders.value.filter((order) => order.status === 'COMPLETED').length
+  const total = visibleOrders.value.length
+  const awaiting = visibleOrders.value.filter((order) => order.status === 'SCHEDULED' || order.status === 'PENDING').length
+  const inProgress = visibleOrders.value.filter((order) => order.status === 'IN_PROGRESS').length
+  const refunding = visibleOrders.value.filter((order) => order.status === 'REFUND_REQUESTED').length
+  const completed = visibleOrders.value.filter((order) => order.status === 'COMPLETED').length
   return {
     total,
     awaiting,
@@ -671,6 +879,92 @@ const applyServiceFilter = () => {
   })
 }
 
+const pruneOrderSelection = () => {
+  if (!selectedOrderIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(orders.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedOrderIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedOrderIds.value = next
+  }
+}
+
+const toggleOrderSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedOrderIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedOrderIds.value = next
+}
+
+const toggleSelectAllOrders = (checked: boolean) => {
+  if (!checked) {
+    selectedOrderIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedOrderIds.value)
+  visibleOrders.value.forEach((item) => next.add(item.id))
+  selectedOrderIds.value = next
+}
+
+const clearOrderSelection = () => {
+  selectedOrderIds.value = new Set()
+}
+
+const pruneUserReviewSelection = () => {
+  if (!selectedUserReviewIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(userReviews.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedUserReviewIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedUserReviewIds.value = next
+  }
+}
+
+const toggleUserReviewSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedUserReviewIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedUserReviewIds.value = next
+}
+
+const toggleSelectAllUserReviews = (checked: boolean) => {
+  if (!checked) {
+    selectedUserReviewIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedUserReviewIds.value)
+  visibleUserReviews.value.forEach((item) => next.add(item.id))
+  selectedUserReviewIds.value = next
+}
+
+const clearUserReviewSelection = () => {
+  selectedUserReviewIds.value = new Set()
+}
+
 const loadServices = async () => {
   try {
     const result = await fetchUserServices()
@@ -684,10 +978,14 @@ const loadServices = async () => {
 }
 
 const loadOrders = async () => {
+  ordersLoading.value = true
   try {
     orders.value = await fetchUserOrders()
+    pruneOrderSelection()
   } catch (error) {
     console.error(error)
+  } finally {
+    ordersLoading.value = false
   }
 }
 
@@ -709,6 +1007,11 @@ watch(serviceSearch, () => {
   }, 300)
 })
 
+watch(orders, pruneOrderSelection)
+watch(visibleOrders, pruneOrderSelection)
+watch(userReviews, pruneUserReviewSelection)
+watch(visibleUserReviews, pruneUserReviewSelection)
+
 const loadDiscover = async () => {
   discoverLoading.value = true
   try {
@@ -727,12 +1030,15 @@ const loadDiscover = async () => {
   }
 }
 
-const loadReviews = async (serviceId: number) => {
+const loadUserReviews = async () => {
+  userReviewsLoading.value = true
   try {
-    serviceReviews.value = await fetchServiceReviews(serviceId)
+    userReviews.value = await fetchUserReviews()
+    pruneUserReviewSelection()
   } catch (error) {
     console.error(error)
-    serviceReviews.value = []
+  } finally {
+    userReviewsLoading.value = false
   }
 }
 
@@ -752,9 +1058,7 @@ const switchSection = (key: SectionKey) => {
   } else if (key === 'wallet') {
     loadAccount()
   } else if (key === 'reviews') {
-    if (reviewForm.serviceId) {
-      loadReviews(Number(reviewForm.serviceId))
-    }
+    loadUserReviews()
   }
 }
 
@@ -910,6 +1214,37 @@ const checkPaymentResult = async () => {
   }
 }
 
+const handleDeleteOrder = async (order: ServiceOrderItem) => {
+  if (!window.confirm(`确定删除订单“${order.serviceName}”（${order.companyName}）吗？`)) {
+    return
+  }
+  try {
+    await deleteUserOrder(order.id)
+    const next = new Set(selectedOrderIds.value)
+    next.delete(order.id)
+    selectedOrderIds.value = next
+    await loadOrders()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除订单失败，请稍后再试。')
+  }
+}
+
+const handleBulkDeleteOrders = async () => {
+  if (!selectedOrderIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedOrderIds.value.size} 个订单记录吗？`)) {
+    return
+  }
+  try {
+    await deleteUserOrders(Array.from(selectedOrderIds.value))
+    clearOrderSelection()
+    await loadOrders()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '批量删除失败，请稍后再试。')
+  }
+}
+
 const canRequestRefund = (order: ServiceOrderItem) => {
   return (
     order.status === 'IN_PROGRESS' ||
@@ -959,12 +1294,43 @@ const handleSubmitReview = async () => {
       content: reviewForm.content,
     })
     reviewForm.content = ''
-    await loadReviews(Number(reviewForm.serviceId))
+    await loadUserReviews()
     window.alert('评价提交成功')
   } catch (error) {
     console.error(error)
   } finally {
     reviewSubmitting.value = false
+  }
+}
+
+const handleDeleteUserReview = async (item: ServiceReviewItem) => {
+  if (!window.confirm(`确定删除对“${item.serviceName}”的这条评价吗？`)) {
+    return
+  }
+  try {
+    await deleteUserReview(item.id)
+    const next = new Set(selectedUserReviewIds.value)
+    next.delete(item.id)
+    selectedUserReviewIds.value = next
+    await loadUserReviews()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除评价失败，请稍后再试。')
+  }
+}
+
+const handleBulkDeleteUserReviews = async () => {
+  if (!selectedUserReviewIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedUserReviewIds.value.size} 条评价吗？`)) {
+    return
+  }
+  try {
+    await deleteUserReviews(Array.from(selectedUserReviewIds.value))
+    clearUserReviewSelection()
+    await loadUserReviews()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '批量删除评价失败，请稍后再试。')
   }
 }
 
@@ -1082,7 +1448,14 @@ const statusText = (status: ServiceOrderItem['status']) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadOrders(), loadDiscover(), loadFavorites()])
+  await Promise.all([
+    loadAccount(),
+    loadServices(),
+    loadOrders(),
+    loadDiscover(),
+    loadFavorites(),
+    loadUserReviews(),
+  ])
 })
 
 onUnmounted(() => {
@@ -1485,6 +1858,16 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
+.table-checkbox {
+  width: 48px;
+  text-align: center;
+}
+
+.table-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+}
+
 .data-table tbody tr:hover {
   background: rgba(148, 163, 184, 0.08);
 }
@@ -1503,6 +1886,23 @@ onUnmounted(() => {
   gap: 0.75rem;
   font-size: 0.85rem;
   color: rgba(148, 163, 184, 0.7);
+}
+
+.review-service {
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.review-rating {
+  margin: 0.35rem 0;
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.review-text {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.85);
+  white-space: pre-wrap;
 }
 
 .status-badge {

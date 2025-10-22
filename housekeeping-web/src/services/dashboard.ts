@@ -364,9 +364,28 @@ export const fetchServiceReviews = async (serviceId: number): Promise<ServiceRev
   return handleResponse<ServiceReviewItem[]>(response)
 }
 
-export const fetchCompanyReviews = async (): Promise<ServiceReviewItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services/reviews'), withAuthHeaders())
+export const fetchCompanyReviews = async (params?: { keyword?: string }): Promise<ServiceReviewItem[]> => {
+  const url = new URL(buildUrl('/api/company/services/reviews'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceReviewItem[]>(response)
+}
+
+export const deleteCompanyReview = async (reviewId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/services/reviews/${reviewId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteCompanyReviews = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/company/services/reviews/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 // 普通用户接口
@@ -379,9 +398,28 @@ export const fetchUserServices = async (params?: { keyword?: string }): Promise<
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
-export const fetchUserOrders = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/user/services/orders'), withAuthHeaders())
+export const fetchUserOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/user/services/orders'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const deleteUserOrder = async (orderId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/user/services/orders/${orderId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteUserOrders = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/user/services/orders/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const createUserOrder = async (payload: CreateOrderPayload): Promise<ServiceOrderItem> => {
@@ -409,6 +447,30 @@ export const submitUserReview = async (payload: ReviewPayload): Promise<ServiceR
     body: JSON.stringify(payload),
   })
   return handleResponse<ServiceReviewItem>(response)
+}
+
+export const fetchUserReviews = async (params?: { keyword?: string }): Promise<ServiceReviewItem[]> => {
+  const url = new URL(buildUrl('/api/user/services/reviews'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<ServiceReviewItem[]>(response)
+}
+
+export const deleteUserReview = async (reviewId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/user/services/reviews/${reviewId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteUserReviews = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/user/services/reviews/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const fetchDashboardCarousels = async (params?: { keyword?: string }): Promise<DashboardCarouselItem[]> => {
@@ -657,9 +719,28 @@ export const handleCompanyRefund = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchCompanyOrders = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services/orders'), withAuthHeaders())
+export const fetchCompanyOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/company/services/orders'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const deleteCompanyOrder = async (orderId: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/company/services/orders/${orderId}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteCompanyOrders = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/company/services/orders/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const updateCompanyOrderProgress = async (

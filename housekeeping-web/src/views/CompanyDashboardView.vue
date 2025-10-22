@@ -326,12 +326,42 @@
               <h2>预约排班</h2>
               <p>掌握近期预约并同步上门进度，合理安排师傅日程。</p>
             </div>
-            <button type="button" class="secondary-button" @click="refreshAppointments">刷新预约</button>
+            <div class="service-actions">
+              <label class="visually-hidden" for="appointment-search">搜索预约</label>
+              <input
+                id="appointment-search"
+                v-model="appointmentSearch"
+                class="search-input"
+                type="search"
+                :disabled="appointmentsLoading"
+                placeholder="搜索服务、用户、电话或备注"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasOrderSelection || appointmentsLoading"
+                @click="handleBulkDeleteOrders"
+              >
+                删除选中<span v-if="selectedOrderCount">（{{ selectedOrderCount }}）</span>
+              </button>
+              <button type="button" class="secondary-button" :disabled="appointmentsLoading" @click="refreshAppointments">
+                刷新预约
+              </button>
+            </div>
           </header>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleOrdersSelected"
+                      :disabled="appointmentsLoading || !visibleCompanyOrders.length"
+                      @change="toggleSelectAllOrders(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选预约"
+                    />
+                  </th>
                   <th>服务</th>
                   <th>预约时间</th>
                   <th>用户</th>
@@ -342,7 +372,16 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="order in companyOrders" :key="order.id">
+                <tr v-for="order in visibleCompanyOrders" :key="order.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedOrderIds.has(order.id)"
+                      :disabled="appointmentsLoading"
+                      @change="toggleOrderSelection(order.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择预约 ${order.serviceName}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
@@ -392,7 +431,7 @@
                     <button
                       type="button"
                       class="link-button"
-                      :disabled="progressSaving[order.id]"
+                      :disabled="progressSaving[order.id] || appointmentsLoading"
                       @click="saveOrderProgress(order, 'SCHEDULED')"
                     >
                       重置
@@ -400,7 +439,7 @@
                     <button
                       type="button"
                       class="link-button"
-                      :disabled="progressSaving[order.id]"
+                      :disabled="progressSaving[order.id] || appointmentsLoading"
                       @click="saveOrderProgress(order, 'IN_PROGRESS')"
                     >
                       服务中
@@ -408,28 +447,142 @@
                     <button
                       type="button"
                       class="link-button"
-                      :disabled="progressSaving[order.id]"
+                      :disabled="progressSaving[order.id] || appointmentsLoading"
                       @click="saveOrderProgress(order, 'COMPLETED')"
                     >
                       完成
                     </button>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="appointmentsLoading"
+                      @click="handleDeleteOrder(order)"
+                    >
+                      删除
+                    </button>
                   </td>
                 </tr>
-                <tr v-if="!companyOrders.length">
-                  <td colspan="6" class="empty-row">暂无预约记录，用户预约后会自动出现在此处。</td>
+                <tr v-if="appointmentsLoading">
+                  <td colspan="8" class="empty-row">预约数据加载中…</td>
+                </tr>
+                <tr v-else-if="!visibleCompanyOrders.length">
+                  <td colspan="8" class="empty-row">
+                    <span v-if="hasAppointmentFilter">未找到匹配的预约，请调整搜索条件。</span>
+                    <span v-else>暂无预约记录，用户预约后会自动出现在此处。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </section>
 
-        <CompanyReviewsPanel
-          v-else-if="activeSection === 'reviews'"
-          class="panel immersive-panel"
-          :loading="reviewsLoading"
-          :reviews="companyReviews"
-          @refresh="loadCompanyReviews"
-        />
+        <section v-else-if="activeSection === 'reviews'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务口碑</h2>
+              <p>
+                平均评分 <strong class="metric-inline">{{ reviewStats.average }}</strong>
+                · 好评率 <strong class="metric-inline">{{ reviewStats.positiveRate }}</strong>
+                · 精选 {{ reviewStats.pinnedCount }} 条
+              </p>
+            </div>
+            <div class="service-actions">
+              <label class="visually-hidden" for="review-search">搜索评价</label>
+              <input
+                id="review-search"
+                v-model="reviewSearch"
+                class="search-input"
+                type="search"
+                :disabled="reviewsLoading"
+                placeholder="搜索服务、用户或评价内容"
+              />
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasReviewSelection || reviewsLoading"
+                @click="handleBulkDeleteReviews"
+              >
+                删除选中<span v-if="selectedReviewCount">（{{ selectedReviewCount }}）</span>
+              </button>
+              <button type="button" class="secondary-button" :disabled="reviewsLoading" @click="loadCompanyReviews">
+                刷新评价
+              </button>
+            </div>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allVisibleReviewsSelected"
+                      :disabled="reviewsLoading || !visibleCompanyReviews.length"
+                      @change="toggleSelectAllReviews(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选评价"
+                    />
+                  </th>
+                  <th>服务与评分</th>
+                  <th>用户</th>
+                  <th>评价内容</th>
+                  <th>回复</th>
+                  <th class="table-actions">时间与操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="review in visibleCompanyReviews" :key="review.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedReviewIds.has(review.id)"
+                      :disabled="reviewsLoading"
+                      @change="toggleReviewSelection(review.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择评价 ${review.serviceName}`"
+                    />
+                  </td>
+                  <td>
+                    <div class="review-service">
+                      <strong>{{ review.serviceName }}</strong>
+                      <span v-if="review.pinned" class="pinned-badge">精选</span>
+                    </div>
+                    <div class="review-rating">评分：{{ review.rating }} 分</div>
+                  </td>
+                  <td>
+                    <div class="review-author">{{ review.username }}</div>
+                    <div class="order-subtext">{{ formatDateTime(review.createdAt) }}</div>
+                  </td>
+                  <td>
+                    <p class="review-text">{{ review.content || '用户未留下文字评价' }}</p>
+                  </td>
+                  <td>
+                    <p v-if="review.companyReply" class="review-text">{{ review.companyReply }}</p>
+                    <span v-else class="order-subtext muted">—</span>
+                  </td>
+                  <td class="table-actions actions-inline">
+                    <span class="order-subtext">更新于 {{ formatDateTime(review.updatedAt) }}</span>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="reviewsLoading"
+                      @click="handleDeleteReview(review)"
+                    >
+                      删除
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="reviewsLoading">
+                  <td colspan="6" class="empty-row">评价数据加载中…</td>
+                </tr>
+                <tr v-else-if="!visibleCompanyReviews.length">
+                  <td colspan="6" class="empty-row">
+                    <span v-if="hasReviewFilter">未找到匹配的评价，请尝试更换关键词。</span>
+                    <span v-else>暂时还没有客户评价，完成更多订单即可收集口碑。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         <CompanyMessagingPanel
           v-else-if="activeSection === 'messages'"
@@ -519,6 +672,10 @@ import {
   deleteCompanyStaff,
   deleteCompanyStaffBatch,
   assignCompanyStaff,
+  deleteCompanyOrder,
+  deleteCompanyOrders,
+  deleteCompanyReview,
+  deleteCompanyReviews,
   type AccountProfileItem,
   type CompanyServicePayload,
   type CompanyConversationItem,
@@ -531,7 +688,6 @@ import {
   type CompanyStaffPayload,
 } from '../services/dashboard'
 
-import CompanyReviewsPanel from '../pages/company/CompanyReviewsPanel.vue'
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
 import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
@@ -581,6 +737,9 @@ const selectedServiceIds = ref<Set<number>>(new Set())
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const refundOrders = ref<ServiceOrderItem[]>([])
 const companyOrders = ref<ServiceOrderItem[]>([])
+const appointmentsLoading = ref(false)
+const appointmentSearch = ref('')
+const selectedOrderIds = ref<Set<number>>(new Set())
 const serviceFormVisible = ref(false)
 const serviceSaving = ref(false)
 const editingServiceId = ref<number | null>(null)
@@ -623,6 +782,8 @@ const hasStaffFilter = computed(() => staffSearch.value.trim().length > 0)
 const selectedStaffCount = computed(() => selectedStaffIds.value.size)
 
 const companyReviews = ref<ServiceReviewItem[]>([])
+const reviewSearch = ref('')
+const selectedReviewIds = ref<Set<number>>(new Set())
 const reviewsLoading = ref(false)
 const conversationSummaries = ref<CompanyConversationItem[]>([])
 const conversationsLoading = ref(false)
@@ -723,15 +884,101 @@ const clearStaffSelection = () => {
   selectedStaffIds.value = new Set()
 }
 
+const pruneOrderSelection = () => {
+  if (!selectedOrderIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(companyOrders.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedOrderIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedOrderIds.value = next
+  }
+}
+
+const toggleOrderSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedOrderIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedOrderIds.value = next
+}
+
+const toggleSelectAllOrders = (checked: boolean) => {
+  if (!checked) {
+    selectedOrderIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedOrderIds.value)
+  visibleCompanyOrders.value.forEach((item) => next.add(item.id))
+  selectedOrderIds.value = next
+}
+
+const clearOrderSelection = () => {
+  selectedOrderIds.value = new Set()
+}
+
+const pruneReviewSelection = () => {
+  if (!selectedReviewIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(companyReviews.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedReviewIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedReviewIds.value = next
+  }
+}
+
+const toggleReviewSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedReviewIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedReviewIds.value = next
+}
+
+const toggleSelectAllReviews = (checked: boolean) => {
+  if (!checked) {
+    selectedReviewIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedReviewIds.value)
+  visibleCompanyReviews.value.forEach((item) => next.add(item.id))
+  selectedReviewIds.value = next
+}
+
+const clearReviewSelection = () => {
+  selectedReviewIds.value = new Set()
+}
+
 watch(serviceSearch, () => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
   }
   serviceSearchTimer = setTimeout(async () => {
-  servicePage.value = 1
-  await loadServices()
-  serviceSearchTimer = null
-}, 300)
+    servicePage.value = 1
+    await loadServices()
+    serviceSearchTimer = null
+  }, 300)
 })
 
 watch(staffSearch, () => {
@@ -776,6 +1023,99 @@ const companyStats = computed(() => {
     staffCount,
   }
 })
+
+const normalizeSearchValue = (value: unknown) => {
+  if (value == null) {
+    return ''
+  }
+  return String(value).toLowerCase()
+}
+
+const matchesOrderSearch = (order: ServiceOrderItem, keyword: string) => {
+  if (!keyword) {
+    return true
+  }
+  const target = keyword.toLowerCase()
+  const fields = [
+    order.serviceName,
+    order.companyName,
+    order.contact,
+    order.username,
+    order.customerContactPhone,
+    order.customerAddress,
+    order.specialRequest,
+    order.serviceAddress,
+    order.progressNote,
+    order.refundReason,
+    order.assignedWorker,
+    order.workerContact,
+  ]
+  return fields.some((field) => normalizeSearchValue(field).includes(target))
+}
+
+const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
+  if (!keyword) {
+    return true
+  }
+  const target = keyword.toLowerCase()
+  const fields = [review.serviceName, review.username, review.content, review.companyReply]
+  return fields.some((field) => normalizeSearchValue(field).includes(target))
+}
+
+const visibleCompanyOrders = computed(() => {
+  const keyword = appointmentSearch.value.trim()
+  if (!keyword) {
+    return companyOrders.value
+  }
+  return companyOrders.value.filter((order) => matchesOrderSearch(order, keyword))
+})
+
+const hasAppointmentFilter = computed(() => appointmentSearch.value.trim().length > 0)
+
+const allVisibleOrdersSelected = computed(
+  () =>
+    visibleCompanyOrders.value.length > 0 &&
+    visibleCompanyOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
+)
+
+const selectedOrderCount = computed(() => selectedOrderIds.value.size)
+const hasOrderSelection = computed(() => selectedOrderIds.value.size > 0)
+
+const visibleCompanyReviews = computed(() => {
+  const keyword = reviewSearch.value.trim()
+  if (!keyword) {
+    return companyReviews.value
+  }
+  return companyReviews.value.filter((item) => matchesReviewSearch(item, keyword))
+})
+
+const hasReviewFilter = computed(() => reviewSearch.value.trim().length > 0)
+
+const allVisibleReviewsSelected = computed(
+  () =>
+    visibleCompanyReviews.value.length > 0 &&
+    visibleCompanyReviews.value.every((item) => selectedReviewIds.value.has(item.id)),
+)
+
+const selectedReviewCount = computed(() => selectedReviewIds.value.size)
+const hasReviewSelection = computed(() => selectedReviewIds.value.size > 0)
+
+const reviewStats = computed(() => {
+  if (!companyReviews.value.length) {
+    return { average: '0.0', positiveRate: '0%', pinnedCount: 0 }
+  }
+  const total = companyReviews.value.reduce((sum, item) => sum + item.rating, 0)
+  const average = (total / companyReviews.value.length).toFixed(1)
+  const positive = companyReviews.value.filter((item) => item.rating >= 4).length
+  const positiveRate = `${Math.round((positive / companyReviews.value.length) * 100)}%`
+  const pinnedCount = companyReviews.value.filter((item) => item.pinned).length
+  return { average, positiveRate, pinnedCount }
+})
+
+watch(companyOrders, pruneOrderSelection)
+watch(visibleCompanyOrders, pruneOrderSelection)
+watch(companyReviews, pruneReviewSelection)
+watch(visibleCompanyReviews, pruneReviewSelection)
 
 const selectedServiceCount = computed(() => selectedServiceIds.value.size)
 const hasServiceSelection = computed(() => selectedServiceIds.value.size > 0)
@@ -1006,6 +1346,37 @@ const assignStaffToOrder = async (order: ServiceOrderItem) => {
   }
 }
 
+const handleDeleteOrder = async (order: ServiceOrderItem) => {
+  if (!window.confirm(`确认删除预约“${order.serviceName}”（${order.username}）吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyOrder(order.id)
+    const next = new Set(selectedOrderIds.value)
+    next.delete(order.id)
+    selectedOrderIds.value = next
+    await loadCompanyOrders()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除预约失败')
+  }
+}
+
+const handleBulkDeleteOrders = async () => {
+  if (!selectedOrderIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedOrderIds.value.size} 条预约记录吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyOrders(Array.from(selectedOrderIds.value))
+    clearOrderSelection()
+    await loadCompanyOrders()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '批量删除失败')
+  }
+}
+
 const refreshAppointments = async () => {
   await Promise.all([loadCompanyOrders(), loadStaff()])
 }
@@ -1065,10 +1436,42 @@ const loadCompanyReviews = async () => {
   reviewsLoading.value = true
   try {
     companyReviews.value = await fetchCompanyReviews()
+    pruneReviewSelection()
   } catch (error) {
     console.error(error)
   } finally {
     reviewsLoading.value = false
+  }
+}
+
+const handleDeleteReview = async (item: ServiceReviewItem) => {
+  if (!window.confirm(`确认删除服务“${item.serviceName}”的这条评价吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyReview(item.id)
+    const next = new Set(selectedReviewIds.value)
+    next.delete(item.id)
+    selectedReviewIds.value = next
+    await loadCompanyReviews()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除评价失败')
+  }
+}
+
+const handleBulkDeleteReviews = async () => {
+  if (!selectedReviewIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedReviewIds.value.size} 条评价吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyReviews(Array.from(selectedReviewIds.value))
+    clearReviewSelection()
+    await loadCompanyReviews()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '批量删除评价失败')
   }
 }
 
@@ -1305,6 +1708,7 @@ const loadRefunds = async () => {
 }
 
 const loadCompanyOrders = async () => {
+  appointmentsLoading.value = true
   try {
     const result = await fetchCompanyOrders()
     companyOrders.value = result
@@ -1313,8 +1717,11 @@ const loadCompanyOrders = async () => {
       staffAssignments[item.id] = ''
       staffAssignmentSaving[item.id] = false
     })
+    pruneOrderSelection()
   } catch (error) {
     console.error(error)
+  } finally {
+    appointmentsLoading.value = false
   }
 }
 
@@ -1656,6 +2063,42 @@ onUnmounted(() => {
   gap: 12px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.metric-inline {
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.review-service {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pinned-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.2);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.review-rating {
+  margin-top: 6px;
+  color: var(--brand-text-muted);
+  font-size: 13px;
+}
+
+.review-author {
+  font-weight: 600;
+}
+
+.review-text {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--brand-text);
 }
 
 .staff-actions {

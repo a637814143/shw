@@ -13,10 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.Instant;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 用户评价相关业务。
@@ -63,7 +66,7 @@ public class ServiceReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceReviewResponse> listReviewsForCurrentCompany() {
+    public List<ServiceReviewResponse> listReviewsForCurrentCompany(String keyword) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
 
@@ -72,15 +75,100 @@ public class ServiceReviewService {
             return Collections.emptyList();
         }
 
+        String normalizedKeyword = normalizeKeyword(keyword);
+
         return serviceReviewRepository.findByServiceInOrderByCreatedAtDesc(services).stream()
+            .filter(review -> matchesReviewKeyword(review, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ServiceReviewResponse> listReviewsForCurrentUser(String keyword) {
+        UserAll user = accountLookupService.getCurrentAccount();
+        ensureRole(user, AccountRole.USER);
+
+        String normalizedKeyword = normalizeKeyword(keyword);
+
+        return serviceReviewRepository.findByUserOrderByCreatedAtDesc(user).stream()
+            .filter(review -> matchesReviewKeyword(review, normalizedKeyword))
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteReviewsForCurrentCompany(List<Long> ids) {
+        UserAll company = accountLookupService.getCurrentAccount();
+        ensureRole(company, AccountRole.COMPANY);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        Set<Long> allowedServiceIds = housekeepServiceRepository.findByCompany(company).stream()
+            .map(HousekeepService::getId)
+            .collect(Collectors.toSet());
+        if (allowedServiceIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> distinctIds = new HashSet<>(ids);
+        List<ServiceReview> reviews = serviceReviewRepository.findAllById(distinctIds);
+        List<ServiceReview> permitted = reviews.stream()
+            .filter(review -> review.getService() != null)
+            .filter(review -> allowedServiceIds.contains(review.getService().getId()))
+            .collect(Collectors.toList());
+        if (permitted.isEmpty()) {
+            return;
+        }
+        serviceReviewRepository.deleteAll(permitted);
+    }
+
+    @Transactional
+    public void deleteReviewsForCurrentUser(List<Long> ids) {
+        UserAll user = accountLookupService.getCurrentAccount();
+        ensureRole(user, AccountRole.USER);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        Set<Long> distinctIds = new HashSet<>(ids);
+        List<ServiceReview> reviews = serviceReviewRepository.findAllById(distinctIds);
+        List<ServiceReview> permitted = reviews.stream()
+            .filter(review -> review.getUser() != null && Objects.equals(review.getUser().getId(), user.getId()))
+            .collect(Collectors.toList());
+        if (permitted.isEmpty()) {
+            return;
+        }
+        serviceReviewRepository.deleteAll(permitted);
     }
 
     private void ensureRole(UserAll account, AccountRole expectedRole) {
         if (!expectedRole.getLabel().equals(account.getUserType())) {
             throw new RuntimeException("权限不足");
         }
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        return trimmed.isEmpty() ? null : trimmed.toLowerCase();
+    }
+
+    private boolean matchesReviewKeyword(ServiceReview review, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return Stream.of(
+                review.getService() != null ? review.getService().getName() : null,
+                review.getUser() != null ? review.getUser().getUsername() : null,
+                review.getContent(),
+                review.getCompanyReply()
+            )
+            .filter(Objects::nonNull)
+            .map(String::toLowerCase)
+            .anyMatch(value -> value.contains(keyword));
     }
 
     private ServiceReviewResponse mapToResponse(ServiceReview review) {
