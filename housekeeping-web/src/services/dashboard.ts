@@ -80,6 +80,33 @@ export interface CompanyServicePage {
   averagePrice: number
 }
 
+export interface PaginatedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface OrderStatsSummary {
+  total: number
+  awaiting: number
+  inProgress: number
+  refunding: number
+  completed: number
+}
+
+export interface ReviewableServiceOption {
+  id: number
+  name: string
+  companyName: string
+}
+
+export interface UserOrderPageResult extends PaginatedResult<ServiceOrderItem> {
+  stats: OrderStatsSummary
+  upcomingOrders: ServiceOrderItem[]
+  reviewableServices: ReviewableServiceOption[]
+}
+
 export interface ServiceOrderItem {
   id: number
   serviceId: number
@@ -364,13 +391,23 @@ export const fetchServiceReviews = async (serviceId: number): Promise<ServiceRev
   return handleResponse<ServiceReviewItem[]>(response)
 }
 
-export const fetchCompanyReviews = async (params?: { keyword?: string }): Promise<ServiceReviewItem[]> => {
+export const fetchCompanyReviews = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceReviewItem>> => {
   const url = new URL(buildUrl('/api/company/services/reviews'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<ServiceReviewItem[]>(response)
+  return handleResponse<PaginatedResult<ServiceReviewItem>>(response)
 }
 
 export const deleteCompanyReview = async (reviewId: number): Promise<void> => {
@@ -398,13 +435,23 @@ export const fetchUserServices = async (params?: { keyword?: string }): Promise<
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
-export const fetchUserOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+export const fetchUserOrders = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<UserOrderPageResult> => {
   const url = new URL(buildUrl('/api/user/services/orders'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
+  return handleResponse<UserOrderPageResult>(response)
 }
 
 export const deleteUserOrder = async (orderId: number): Promise<void> => {
@@ -449,13 +496,23 @@ export const submitUserReview = async (payload: ReviewPayload): Promise<ServiceR
   return handleResponse<ServiceReviewItem>(response)
 }
 
-export const fetchUserReviews = async (params?: { keyword?: string }): Promise<ServiceReviewItem[]> => {
+export const fetchUserReviews = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceReviewItem>> => {
   const url = new URL(buildUrl('/api/user/services/reviews'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<ServiceReviewItem[]>(response)
+  return handleResponse<PaginatedResult<ServiceReviewItem>>(response)
 }
 
 export const deleteUserReview = async (reviewId: number): Promise<void> => {
@@ -647,13 +704,23 @@ export const deleteCompanyServices = async (ids: number[]): Promise<void> => {
   await handleResponse<null>(response)
 }
 
-export const fetchCompanyStaff = async (params?: { keyword?: string }): Promise<CompanyStaffItem[]> => {
+export const fetchCompanyStaff = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<CompanyStaffItem>> => {
   const url = new URL(buildUrl('/api/company/staff'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<CompanyStaffItem[]>(response)
+  return handleResponse<PaginatedResult<CompanyStaffItem>>(response)
 }
 
 export const createCompanyStaff = async (
@@ -703,9 +770,23 @@ export const assignCompanyStaff = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchCompanyRefunds = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services/refunds'), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
+export const fetchCompanyRefunds = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceOrderItem>> => {
+  const url = new URL(buildUrl('/api/company/services/refunds'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaginatedResult<ServiceOrderItem>>(response)
 }
 
 export const handleCompanyRefund = async (
@@ -719,13 +800,23 @@ export const handleCompanyRefund = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchCompanyOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+export const fetchCompanyOrders = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceOrderItem>> => {
   const url = new URL(buildUrl('/api/company/services/orders'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
+  return handleResponse<PaginatedResult<ServiceOrderItem>>(response)
 }
 
 export const deleteCompanyOrder = async (orderId: number): Promise<void> => {
@@ -850,7 +941,9 @@ export const deleteAdminUsers = async (ids: number[]): Promise<void> => {
 export const fetchAdminRefunds = async (params?: {
   stage?: 'pending' | 'processed' | 'all'
   keyword?: string
-}): Promise<ServiceOrderItem[]> => {
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceOrderItem>> => {
   const url = new URL(buildUrl('/api/admin/refunds'))
   if (params?.stage) {
     url.searchParams.set('stage', params.stage)
@@ -858,8 +951,14 @@ export const fetchAdminRefunds = async (params?: {
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
+  return handleResponse<PaginatedResult<ServiceOrderItem>>(response)
 }
 
 export const handleAdminRefund = async (
@@ -921,9 +1020,23 @@ export const fetchAdminManagers = async (): Promise<UserAccountItem[]> => {
   return handleResponse<UserAccountItem[]>(response)
 }
 
-export const fetchAdminOrders = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/orders'), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
+export const fetchAdminOrders = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceOrderItem>> => {
+  const url = new URL(buildUrl('/api/admin/orders'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaginatedResult<ServiceOrderItem>>(response)
 }
 
 export const assignAdminWorker = async (
@@ -937,14 +1050,42 @@ export const assignAdminWorker = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchAdminTransactions = async (): Promise<AccountTransactionItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/transactions'), withAuthHeaders())
-  return handleResponse<AccountTransactionItem[]>(response)
+export const fetchAdminTransactions = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<AccountTransactionItem>> => {
+  const url = new URL(buildUrl('/api/admin/transactions'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaginatedResult<AccountTransactionItem>>(response)
 }
 
-export const fetchAdminFavorites = async (): Promise<ServiceFavoriteItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/favorites'), withAuthHeaders())
-  return handleResponse<ServiceFavoriteItem[]>(response)
+export const fetchAdminFavorites = async (params?: {
+  keyword?: string
+  page?: number
+  size?: number
+}): Promise<PaginatedResult<ServiceFavoriteItem>> => {
+  const url = new URL(buildUrl('/api/admin/favorites'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (params?.page) {
+    url.searchParams.set('page', String(params.page))
+  }
+  if (params?.size) {
+    url.searchParams.set('size', String(params.size))
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<PaginatedResult<ServiceFavoriteItem>>(response)
 }
 
 export const createDashboardTip = async (payload: DashboardTipItem): Promise<DashboardTipItem> => {

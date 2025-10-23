@@ -293,6 +293,7 @@
               >
                 删除选中<span v-if="selectedOrderCount">（{{ selectedOrderCount }}）</span>
               </button>
+              <span class="service-hint">共 {{ orderTotal }} 单，每页显示 {{ orderSize }} 单</span>
               <button type="button" class="secondary-button" :disabled="ordersLoading" @click="loadOrders">
                 刷新订单
               </button>
@@ -400,6 +401,30 @@
                 </tr>
               </tbody>
             </table>
+            <div v-if="orderTotal > orderSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="ordersLoading || orderPage === 1"
+                  @click="changeOrderPage(orderPage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ orderPage }} / {{ orderTotalPages }} 页 · 显示
+                  {{ orderPageStart }}-{{ orderPageEnd }} 单，共 {{ orderTotal }} 单
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="ordersLoading || orderPage === orderTotalPages"
+                  @click="changeOrderPage(orderPage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="upcomingOrders.length" class="schedule-timeline">
             <h3>我的预约日程</h3>
@@ -505,6 +530,7 @@
             >
               删除选中<span v-if="selectedUserReviewCount">（{{ selectedUserReviewCount }}）</span>
             </button>
+            <span class="service-hint">共 {{ reviewTotal }} 条，每页显示 {{ reviewSize }} 条</span>
             <button type="button" class="secondary-button" :disabled="userReviewsLoading" @click="loadUserReviews">
               刷新评价
             </button>
@@ -570,6 +596,30 @@
                 </tr>
               </tbody>
             </table>
+            <div v-if="reviewTotal > reviewSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="userReviewsLoading || reviewPage === 1"
+                  @click="changeReviewPage(reviewPage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ reviewPage }} / {{ reviewTotalPages }} 页 · 显示
+                  {{ reviewPageStart }}-{{ reviewPageEnd }} 条，共 {{ reviewTotal }} 条
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="userReviewsLoading || reviewPage === reviewTotalPages"
+                  @click="changeReviewPage(reviewPage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -621,6 +671,8 @@ import {
   type HousekeepServiceItem,
   type ServiceFavoriteItem,
   type ServiceOrderItem,
+  type OrderStatsSummary,
+  type ReviewableServiceOption,
   type ServiceReviewItem,
   type UserConversationItem,
 } from '../services/dashboard'
@@ -648,12 +700,29 @@ const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const orders = ref<ServiceOrderItem[]>([])
+const orderStats = reactive<OrderStatsSummary>({
+  total: 0,
+  awaiting: 0,
+  inProgress: 0,
+  refunding: 0,
+  completed: 0,
+})
+const upcomingOrders = ref<ServiceOrderItem[]>([])
+const reviewableServices = ref<ReviewableServiceOption[]>([])
 const ordersLoading = ref(false)
+const orderPage = ref(1)
+const orderSize = ref(5)
+const orderTotal = ref(0)
 const orderSearch = ref('')
+let orderSearchTimer: ReturnType<typeof setTimeout> | null = null
 const selectedOrderIds = ref<Set<number>>(new Set())
 const userReviews = ref<ServiceReviewItem[]>([])
 const userReviewsLoading = ref(false)
 const reviewSearch = ref('')
+const reviewPage = ref(1)
+const reviewSize = ref(5)
+const reviewTotal = ref(0)
+let reviewSearchTimer: ReturnType<typeof setTimeout> | null = null
 const selectedUserReviewIds = ref<Set<number>>(new Set())
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -746,49 +815,7 @@ const paymentQrSrc = computed(() => {
   return `${base}?size=240x240&data=${encodeURIComponent(link)}`
 })
 
-const normalizeUserSearchValue = (value: unknown) => {
-  if (value == null) {
-    return ''
-  }
-  return String(value).toLowerCase()
-}
-
-const matchesUserOrderSearch = (order: ServiceOrderItem, keyword: string) => {
-  if (!keyword) {
-    return true
-  }
-  const target = keyword.toLowerCase()
-  const fields = [
-    order.serviceName,
-    order.companyName,
-    order.contact,
-    order.username,
-    order.specialRequest,
-    order.serviceAddress,
-    order.progressNote,
-    order.assignedWorker,
-    order.workerContact,
-    order.refundReason,
-  ]
-  return fields.some((field) => normalizeUserSearchValue(field).includes(target))
-}
-
-const matchesUserReviewSearch = (review: ServiceReviewItem, keyword: string) => {
-  if (!keyword) {
-    return true
-  }
-  const target = keyword.toLowerCase()
-  const fields = [review.serviceName, String(review.rating), review.content]
-  return fields.some((field) => normalizeUserSearchValue(field).includes(target))
-}
-
-const visibleOrders = computed(() => {
-  const keyword = orderSearch.value.trim()
-  if (!keyword) {
-    return orders.value
-  }
-  return orders.value.filter((order) => matchesUserOrderSearch(order, keyword))
-})
+const visibleOrders = computed(() => orders.value)
 
 const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
 
@@ -799,13 +826,15 @@ const allVisibleOrdersSelected = computed(
 const selectedOrderCount = computed(() => selectedOrderIds.value.size)
 const hasOrderSelection = computed(() => selectedOrderIds.value.size > 0)
 
-const visibleUserReviews = computed(() => {
-  const keyword = reviewSearch.value.trim()
-  if (!keyword) {
-    return userReviews.value
-  }
-  return userReviews.value.filter((item) => matchesUserReviewSearch(item, keyword))
-})
+const orderTotalPages = computed(() => Math.max(1, Math.ceil((orderTotal.value || 0) / orderSize.value)))
+const orderPageStart = computed(() =>
+  orderTotal.value === 0 ? 0 : (orderPage.value - 1) * orderSize.value + 1,
+)
+const orderPageEnd = computed(() =>
+  orderTotal.value === 0 ? 0 : Math.min(orderTotal.value, orderPage.value * orderSize.value),
+)
+
+const visibleUserReviews = computed(() => userReviews.value)
 
 const hasUserReviewFilter = computed(() => reviewSearch.value.trim().length > 0)
 
@@ -818,42 +847,13 @@ const allVisibleUserReviewsSelected = computed(
 const selectedUserReviewCount = computed(() => selectedUserReviewIds.value.size)
 const hasUserReviewSelection = computed(() => selectedUserReviewIds.value.size > 0)
 
-const orderStats = computed(() => {
-  const total = visibleOrders.value.length
-  const awaiting = visibleOrders.value.filter((order) => order.status === 'SCHEDULED' || order.status === 'PENDING').length
-  const inProgress = visibleOrders.value.filter((order) => order.status === 'IN_PROGRESS').length
-  const refunding = visibleOrders.value.filter((order) => order.status === 'REFUND_REQUESTED').length
-  const completed = visibleOrders.value.filter((order) => order.status === 'COMPLETED').length
-  return {
-    total,
-    awaiting,
-    inProgress,
-    refunding,
-    completed,
-  }
-})
-
-const upcomingOrders = computed(() => {
-  return orders.value
-    .filter((order) => ['SCHEDULED', 'PENDING', 'IN_PROGRESS'].includes(order.status))
-    .slice()
-    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-    .slice(0, 5)
-})
-
-const reviewableServices = computed(() => {
-  const uniqueMap = new Map<number, { id: number; name: string; companyName: string }>()
-  orders.value.forEach((order) => {
-    if (!uniqueMap.has(order.serviceId)) {
-      uniqueMap.set(order.serviceId, {
-        id: order.serviceId,
-        name: order.serviceName,
-        companyName: order.companyName,
-      })
-    }
-  })
-  return Array.from(uniqueMap.values())
-})
+const reviewTotalPages = computed(() => Math.max(1, Math.ceil((reviewTotal.value || 0) / reviewSize.value)))
+const reviewPageStart = computed(() =>
+  reviewTotal.value === 0 ? 0 : (reviewPage.value - 1) * reviewSize.value + 1,
+)
+const reviewPageEnd = computed(() =>
+  reviewTotal.value === 0 ? 0 : Math.min(reviewTotal.value, reviewPage.value * reviewSize.value),
+)
 
 const loadAccount = async () => {
   try {
@@ -861,6 +861,26 @@ const loadAccount = async () => {
   } catch (error) {
     console.error(error)
   }
+}
+
+const changeOrderPage = (page: number) => {
+  const totalPages = orderTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === orderPage.value) {
+    return
+  }
+  orderPage.value = target
+  loadOrders()
+}
+
+const changeReviewPage = (page: number) => {
+  const totalPages = reviewTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === reviewPage.value) {
+    return
+  }
+  reviewPage.value = target
+  loadUserReviews()
 }
 
 const handleProfileUpdated = (payload: AccountProfileItem) => {
@@ -980,7 +1000,32 @@ const loadServices = async () => {
 const loadOrders = async () => {
   ordersLoading.value = true
   try {
-    orders.value = await fetchUserOrders()
+    const keyword = orderSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: orderPage.value,
+      size: orderSize.value,
+    }
+    let result = await fetchUserOrders(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / orderSize.value))
+    if (orderPage.value > totalPages) {
+      orderPage.value = totalPages
+      result = await fetchUserOrders({ ...params, page: orderPage.value })
+    }
+    orders.value = result.items
+    orderTotal.value = result.total
+    orderPage.value = result.page || orderPage.value
+    orderSize.value = result.size || orderSize.value
+    const stats = result.stats || {
+      total: result.total ?? 0,
+      awaiting: 0,
+      inProgress: 0,
+      refunding: 0,
+      completed: 0,
+    }
+    Object.assign(orderStats, stats)
+    upcomingOrders.value = result.upcomingOrders ?? []
+    reviewableServices.value = result.reviewableServices ?? []
     pruneOrderSelection()
   } catch (error) {
     console.error(error)
@@ -1007,10 +1052,43 @@ watch(serviceSearch, () => {
   }, 300)
 })
 
+watch(orderSearch, () => {
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+  }
+  orderSearchTimer = setTimeout(async () => {
+    orderPage.value = 1
+    await loadOrders()
+    orderSearchTimer = null
+  }, 300)
+})
+
+watch(reviewSearch, () => {
+  if (reviewSearchTimer) {
+    clearTimeout(reviewSearchTimer)
+  }
+  reviewSearchTimer = setTimeout(async () => {
+    reviewPage.value = 1
+    await loadUserReviews()
+    reviewSearchTimer = null
+  }, 300)
+})
+
 watch(orders, pruneOrderSelection)
 watch(visibleOrders, pruneOrderSelection)
 watch(userReviews, pruneUserReviewSelection)
 watch(visibleUserReviews, pruneUserReviewSelection)
+watch(reviewableServices, (list: ReviewableServiceOption[]) => {
+  if (!list.length) {
+    reviewForm.serviceId = ''
+    return
+  }
+  const current = Number(reviewForm.serviceId)
+  const first = list[0]
+  if (!current || !list.some((item) => item.id === current)) {
+    reviewForm.serviceId = first?.id ?? ''
+  }
+})
 
 const loadDiscover = async () => {
   discoverLoading.value = true
@@ -1033,7 +1111,22 @@ const loadDiscover = async () => {
 const loadUserReviews = async () => {
   userReviewsLoading.value = true
   try {
-    userReviews.value = await fetchUserReviews()
+    const keyword = reviewSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: reviewPage.value,
+      size: reviewSize.value,
+    }
+    let result = await fetchUserReviews(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / reviewSize.value))
+    if (reviewPage.value > totalPages) {
+      reviewPage.value = totalPages
+      result = await fetchUserReviews({ ...params, page: reviewPage.value })
+    }
+    userReviews.value = result.items
+    reviewTotal.value = result.total
+    reviewPage.value = result.page || reviewPage.value
+    reviewSize.value = result.size || reviewSize.value
     pruneUserReviewSelection()
   } catch (error) {
     console.error(error)
@@ -1462,6 +1555,14 @@ onUnmounted(() => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
     serviceSearchTimer = null
+  }
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+    orderSearchTimer = null
+  }
+  if (reviewSearchTimer) {
+    clearTimeout(reviewSearchTimer)
+    reviewSearchTimer = null
   }
 })
 </script>

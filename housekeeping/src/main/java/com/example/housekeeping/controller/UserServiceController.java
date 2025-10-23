@@ -3,12 +3,14 @@ package com.example.housekeeping.controller;
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.dto.IdListRequest;
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.dto.ServiceReviewResponse;
+import com.example.housekeeping.dto.UserOrderPageResponse;
 import com.example.housekeeping.service.HousekeepServiceManager;
 import com.example.housekeeping.service.ServiceFavoriteService;
 import com.example.housekeeping.service.ServiceOrderService;
@@ -45,10 +47,14 @@ public class UserServiceController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listOrders(
-        @RequestParam(value = "keyword", required = false) String keyword
+    public Result<UserOrderPageResponse> listOrders(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(serviceOrderService.listOrdersForCurrentUser(keyword));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : size;
+        return Result.success(serviceOrderService.listOrdersForCurrentUser(keyword, safePage, safeSize));
     }
 
     @GetMapping("/favorites")
@@ -97,10 +103,14 @@ public class UserServiceController {
     }
 
     @GetMapping("/reviews")
-    public Result<List<ServiceReviewResponse>> listReviews(
-        @RequestParam(value = "keyword", required = false) String keyword
+    public Result<PageResponse<ServiceReviewResponse>> listReviews(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(serviceReviewService.listReviewsForCurrentUser(keyword));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : size;
+        return Result.success(serviceReviewService.listReviewsForCurrentUser(keyword, safePage, safeSize));
     }
 
     @DeleteMapping("/reviews/{reviewId}")

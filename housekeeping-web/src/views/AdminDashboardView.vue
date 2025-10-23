@@ -235,6 +235,18 @@
               {{ ordersLoading ? '刷新中…' : '刷新列表' }}
             </button>
           </header>
+          <div class="service-actions">
+            <label class="visually-hidden" for="admin-order-search">搜索预约</label>
+            <input
+              id="admin-order-search"
+              v-model="orderSearch"
+              class="search-input"
+              type="search"
+              :disabled="ordersLoading"
+              placeholder="搜索服务、用户或指派信息"
+            />
+            <span class="service-hint">共 {{ orderTotal }} 条，每页显示 {{ orderSize }} 条</span>
+          </div>
           <div v-if="ordersLoading" class="loading-state">正在获取预约数据…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
@@ -286,10 +298,37 @@
                   </td>
                 </tr>
                 <tr v-if="!adminOrders.length">
-                  <td colspan="5" class="empty-row">暂无预约数据。</td>
+                  <td colspan="5" class="empty-row">
+                    <span v-if="hasOrderFilter">未找到匹配的预约记录，请调整搜索条件。</span>
+                    <span v-else>暂无预约数据。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="orderTotal > orderSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="ordersLoading || orderPage === 1"
+                  @click="changeOrderPage(orderPage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ orderPage }} / {{ orderTotalPages }} 页 · 显示
+                  {{ orderPageStart }}-{{ orderPageEnd }} 条，共 {{ orderTotal }} 条
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="ordersLoading || orderPage === orderTotalPages"
+                  @click="changeOrderPage(orderPage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -303,6 +342,18 @@
               {{ transactionsLoading ? '刷新中…' : '刷新流水' }}
             </button>
           </header>
+          <div class="service-actions">
+            <label class="visually-hidden" for="transaction-search">搜索流水</label>
+            <input
+              id="transaction-search"
+              v-model="transactionSearch"
+              class="search-input"
+              type="search"
+              :disabled="transactionsLoading"
+              placeholder="搜索账号、类型或备注"
+            />
+            <span class="service-hint">共 {{ transactionTotal }} 条，每页显示 {{ transactionSize }} 条</span>
+          </div>
           <div v-if="transactionsLoading" class="loading-state">正在同步流水记录…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
@@ -324,10 +375,37 @@
                   <td>{{ item.note || '—' }}</td>
                 </tr>
                 <tr v-if="!transactions.length">
-                  <td colspan="5" class="empty-row">暂无充值或调整记录。</td>
+                  <td colspan="5" class="empty-row">
+                    <span v-if="hasTransactionFilter">未找到匹配的流水，请调整搜索关键词。</span>
+                    <span v-else>暂无充值或调整记录。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="transactionTotal > transactionSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="transactionsLoading || transactionPage === 1"
+                  @click="changeTransactionPage(transactionPage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ transactionPage }} / {{ transactionTotalPages }} 页 · 显示
+                  {{ transactionPageStart }}-{{ transactionPageEnd }} 条，共 {{ transactionTotal }} 条
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="transactionsLoading || transactionPage === transactionTotalPages"
+                  @click="changeTransactionPage(transactionPage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -341,6 +419,18 @@
               {{ favoritesLoading ? '刷新中…' : '刷新数据' }}
             </button>
           </header>
+          <div class="service-actions">
+            <label class="visually-hidden" for="favorite-search">搜索收藏</label>
+            <input
+              id="favorite-search"
+              v-model="favoriteSearch"
+              class="search-input"
+              type="search"
+              :disabled="favoritesLoading"
+              placeholder="搜索用户、服务或公司"
+            />
+            <span class="service-hint">共 {{ favoriteTotal }} 条，每页显示 {{ favoriteSize }} 条</span>
+          </div>
           <div v-if="favoritesLoading" class="loading-state">正在加载收藏列表…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
@@ -360,10 +450,37 @@
                   <td>{{ formatDateTime(item.createdAt) }}</td>
                 </tr>
                 <tr v-if="!favorites.length">
-                  <td colspan="4" class="empty-row">暂未产生收藏数据。</td>
+                  <td colspan="4" class="empty-row">
+                    <span v-if="hasFavoriteFilter">未找到匹配的收藏记录，请调整搜索条件。</span>
+                    <span v-else>暂未产生收藏数据。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            <div v-if="favoriteTotal > favoriteSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="favoritesLoading || favoritePage === 1"
+                  @click="changeFavoritePage(favoritePage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ favoritePage }} / {{ favoriteTotalPages }} 页 · 显示
+                  {{ favoritePageStart }}-{{ favoritePageEnd }} 条，共 {{ favoriteTotal }} 条
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="favoritesLoading || favoritePage === favoriteTotalPages"
+                  @click="changeFavoritePage(favoritePage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -653,6 +770,7 @@
                 placeholder="搜索服务/用户/公司"
                 :disabled="refundsLoading"
               />
+              <span class="service-hint">共 {{ refundTotal }} 条，每页显示 {{ refundSize }} 条</span>
               <button
                 type="button"
                 class="secondary-button danger"
@@ -732,6 +850,30 @@
                 </tr>
               </tbody>
             </table>
+            <div v-if="refundTotal > refundSize" class="table-footer">
+              <div class="pagination">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="refundsLoading || refundPage === 1"
+                  @click="changeRefundPage(refundPage - 1)"
+                >
+                  上一页
+                </button>
+                <span>
+                  第 {{ refundPage }} / {{ refundTotalPages }} 页 · 显示
+                  {{ refundPageStart }}-{{ refundPageEnd }} 条，共 {{ refundTotal }} 条
+                </span>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="refundsLoading || refundPage === refundTotalPages"
+                  @click="changeRefundPage(refundPage + 1)"
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </main>
@@ -823,18 +965,36 @@ let userSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const adminOrders = ref<ServiceOrderItem[]>([])
 const ordersLoading = ref(false)
+const orderSearch = ref('')
+const orderPage = ref(1)
+const orderSize = ref(5)
+const orderTotal = ref(0)
+let orderSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const transactions = ref<AccountTransactionItem[]>([])
 const transactionsLoading = ref(false)
+const transactionSearch = ref('')
+const transactionPage = ref(1)
+const transactionSize = ref(5)
+const transactionTotal = ref(0)
+let transactionSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const favorites = ref<ServiceFavoriteItem[]>([])
 const favoritesLoading = ref(false)
+const favoriteSearch = ref('')
+const favoritePage = ref(1)
+const favoriteSize = ref(5)
+const favoriteTotal = ref(0)
+let favoriteSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const refundOrders = ref<ServiceOrderItem[]>([])
 const refundsLoading = ref(false)
 const pendingRefundCount = ref(0)
 const refundStage = ref<'pending' | 'processed' | 'all'>('pending')
 const refundSearch = ref('')
+const refundPage = ref(1)
+const refundSize = ref(5)
+const refundTotal = ref(0)
 const selectedRefundIds = ref<Set<number>>(new Set())
 let refundSearchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -844,6 +1004,42 @@ const allUsersSelected = computed(
   () => users.value.length > 0 && users.value.every((user) => selectedUserIds.value.has(user.id)),
 )
 const hasUserFilter = computed(() => userSearch.value.trim().length > 0)
+
+const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
+const hasTransactionFilter = computed(() => transactionSearch.value.trim().length > 0)
+const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
+
+const orderTotalPages = computed(() => Math.max(1, Math.ceil((orderTotal.value || 0) / orderSize.value)))
+const orderPageStart = computed(() =>
+  orderTotal.value === 0 ? 0 : (orderPage.value - 1) * orderSize.value + 1,
+)
+const orderPageEnd = computed(() =>
+  orderTotal.value === 0 ? 0 : Math.min(orderTotal.value, orderPage.value * orderSize.value),
+)
+
+const transactionTotalPages = computed(() => Math.max(1, Math.ceil((transactionTotal.value || 0) / transactionSize.value)))
+const transactionPageStart = computed(() =>
+  transactionTotal.value === 0 ? 0 : (transactionPage.value - 1) * transactionSize.value + 1,
+)
+const transactionPageEnd = computed(() =>
+  transactionTotal.value === 0 ? 0 : Math.min(transactionTotal.value, transactionPage.value * transactionSize.value),
+)
+
+const favoriteTotalPages = computed(() => Math.max(1, Math.ceil((favoriteTotal.value || 0) / favoriteSize.value)))
+const favoritePageStart = computed(() =>
+  favoriteTotal.value === 0 ? 0 : (favoritePage.value - 1) * favoriteSize.value + 1,
+)
+const favoritePageEnd = computed(() =>
+  favoriteTotal.value === 0 ? 0 : Math.min(favoriteTotal.value, favoritePage.value * favoriteSize.value),
+)
+
+const refundTotalPages = computed(() => Math.max(1, Math.ceil((refundTotal.value || 0) / refundSize.value)))
+const refundPageStart = computed(() =>
+  refundTotal.value === 0 ? 0 : (refundPage.value - 1) * refundSize.value + 1,
+)
+const refundPageEnd = computed(() =>
+  refundTotal.value === 0 ? 0 : Math.min(refundTotal.value, refundPage.value * refundSize.value),
+)
 
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -1079,6 +1275,46 @@ const switchSection = (key: SectionKey) => {
   }
 }
 
+const changeOrderPage = (page: number) => {
+  const totalPages = orderTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === orderPage.value) {
+    return
+  }
+  orderPage.value = target
+  loadAdminOrders()
+}
+
+const changeTransactionPage = (page: number) => {
+  const totalPages = transactionTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === transactionPage.value) {
+    return
+  }
+  transactionPage.value = target
+  loadTransactions()
+}
+
+const changeFavoritePage = (page: number) => {
+  const totalPages = favoriteTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === favoritePage.value) {
+    return
+  }
+  favoritePage.value = target
+  loadFavorites()
+}
+
+const changeRefundPage = (page: number) => {
+  const totalPages = refundTotalPages.value
+  const target = Math.min(Math.max(page, 1), totalPages)
+  if (target === refundPage.value) {
+    return
+  }
+  refundPage.value = target
+  loadRefunds()
+}
+
 const logout = () => {
   sessionStorage.removeItem(AUTH_TOKEN_KEY)
   sessionStorage.removeItem(AUTH_ACCOUNT_KEY)
@@ -1119,7 +1355,22 @@ const loadUsers = async () => {
 const loadAdminOrders = async () => {
   ordersLoading.value = true
   try {
-    adminOrders.value = await fetchAdminOrders()
+    const keyword = orderSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: orderPage.value,
+      size: orderSize.value,
+    }
+    let result = await fetchAdminOrders(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / orderSize.value))
+    if (orderPage.value > totalPages) {
+      orderPage.value = totalPages
+      result = await fetchAdminOrders({ ...params, page: orderPage.value })
+    }
+    adminOrders.value = result.items
+    orderTotal.value = result.total
+    orderPage.value = result.page || orderPage.value
+    orderSize.value = result.size || orderSize.value
     adminOrders.value.forEach((order) => {
       const edit = ensureAssignEdit(order.id)
       edit.workerName = order.assignedWorker ?? ''
@@ -1135,7 +1386,22 @@ const loadAdminOrders = async () => {
 const loadTransactions = async () => {
   transactionsLoading.value = true
   try {
-    transactions.value = await fetchAdminTransactions()
+    const keyword = transactionSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: transactionPage.value,
+      size: transactionSize.value,
+    }
+    let result = await fetchAdminTransactions(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / transactionSize.value))
+    if (transactionPage.value > totalPages) {
+      transactionPage.value = totalPages
+      result = await fetchAdminTransactions({ ...params, page: transactionPage.value })
+    }
+    transactions.value = result.items
+    transactionTotal.value = result.total
+    transactionPage.value = result.page || transactionPage.value
+    transactionSize.value = result.size || transactionSize.value
   } catch (error) {
     console.error(error)
   } finally {
@@ -1146,7 +1412,22 @@ const loadTransactions = async () => {
 const loadFavorites = async () => {
   favoritesLoading.value = true
   try {
-    favorites.value = await fetchAdminFavorites()
+    const keyword = favoriteSearch.value.trim()
+    const params = {
+      keyword: keyword ? keyword : undefined,
+      page: favoritePage.value,
+      size: favoriteSize.value,
+    }
+    let result = await fetchAdminFavorites(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / favoriteSize.value))
+    if (favoritePage.value > totalPages) {
+      favoritePage.value = totalPages
+      result = await fetchAdminFavorites({ ...params, page: favoritePage.value })
+    }
+    favorites.value = result.items
+    favoriteTotal.value = result.total
+    favoritePage.value = result.page || favoritePage.value
+    favoriteSize.value = result.size || favoriteSize.value
   } catch (error) {
     console.error(error)
   } finally {
@@ -1202,6 +1483,7 @@ const changeRefundStage = (stage: 'pending' | 'processed' | 'all') => {
     return
   }
   refundStage.value = stage
+  refundPage.value = 1
   clearRefundSelection()
   loadRefunds()
 }
@@ -1249,6 +1531,39 @@ watch(userSearch, () => {
   userSearchTimer = setTimeout(async () => {
     await loadUsers()
     userSearchTimer = null
+  }, 300)
+})
+
+watch(orderSearch, () => {
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+  }
+  orderSearchTimer = setTimeout(async () => {
+    orderPage.value = 1
+    await loadAdminOrders()
+    orderSearchTimer = null
+  }, 300)
+})
+
+watch(transactionSearch, () => {
+  if (transactionSearchTimer) {
+    clearTimeout(transactionSearchTimer)
+  }
+  transactionSearchTimer = setTimeout(async () => {
+    transactionPage.value = 1
+    await loadTransactions()
+    transactionSearchTimer = null
+  }, 300)
+})
+
+watch(favoriteSearch, () => {
+  if (favoriteSearchTimer) {
+    clearTimeout(favoriteSearchTimer)
+  }
+  favoriteSearchTimer = setTimeout(async () => {
+    favoritePage.value = 1
+    await loadFavorites()
+    favoriteSearchTimer = null
   }, 300)
 })
 
@@ -1335,6 +1650,7 @@ watch(refundSearch, () => {
     clearTimeout(refundSearchTimer)
   }
   refundSearchTimer = setTimeout(async () => {
+    refundPage.value = 1
     await loadRefunds()
     refundSearchTimer = null
   }, 300)
@@ -1344,17 +1660,30 @@ const loadRefunds = async () => {
   refundsLoading.value = true
   try {
     const keyword = refundSearch.value.trim()
-    refundOrders.value = await fetchAdminRefunds({
+    const params = {
       stage: refundStage.value,
       keyword: keyword ? keyword : undefined,
-    })
+      page: refundPage.value,
+      size: refundSize.value,
+    }
+    let result = await fetchAdminRefunds(params)
+    const totalPages = Math.max(1, Math.ceil((result.total || 0) / refundSize.value))
+    if (refundPage.value > totalPages) {
+      refundPage.value = totalPages
+      result = await fetchAdminRefunds({ ...params, page: refundPage.value })
+    }
+    refundOrders.value = result.items
+    refundTotal.value = result.total
+    refundPage.value = result.page || refundPage.value
+    refundSize.value = result.size || refundSize.value
     if (refundStage.value === 'pending') {
-      pendingRefundCount.value = refundOrders.value.length
+      pendingRefundCount.value = result.total ?? refundOrders.value.length
     }
     pruneRefundSelection()
   } catch (error) {
     console.error(error)
     refundOrders.value = []
+    refundTotal.value = 0
     clearRefundSelection()
   } finally {
     refundsLoading.value = false
@@ -1799,6 +2128,18 @@ onUnmounted(() => {
   if (refundSearchTimer) {
     clearTimeout(refundSearchTimer)
     refundSearchTimer = null
+  }
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+    orderSearchTimer = null
+  }
+  if (transactionSearchTimer) {
+    clearTimeout(transactionSearchTimer)
+    transactionSearchTimer = null
+  }
+  if (favoriteSearchTimer) {
+    clearTimeout(favoriteSearchTimer)
+    favoriteSearchTimer = null
   }
   if (carouselSearchTimer) {
     clearTimeout(carouselSearchTimer)

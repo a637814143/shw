@@ -2,10 +2,14 @@ package com.example.housekeeping.service;
 
 import com.example.housekeeping.dto.AssignWorkerRequest;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
+import com.example.housekeeping.dto.OrderStatsSummary;
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.dto.ReviewableServiceOption;
+import com.example.housekeeping.dto.UserOrderPageResponse;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
@@ -22,9 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -105,27 +113,34 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listOrdersForCurrentUser(String keyword) {
+    public UserOrderPageResponse listOrdersForCurrentUser(String keyword, int page, int size) {
         UserAll user = accountLookupService.getCurrentAccount();
         ensureRole(user, AccountRole.USER);
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findByUserOrderByCreatedAtDesc(user)
+        List<ServiceOrderResponse> responses = serviceOrderRepository.findByUserOrderByCreatedAtDesc(user)
             .stream()
             .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+
+        PageResponse<ServiceOrderResponse> base = PageResponse.from(responses, page, size);
+        OrderStatsSummary stats = buildOrderStats(responses);
+        List<ServiceOrderResponse> upcoming = buildUpcomingOrders(responses);
+        List<ReviewableServiceOption> reviewable = buildReviewableServices(responses);
+
+        return new UserOrderPageResponse(base, stats, upcoming, reviewable);
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listActiveOrdersForCompany(String keyword) {
+    public PageResponse<ServiceOrderResponse> listActiveOrdersForCompany(String keyword, int page, int size) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
-            return List.of();
+            return PageResponse.empty(size);
         }
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findByServiceIn(services).stream()
+        List<ServiceOrderResponse> responses = serviceOrderRepository.findByServiceIn(services).stream()
             .filter(order -> order.getStatus() == ServiceOrderStatus.SCHEDULED
                 || order.getStatus() == ServiceOrderStatus.IN_PROGRESS
                 || order.getStatus() == ServiceOrderStatus.PENDING)
@@ -133,6 +148,7 @@ public class ServiceOrderService {
             .sorted(Comparator.comparing(ServiceOrder::getScheduledAt))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional
@@ -158,17 +174,20 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listRefundRequestsForCompany() {
+    public PageResponse<ServiceOrderResponse> listRefundRequestsForCompany(String keyword, int page, int size) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
-            return List.of();
+            return PageResponse.empty(size);
         }
-        return serviceOrderRepository.findByServiceInAndStatus(services, ServiceOrderStatus.REFUND_REQUESTED)
+        String normalizedKeyword = normalizeKeyword(keyword);
+        List<ServiceOrderResponse> responses = serviceOrderRepository.findByServiceInAndStatus(services, ServiceOrderStatus.REFUND_REQUESTED)
             .stream()
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional
@@ -208,22 +227,23 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listRefundRequestsForAdmin() {
-        return listRefundsForAdmin("pending", null);
+    public PageResponse<ServiceOrderResponse> listRefundRequestsForAdmin(int page, int size) {
+        return listRefundsForAdmin("pending", null, page, size);
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listRefundsForAdmin(String stage, String keyword) {
+    public PageResponse<ServiceOrderResponse> listRefundsForAdmin(String stage, String keyword, int page, int size) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
         List<ServiceOrderStatus> statuses = resolveRefundStatuses(stage);
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findAll().stream()
+        List<ServiceOrderResponse> responses = serviceOrderRepository.findAll().stream()
             .filter(order -> statuses.contains(order.getStatus()))
             .filter(order -> matchesRefundKeyword(order, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceOrder::getUpdatedAt).reversed())
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional
@@ -344,13 +364,16 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listOrdersForAdmin() {
+    public PageResponse<ServiceOrderResponse> listOrdersForAdmin(String keyword, int page, int size) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
-        return serviceOrderRepository.findAll().stream()
+        String normalizedKeyword = normalizeKeyword(keyword);
+        List<ServiceOrderResponse> responses = serviceOrderRepository.findAll().stream()
             .sorted(Comparator.comparing(ServiceOrder::getCreatedAt).reversed())
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     private void ensureRole(UserAll account, AccountRole expectedRole) {
@@ -453,6 +476,70 @@ public class ServiceOrderService {
             .filter(Objects::nonNull)
             .map(String::toLowerCase)
             .anyMatch(value -> value.contains(lower));
+    }
+
+    private OrderStatsSummary buildOrderStats(List<ServiceOrderResponse> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return new OrderStatsSummary(0, 0, 0, 0, 0);
+        }
+        long awaiting = responses.stream()
+            .map(ServiceOrderResponse::getStatus)
+            .filter(this::isAwaitingStatus)
+            .count();
+        long inProgress = responses.stream()
+            .map(ServiceOrderResponse::getStatus)
+            .filter(status -> status == ServiceOrderStatus.IN_PROGRESS)
+            .count();
+        long refunding = responses.stream()
+            .map(ServiceOrderResponse::getStatus)
+            .filter(status -> status == ServiceOrderStatus.REFUND_REQUESTED)
+            .count();
+        long completed = responses.stream()
+            .map(ServiceOrderResponse::getStatus)
+            .filter(status -> status == ServiceOrderStatus.COMPLETED)
+            .count();
+        return new OrderStatsSummary(responses.size(), awaiting, inProgress, refunding, completed);
+    }
+
+    private List<ServiceOrderResponse> buildUpcomingOrders(List<ServiceOrderResponse> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return responses.stream()
+            .filter(response -> isAwaitingStatus(response.getStatus())
+                || response.getStatus() == ServiceOrderStatus.IN_PROGRESS)
+            .sorted(Comparator.comparing(
+                ServiceOrderResponse::getScheduledAt,
+                Comparator.nullsLast(Comparator.naturalOrder())
+            ))
+            .limit(5)
+            .collect(Collectors.toList());
+    }
+
+    private List<ReviewableServiceOption> buildReviewableServices(List<ServiceOrderResponse> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, ReviewableServiceOption> options = new LinkedHashMap<>();
+        for (ServiceOrderResponse response : responses) {
+            Long serviceId = response.getServiceId();
+            if (serviceId == null || options.containsKey(serviceId)) {
+                continue;
+            }
+            options.put(serviceId, new ReviewableServiceOption(
+                serviceId,
+                response.getServiceName(),
+                response.getCompanyName()
+            ));
+        }
+        return new ArrayList<>(options.values());
+    }
+
+    private boolean isAwaitingStatus(ServiceOrderStatus status) {
+        if (status == null) {
+            return false;
+        }
+        return status == ServiceOrderStatus.SCHEDULED || status == ServiceOrderStatus.PENDING;
     }
 
     private List<ServiceOrderStatus> resolveRefundStatuses(String stage) {
