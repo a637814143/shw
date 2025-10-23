@@ -729,7 +729,7 @@ const activeSection = ref<SectionKey>('services')
 const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
 const servicePage = ref(1)
-const serviceSize = ref(10)
+const serviceSize = ref(5)
 const serviceTotal = ref(0)
 const serviceAveragePrice = ref(0)
 const serviceLoading = ref(false)
@@ -1435,10 +1435,14 @@ const updateConversationSummary = (
 const loadCompanyReviews = async () => {
   reviewsLoading.value = true
   try {
-    companyReviews.value = await fetchCompanyReviews()
+    const keyword = reviewSearch.value.trim()
+    const result = await fetchCompanyReviews(keyword ? { keyword } : undefined)
+    companyReviews.value = result.items
     pruneReviewSelection()
   } catch (error) {
     console.error(error)
+    companyReviews.value = []
+    clearReviewSelection()
   } finally {
     reviewsLoading.value = false
   }
@@ -1688,7 +1692,8 @@ const loadStaff = async () => {
   staffLoading.value = true
   try {
     const keyword = staffSearch.value.trim()
-    staffList.value = await fetchCompanyStaff(keyword ? { keyword } : undefined)
+    const result = await fetchCompanyStaff(keyword ? { keyword } : undefined)
+    staffList.value = result.items
     pruneStaffSelection()
   } catch (error) {
     console.error(error)
@@ -1701,9 +1706,11 @@ const loadStaff = async () => {
 
 const loadRefunds = async () => {
   try {
-    refundOrders.value = await fetchCompanyRefunds()
+    const result = await fetchCompanyRefunds()
+    refundOrders.value = result.items
   } catch (error) {
     console.error(error)
+    refundOrders.value = []
   }
 }
 
@@ -1711,8 +1718,9 @@ const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
     const result = await fetchCompanyOrders()
-    companyOrders.value = result
-    result.forEach((item) => {
+    const items = result.items
+    companyOrders.value = items
+    items.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
       staffAssignments[item.id] = ''
       staffAssignmentSaving[item.id] = false
@@ -1720,6 +1728,7 @@ const loadCompanyOrders = async () => {
     pruneOrderSelection()
   } catch (error) {
     console.error(error)
+    companyOrders.value = []
   } finally {
     appointmentsLoading.value = false
   }

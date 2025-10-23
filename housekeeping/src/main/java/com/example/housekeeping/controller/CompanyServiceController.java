@@ -6,6 +6,7 @@ import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.dto.IdListRequest;
 import com.example.housekeeping.dto.OrderProgressUpdateRequest;
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.dto.ServiceReviewResponse;
@@ -38,9 +39,11 @@ public class CompanyServiceController {
     public Result<CompanyServicePageResponse> listCompanyServices(
         @RequestParam(value = "keyword", required = false) String keyword,
         @RequestParam(value = "page", defaultValue = "1") Integer page,
-        @RequestParam(value = "size", defaultValue = "10") Integer size
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword, page == null ? 1 : page, size == null ? 10 : size));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword, safePage, safeSize));
     }
 
     @PostMapping
@@ -67,15 +70,25 @@ public class CompanyServiceController {
     }
 
     @GetMapping("/refunds")
-    public Result<List<ServiceOrderResponse>> listRefundRequests() {
-        return Result.success(serviceOrderService.listRefundRequestsForCompany());
+    public Result<PageResponse<ServiceOrderResponse>> listRefundRequests(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
+    ) {
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(serviceOrderService.listRefundRequestsForCompany(keyword, safePage, safeSize));
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listActiveOrders(
-        @RequestParam(value = "keyword", required = false) String keyword
+    public Result<PageResponse<ServiceOrderResponse>> listActiveOrders(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword, safePage, safeSize));
     }
 
     @DeleteMapping("/orders/{orderId}")
@@ -103,10 +116,14 @@ public class CompanyServiceController {
     }
 
     @GetMapping("/reviews")
-    public Result<List<ServiceReviewResponse>> listServiceReviews(
-        @RequestParam(value = "keyword", required = false) String keyword
+    public Result<PageResponse<ServiceReviewResponse>> listServiceReviews(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(serviceReviewService.listReviewsForCurrentCompany(keyword));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(serviceReviewService.listReviewsForCurrentCompany(keyword, safePage, safeSize));
     }
 
     @DeleteMapping("/reviews/{reviewId}")

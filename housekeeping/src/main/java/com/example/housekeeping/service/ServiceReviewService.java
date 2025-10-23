@@ -1,5 +1,6 @@
 package com.example.housekeeping.service;
 
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.dto.ServiceReviewResponse;
 import com.example.housekeeping.entity.HousekeepService;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -66,34 +66,36 @@ public class ServiceReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceReviewResponse> listReviewsForCurrentCompany(String keyword) {
+    public PageResponse<ServiceReviewResponse> listReviewsForCurrentCompany(String keyword, int page, int size) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
 
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
-            return Collections.emptyList();
+            return PageResponse.empty(size);
         }
 
         String normalizedKeyword = normalizeKeyword(keyword);
 
-        return serviceReviewRepository.findByServiceInOrderByCreatedAtDesc(services).stream()
+        List<ServiceReviewResponse> responses = serviceReviewRepository.findByServiceInOrderByCreatedAtDesc(services).stream()
             .filter(review -> matchesReviewKeyword(review, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceReviewResponse> listReviewsForCurrentUser(String keyword) {
+    public PageResponse<ServiceReviewResponse> listReviewsForCurrentUser(String keyword, int page, int size) {
         UserAll user = accountLookupService.getCurrentAccount();
         ensureRole(user, AccountRole.USER);
 
         String normalizedKeyword = normalizeKeyword(keyword);
 
-        return serviceReviewRepository.findByUserOrderByCreatedAtDesc(user).stream()
+        List<ServiceReviewResponse> responses = serviceReviewRepository.findByUserOrderByCreatedAtDesc(user).stream()
             .filter(review -> matchesReviewKeyword(review, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional

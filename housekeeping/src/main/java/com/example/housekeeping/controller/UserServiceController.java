@@ -53,7 +53,7 @@ public class UserServiceController {
         @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
         int safePage = page == null ? 1 : page;
-        int safeSize = size == null ? 5 : size;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
         return Result.success(serviceOrderService.listOrdersForCurrentUser(keyword, safePage, safeSize));
     }
 
@@ -109,7 +109,7 @@ public class UserServiceController {
         @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
         int safePage = page == null ? 1 : page;
-        int safeSize = size == null ? 5 : size;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
         return Result.success(serviceReviewService.listReviewsForCurrentUser(keyword, safePage, safeSize));
     }
 

@@ -2,6 +2,7 @@ package com.example.housekeeping.service;
 
 import com.example.housekeeping.dto.AccountTransactionResponse;
 import com.example.housekeeping.dto.AdminOverviewResponse;
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.entity.AccountTransaction;
 import com.example.housekeeping.entity.ServiceFavorite;
@@ -28,7 +29,9 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 管理员仪表盘统计。
@@ -78,9 +81,12 @@ public class AdminInsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountTransactionResponse> listRecentTransactions() {
+    public PageResponse<AccountTransactionResponse> listTransactions(String keyword, int page, int size) {
         ensureAdmin();
-        return accountTransactionRepository.findTop50ByOrderByCreatedAtDesc().stream()
+        String normalized = normalizeKeyword(keyword);
+        List<AccountTransactionResponse> responses = accountTransactionRepository.findAll().stream()
+            .sorted(Comparator.comparing(AccountTransaction::getCreatedAt).reversed())
+            .filter(txn -> matchesTransactionKeyword(txn, normalized))
             .map(txn -> new AccountTransactionResponse(
                 txn.getId(),
                 txn.getUser().getUsername(),
@@ -90,13 +96,16 @@ public class AdminInsightService {
                 txn.getCreatedAt()
             ))
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceFavoriteResponse> listFavorites() {
+    public PageResponse<ServiceFavoriteResponse> listFavorites(String keyword, int page, int size) {
         ensureAdmin();
-        return serviceFavoriteRepository.findAll().stream()
+        String normalized = normalizeKeyword(keyword);
+        List<ServiceFavoriteResponse> responses = serviceFavoriteRepository.findAll().stream()
             .sorted(Comparator.comparing(ServiceFavorite::getCreatedAt).reversed())
+            .filter(favorite -> matchesFavoriteKeyword(favorite, normalized))
             .map(favorite -> new ServiceFavoriteResponse(
                 favorite.getId(),
                 favorite.getUser().getUsername(),
@@ -106,6 +115,45 @@ public class AdminInsightService {
                 favorite.getCreatedAt()
             ))
             .collect(Collectors.toList());
+        return PageResponse.from(responses, page, size);
+    }
+
+    private boolean matchesTransactionKeyword(AccountTransaction transaction, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return Stream.of(
+                transaction.getUser() != null ? transaction.getUser().getUsername() : null,
+                transaction.getType() != null ? transaction.getType().name() : null,
+                transaction.getNote()
+            )
+            .filter(Objects::nonNull)
+            .map(String::toLowerCase)
+            .anyMatch(value -> value.contains(keyword));
+    }
+
+    private boolean matchesFavoriteKeyword(ServiceFavorite favorite, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return Stream.of(
+                favorite.getUser() != null ? favorite.getUser().getUsername() : null,
+                favorite.getService() != null ? favorite.getService().getName() : null,
+                favorite.getService() != null && favorite.getService().getCompany() != null
+                    ? favorite.getService().getCompany().getUsername()
+                    : null
+            )
+            .filter(Objects::nonNull)
+            .map(String::toLowerCase)
+            .anyMatch(value -> value.contains(keyword));
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim().toLowerCase();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private UserAll ensureAdmin() {

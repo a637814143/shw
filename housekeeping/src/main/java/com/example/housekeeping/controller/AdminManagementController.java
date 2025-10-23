@@ -4,6 +4,7 @@ import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.AccountTransactionResponse;
 import com.example.housekeeping.dto.AdminOverviewResponse;
 import com.example.housekeeping.dto.AssignWorkerRequest;
+import com.example.housekeeping.dto.PageResponse;
 import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.ServiceFavoriteResponse;
 import com.example.housekeeping.dto.ServiceOrderResponse;
@@ -94,11 +95,15 @@ public class AdminManagementController {
     }
 
     @GetMapping("/refunds")
-    public Result<List<ServiceOrderResponse>> listRefunds(
+    public Result<PageResponse<ServiceOrderResponse>> listRefunds(
         @RequestParam(value = "stage", defaultValue = "pending") String stage,
-        @RequestParam(value = "keyword", required = false) String keyword
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
     ) {
-        return Result.success(serviceOrderService.listRefundsForAdmin(stage, keyword));
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(serviceOrderService.listRefundsForAdmin(stage, keyword, safePage, safeSize));
     }
 
     @PostMapping("/refunds/{orderId}")
@@ -114,8 +119,14 @@ public class AdminManagementController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listOrders() {
-        return Result.success(serviceOrderService.listOrdersForAdmin());
+    public Result<PageResponse<ServiceOrderResponse>> listOrders(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
+    ) {
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(serviceOrderService.listOrdersForAdmin(keyword, safePage, safeSize));
     }
 
     @PostMapping("/orders/{orderId}/assign")
@@ -125,12 +136,24 @@ public class AdminManagementController {
     }
 
     @GetMapping("/transactions")
-    public Result<List<AccountTransactionResponse>> listTransactions() {
-        return Result.success(adminInsightService.listRecentTransactions());
+    public Result<PageResponse<AccountTransactionResponse>> listTransactions(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
+    ) {
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(adminInsightService.listTransactions(keyword, safePage, safeSize));
     }
 
     @GetMapping("/favorites")
-    public Result<List<ServiceFavoriteResponse>> listFavorites() {
-        return Result.success(adminInsightService.listFavorites());
+    public Result<PageResponse<ServiceFavoriteResponse>> listFavorites(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "page", defaultValue = "1") Integer page,
+        @RequestParam(value = "size", defaultValue = "5") Integer size
+    ) {
+        int safePage = page == null ? 1 : page;
+        int safeSize = size == null ? 5 : Math.min(size, 5);
+        return Result.success(adminInsightService.listFavorites(keyword, safePage, safeSize));
     }
 }
