@@ -158,17 +158,49 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listRefundRequestsForCompany() {
+    public List<ServiceOrderResponse> listRefundRequestsForCompany(String keyword) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
             return List.of();
         }
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findByServiceInAndStatus(services, ServiceOrderStatus.REFUND_REQUESTED)
             .stream()
+            .filter(order -> matchesRefundKeyword(order, normalizedKeyword))
+            .sorted(Comparator.comparing(ServiceOrder::getUpdatedAt).reversed())
             .map(this::mapToResponse)
             .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteRefundsForCompany(List<Long> ids) {
+        UserAll company = accountLookupService.getCurrentAccount();
+        ensureRole(company, AccountRole.COMPANY);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinct.isEmpty()) {
+            return;
+        }
+        List<ServiceOrder> orders = serviceOrderRepository.findAllById(distinct);
+        List<ServiceOrder> permitted = orders.stream()
+            .filter(order -> order.getService() != null
+                && order.getService().getCompany() != null
+                && Objects.equals(order.getService().getCompany().getId(), company.getId()))
+            .filter(order -> order.getStatus() == ServiceOrderStatus.REFUND_REQUESTED
+                || order.getStatus() == ServiceOrderStatus.REFUND_APPROVED
+                || order.getStatus() == ServiceOrderStatus.REFUND_REJECTED)
+            .collect(Collectors.toList());
+        if (permitted.isEmpty()) {
+            return;
+        }
+        permitted.forEach(companyMessageRepository::deleteByOrder);
+        serviceOrderRepository.deleteAll(permitted);
     }
 
     @Transactional
@@ -328,6 +360,13 @@ public class ServiceOrderService {
     }
 
     @Transactional
+    public void deleteOrdersForAdmin(List<Long> ids) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+        deleteOrders(ids, order -> true);
+    }
+
+    @Transactional
     public void deleteOrdersForCompany(List<Long> ids) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
@@ -344,10 +383,12 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listOrdersForAdmin() {
+    public List<ServiceOrderResponse> listOrdersForAdmin(String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findAll().stream()
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceOrder::getCreatedAt).reversed())
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -474,13 +515,7 @@ public class ServiceOrderService {
     }
 
     private boolean matchesRefundKeyword(ServiceOrder order, String keyword) {
-        if (keyword == null) {
-            return true;
-        }
-        String lower = keyword.toLowerCase();
-        return order.getService().getName().toLowerCase().contains(lower)
-            || order.getUser().getUsername().toLowerCase().contains(lower)
-            || order.getService().getCompany().getUsername().toLowerCase().contains(lower);
+        return matchesOrderKeyword(order, keyword);
     }
 
     private void deleteOrders(List<Long> ids, Predicate<ServiceOrder> allowedPredicate) {

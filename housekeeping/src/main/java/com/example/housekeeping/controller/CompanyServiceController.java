@@ -67,8 +67,16 @@ public class CompanyServiceController {
     }
 
     @GetMapping("/refunds")
-    public Result<List<ServiceOrderResponse>> listRefundRequests() {
-        return Result.success(serviceOrderService.listRefundRequestsForCompany());
+    public Result<List<ServiceOrderResponse>> listRefundRequests(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceOrderService.listRefundRequestsForCompany(keyword));
+    }
+
+    @DeleteMapping("/refunds")
+    public Result<Void> deleteRefundRequests(@Valid @RequestBody IdListRequest request) {
+        serviceOrderService.deleteRefundsForCompany(request.getIds());
+        return Result.success("删除成功", null);
     }
 
     @GetMapping("/orders")
