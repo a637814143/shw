@@ -703,9 +703,21 @@ export const assignCompanyStaff = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchCompanyRefunds = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services/refunds'), withAuthHeaders())
+export const fetchCompanyRefunds = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/company/services/refunds'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const deleteCompanyRefunds = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/company/services/refunds'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const handleCompanyRefund = async (
@@ -921,9 +933,21 @@ export const fetchAdminManagers = async (): Promise<UserAccountItem[]> => {
   return handleResponse<UserAccountItem[]>(response)
 }
 
-export const fetchAdminOrders = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/orders'), withAuthHeaders())
+export const fetchAdminOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/admin/orders'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const deleteAdminOrders = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/orders'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const assignAdminWorker = async (
@@ -937,14 +961,38 @@ export const assignAdminWorker = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchAdminTransactions = async (): Promise<AccountTransactionItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/transactions'), withAuthHeaders())
+export const fetchAdminTransactions = async (params?: { keyword?: string }): Promise<AccountTransactionItem[]> => {
+  const url = new URL(buildUrl('/api/admin/transactions'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<AccountTransactionItem[]>(response)
 }
 
-export const fetchAdminFavorites = async (): Promise<ServiceFavoriteItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/favorites'), withAuthHeaders())
+export const deleteAdminTransactions = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/transactions'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const fetchAdminFavorites = async (params?: { keyword?: string }): Promise<ServiceFavoriteItem[]> => {
+  const url = new URL(buildUrl('/api/admin/favorites'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceFavoriteItem[]>(response)
+}
+
+export const deleteAdminFavorites = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/favorites'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const createDashboardTip = async (payload: DashboardTipItem): Promise<DashboardTipItem> => {

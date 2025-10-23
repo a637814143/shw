@@ -605,11 +605,52 @@
               <h2>退款申请处理</h2>
               <p>审核用户的退款申请，保障服务体验。</p>
             </div>
+            <div class="refund-actions">
+              <label class="visually-hidden" for="company-refund-search">搜索退款申请</label>
+              <input
+                id="company-refund-search"
+                v-model="refundSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务或用户"
+                :disabled="refundsLoading"
+              />
+              <button
+                v-if="refundSearch.trim()"
+                type="button"
+                class="ghost-button"
+                :disabled="refundsLoading"
+                @click="clearCompanyRefundFilter"
+              >
+                清除筛选
+              </button>
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasRefundSelection || refundsLoading"
+                @click="handleBulkDeleteRefunds"
+              >
+                删除选中<span v-if="selectedRefundIds.size">（{{ selectedRefundIds.size }}）</span>
+              </button>
+              <button type="button" class="ghost-button" @click="loadRefunds" :disabled="refundsLoading">
+                {{ refundsLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
           </header>
-          <div class="table-wrapper">
+          <div v-if="refundsLoading" class="loading-state">正在获取退款申请…</div>
+          <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allRefundsSelected"
+                      :disabled="refundsLoading || !refundOrders.length"
+                      @change="toggleSelectAllRefunds(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选退款申请"
+                    />
+                  </th>
                   <th>订单信息</th>
                   <th>用户</th>
                   <th>退款原因</th>
@@ -619,6 +660,15 @@
               </thead>
               <tbody>
                 <tr v-for="order in refundOrders" :key="order.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedRefundIds.has(order.id)"
+                      :disabled="refundsLoading"
+                      @change="toggleRefundSelection(order.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择退款 ${order.serviceName}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
@@ -631,10 +681,16 @@
                     <button type="button" class="link-button danger" @click="handleRefund(order, false)">
                       拒绝
                     </button>
+                    <button type="button" class="link-button danger" @click="handleDeleteRefundRecord(order)">
+                      删除
+                    </button>
                   </td>
                 </tr>
                 <tr v-if="!refundOrders.length">
-                  <td colspan="5" class="empty-row">暂无待处理的退款申请。</td>
+                  <td colspan="6" class="empty-row">
+                    <span v-if="hasRefundFilter">未找到匹配的退款申请，请调整搜索关键词。</span>
+                    <span v-else>暂无待处理的退款申请。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -657,6 +713,7 @@ import {
   deleteCompanyServices,
   fetchCompanyOrders,
   fetchCompanyRefunds,
+  deleteCompanyRefunds,
   fetchCompanyServices,
   fetchCompanyReviews,
   fetchCompanyConversations,
@@ -736,6 +793,10 @@ const serviceLoading = ref(false)
 const selectedServiceIds = ref<Set<number>>(new Set())
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const refundOrders = ref<ServiceOrderItem[]>([])
+const refundsLoading = ref(false)
+const refundSearch = ref('')
+const selectedRefundIds = ref<Set<number>>(new Set())
+let refundSearchTimer: ReturnType<typeof setTimeout> | null = null
 const companyOrders = ref<ServiceOrderItem[]>([])
 const appointmentsLoading = ref(false)
 const appointmentSearch = ref('')
@@ -991,6 +1052,28 @@ watch(staffSearch, () => {
   }, 300)
 })
 
+watch(refundSearch, () => {
+  if (refundSearchTimer) {
+    clearTimeout(refundSearchTimer)
+  }
+  refundSearchTimer = setTimeout(async () => {
+    await loadRefunds()
+    refundSearchTimer = null
+  }, 300)
+})
+
+const clearCompanyRefundFilter = async () => {
+  if (!refundSearch.value) {
+    return
+  }
+  refundSearch.value = ''
+  if (refundSearchTimer) {
+    clearTimeout(refundSearchTimer)
+    refundSearchTimer = null
+  }
+  await loadRefunds()
+}
+
 const clearStaffFilter = async () => {
   if (!staffSearch.value) {
     return
@@ -1024,6 +1107,12 @@ const companyStats = computed(() => {
   }
 })
 
+const hasRefundSelection = computed(() => selectedRefundIds.value.size > 0)
+const hasRefundFilter = computed(() => refundSearch.value.trim().length > 0)
+const allRefundsSelected = computed(
+  () => refundOrders.value.length > 0 && refundOrders.value.every((order) => selectedRefundIds.value.has(order.id)),
+)
+
 const normalizeSearchValue = (value: unknown) => {
   if (value == null) {
     return ''
@@ -1051,6 +1140,82 @@ const matchesOrderSearch = (order: ServiceOrderItem, keyword: string) => {
     order.workerContact,
   ]
   return fields.some((field) => normalizeSearchValue(field).includes(target))
+}
+
+const pruneRefundSelection = () => {
+  if (!selectedRefundIds.value.size) {
+    return
+  }
+  const validIds = new Set(refundOrders.value.map((order) => order.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedRefundIds.value.forEach((id) => {
+    if (validIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedRefundIds.value = next
+  }
+}
+
+const toggleRefundSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedRefundIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedRefundIds.value = next
+}
+
+const toggleSelectAllRefunds = (checked: boolean) => {
+  if (!checked) {
+    clearRefundSelection()
+    return
+  }
+  const next = new Set(selectedRefundIds.value)
+  refundOrders.value.forEach((order) => next.add(order.id))
+  selectedRefundIds.value = next
+}
+
+const clearRefundSelection = () => {
+  selectedRefundIds.value = new Set()
+}
+
+const handleBulkDeleteRefunds = async () => {
+  if (!selectedRefundIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedRefundIds.value.size} 条退款申请吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyRefunds(Array.from(selectedRefundIds.value))
+    clearRefundSelection()
+    await loadRefunds()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleDeleteRefundRecord = async (order: ServiceOrderItem) => {
+  if (!window.confirm(`确认删除退款申请“${order.serviceName}”吗？`)) {
+    return
+  }
+  try {
+    await deleteCompanyRefunds([order.id])
+    if (selectedRefundIds.value.has(order.id)) {
+      const next = new Set(selectedRefundIds.value)
+      next.delete(order.id)
+      selectedRefundIds.value = next
+    }
+    await loadRefunds()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
 }
 
 const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
@@ -1700,10 +1865,17 @@ const loadStaff = async () => {
 }
 
 const loadRefunds = async () => {
+  refundsLoading.value = true
   try {
-    refundOrders.value = await fetchCompanyRefunds()
+    const keyword = refundSearch.value.trim()
+    refundOrders.value = await fetchCompanyRefunds(keyword ? { keyword } : undefined)
+    pruneRefundSelection()
   } catch (error) {
     console.error(error)
+    refundOrders.value = []
+    clearRefundSelection()
+  } finally {
+    refundsLoading.value = false
   }
 }
 
@@ -1772,6 +1944,10 @@ onUnmounted(() => {
   if (staffSearchTimer) {
     clearTimeout(staffSearchTimer)
     staffSearchTimer = null
+  }
+  if (refundSearchTimer) {
+    clearTimeout(refundSearchTimer)
+    refundSearchTimer = null
   }
   stopMessagePolling()
 })
