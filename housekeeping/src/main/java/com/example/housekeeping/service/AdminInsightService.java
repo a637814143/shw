@@ -25,10 +25,14 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 管理员仪表盘统计。
@@ -78,9 +82,13 @@ public class AdminInsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountTransactionResponse> listRecentTransactions() {
+    public List<AccountTransactionResponse> listTransactions(String keyword) {
         ensureAdmin();
-        return accountTransactionRepository.findTop50ByOrderByCreatedAtDesc().stream()
+        String normalizedKeyword = normalizeKeyword(keyword);
+        return accountTransactionRepository.findAll().stream()
+            .sorted(Comparator.comparing(AccountTransaction::getCreatedAt).reversed())
+            .filter(txn -> matchesTransactionKeyword(txn, normalizedKeyword))
+            .limit(200)
             .map(txn -> new AccountTransactionResponse(
                 txn.getId(),
                 txn.getUser().getUsername(),
@@ -93,10 +101,12 @@ public class AdminInsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceFavoriteResponse> listFavorites() {
+    public List<ServiceFavoriteResponse> listFavorites(String keyword) {
         ensureAdmin();
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceFavoriteRepository.findAll().stream()
             .sorted(Comparator.comparing(ServiceFavorite::getCreatedAt).reversed())
+            .filter(favorite -> matchesFavoriteKeyword(favorite, normalizedKeyword))
             .map(favorite -> new ServiceFavoriteResponse(
                 favorite.getId(),
                 favorite.getUser().getUsername(),
@@ -108,12 +118,88 @@ public class AdminInsightService {
             .collect(Collectors.toList());
     }
 
+    @Transactional
+    public void deleteTransactions(List<Long> ids) {
+        ensureAdmin();
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinct.isEmpty()) {
+            return;
+        }
+        List<AccountTransaction> transactions = accountTransactionRepository.findAllById(distinct);
+        if (transactions.size() != distinct.size()) {
+            throw new RuntimeException("部分流水不存在或已被删除");
+        }
+        accountTransactionRepository.deleteAll(transactions);
+    }
+
+    @Transactional
+    public void deleteFavorites(List<Long> ids) {
+        ensureAdmin();
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinct = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinct.isEmpty()) {
+            return;
+        }
+        List<ServiceFavorite> favorites = serviceFavoriteRepository.findAllById(distinct);
+        if (favorites.size() != distinct.size()) {
+            throw new RuntimeException("部分收藏记录不存在或已被删除");
+        }
+        serviceFavoriteRepository.deleteAll(favorites);
+    }
+
     private UserAll ensureAdmin() {
         UserAll admin = accountLookupService.getCurrentAccount();
         if (!AccountRole.ADMIN.getLabel().equals(admin.getUserType())) {
             throw new RuntimeException("仅管理员可访问");
         }
         return admin;
+    }
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        return trimmed.isEmpty() ? null : trimmed.toLowerCase();
+    }
+
+    private boolean matchesTransactionKeyword(AccountTransaction txn, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return Stream.of(
+                txn.getUser() != null ? txn.getUser().getUsername() : null,
+                txn.getNote(),
+                txn.getType() != null ? txn.getType().name() : null
+            )
+            .filter(Objects::nonNull)
+            .map(value -> value.toLowerCase())
+            .anyMatch(value -> value.contains(keyword));
+    }
+
+    private boolean matchesFavoriteKeyword(ServiceFavorite favorite, String keyword) {
+        if (keyword == null) {
+            return true;
+        }
+        return Stream.of(
+                favorite.getUser() != null ? favorite.getUser().getUsername() : null,
+                favorite.getService() != null ? favorite.getService().getName() : null,
+                favorite.getService() != null && favorite.getService().getCompany() != null
+                    ? favorite.getService().getCompany().getUsername()
+                    : null
+            )
+            .filter(Objects::nonNull)
+            .map(value -> value.toLowerCase())
+            .anyMatch(value -> value.contains(keyword));
     }
 
     private BigDecimal sumByType(List<AccountTransaction> transactions, AccountTransactionType type) {
