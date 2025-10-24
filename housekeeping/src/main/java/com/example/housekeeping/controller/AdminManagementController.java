@@ -114,8 +114,15 @@ public class AdminManagementController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listOrders() {
-        return Result.success(serviceOrderService.listOrdersForAdmin());
+    public Result<List<ServiceOrderResponse>> listOrders(
+        @RequestParam(value = "keyword", required = false) String keyword
+    ) {
+        return Result.success(serviceOrderService.listOrdersForAdmin(keyword));
+    }
+
+    @PostMapping("/orders/{orderId}/settle")
+    public Result<ServiceOrderResponse> settleOrder(@PathVariable Long orderId) {
+        return Result.success("结算成功", serviceOrderService.settleCompletedOrder(orderId));
     }
 
     @PostMapping("/orders/{orderId}/assign")
