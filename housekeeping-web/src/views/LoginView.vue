@@ -2,7 +2,10 @@
   <div class="auth-page">
     <div class="auth-container">
       <section class="auth-info">
-        <p class="info-badge">全流程家政服务平台</p>
+        <div class="info-header">
+          <p class="info-badge">全流程家政服务平台</p>
+          <button type="button" class="guest-button" @click="goToTourist">游客模式</button>
+        </div>
         <h1 class="info-title">欢迎回来，开启专业级家政服务运营</h1>
         <p class="info-description">
           统一管理个人预约、家政公司项目以及平台级审批，让每一次服务都更高效、更可信赖。
@@ -79,6 +82,10 @@ const roleOptions = (
   Object.entries(ROLE_LABELS) as Array<[UserRole, string]>
 ).map(([value, label]) => ({ value, label }))
 
+const goToTourist = () => {
+  router.push({ name: 'tourist' })
+}
+
 const handleLogin = async () => {
   if (!account.value.trim() || !password.value) {
     window.alert('请输入账号和密码')
@@ -141,6 +148,13 @@ const handleLogin = async () => {
   gap: 20px;
 }
 
+.info-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .info-badge {
   display: inline-flex;
   align-items: center;
@@ -152,6 +166,28 @@ const handleLogin = async () => {
   font-weight: 600;
   font-size: 14px;
   width: fit-content;
+}
+
+.guest-button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--brand-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.guest-button:hover {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.guest-button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.3);
+  outline-offset: 2px;
 }
 
 .info-title {
