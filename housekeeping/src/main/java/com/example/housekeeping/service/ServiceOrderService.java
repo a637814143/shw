@@ -6,12 +6,15 @@ import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.entity.CompanyStaff;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.enums.StaffStatus;
 import com.example.housekeeping.repository.CompanyMessageRepository;
+import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -22,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -52,6 +58,9 @@ public class ServiceOrderService {
     @Autowired
     private CompanyMessageRepository companyMessageRepository;
 
+    @Autowired
+    private CompanyStaffRepository companyStaffRepository;
+
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
         UserAll user = accountLookupService.getCurrentAccount();
@@ -72,11 +81,16 @@ public class ServiceOrderService {
         if (scheduledAt.isBefore(Instant.now().minusSeconds(60))) {
             throw new RuntimeException("预约时间不能早于当前时间");
         }
+        ensureWithinBusinessHours(scheduledAt);
 
         String specialRequest = normalizeMessage(request.getSpecialRequest());
         String serviceAddress = normalizeMessage(request.getServiceAddress());
         if (serviceAddress == null) {
             serviceAddress = normalizeMessage(user.getContactAddress());
+        }
+        long idleCount = companyStaffRepository.countByCompanyAndStatus(service.getCompany(), StaffStatus.IDLE);
+        if (idleCount <= 1) {
+            throw new RuntimeException("当前空闲人员不足，暂无法预约");
         }
         int earnedPoints = calculateLoyaltyPoints(price);
 
@@ -150,6 +164,7 @@ public class ServiceOrderService {
         if (order.getStatus() == ServiceOrderStatus.REFUND_APPROVED) {
             throw new RuntimeException("订单已退款");
         }
+        releaseAssignedStaff(order);
         order.setStatus(ServiceOrderStatus.REFUND_REQUESTED);
         order.setRefundReason(request.getReason().trim());
         order.setRefundResponse(null);
@@ -191,6 +206,9 @@ public class ServiceOrderService {
             }
         }
         order.setProgressNote(note);
+        if (desiredStatus == ServiceOrderStatus.COMPLETED) {
+            releaseAssignedStaff(order);
+        }
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));
     }
@@ -254,6 +272,7 @@ public class ServiceOrderService {
             order.setProgressNote("订单已退款");
             order.setSettlementReleased(false);
             order.setSettlementReleasedAt(null);
+            releaseAssignedStaff(order);
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");
@@ -326,6 +345,7 @@ public class ServiceOrderService {
             throw new RuntimeException("家政人员与联系方式不能为空");
         }
 
+        releaseAssignedStaff(order);
         order.setAssignedWorker(workerName);
         order.setWorkerContact(workerContact);
         if (order.getStatus() == ServiceOrderStatus.SCHEDULED || order.getStatus() == ServiceOrderStatus.PENDING) {
@@ -360,6 +380,7 @@ public class ServiceOrderService {
             }
         }
         for (ServiceOrder order : orders) {
+            releaseAssignedStaff(order);
             companyMessageRepository.deleteByOrder(order);
         }
         serviceOrderRepository.deleteAll(orders);
@@ -419,6 +440,7 @@ public class ServiceOrderService {
             order.getRefundReason(),
             order.getRefundResponse(),
             order.getHandledBy() == null ? null : order.getHandledBy().getUsername(),
+            order.getAssignedStaff() == null ? null : order.getAssignedStaff().getId(),
             order.getAssignedWorker(),
             order.getWorkerContact(),
             order.getUser().getContactPhone(),
@@ -550,7 +572,31 @@ public class ServiceOrderService {
         if (permitted.isEmpty()) {
             return;
         }
+        permitted.forEach(this::releaseAssignedStaff);
         permitted.forEach(companyMessageRepository::deleteByOrder);
         serviceOrderRepository.deleteAll(permitted);
+    }
+
+    private void ensureWithinBusinessHours(Instant scheduledAt) {
+        ZoneId zone = ZoneId.systemDefault();
+        LocalTime time = LocalDateTime.ofInstant(scheduledAt, zone).toLocalTime();
+        LocalTime start = LocalTime.of(8, 0);
+        LocalTime end = LocalTime.of(18, 0);
+        if (time.isBefore(start) || time.isAfter(end)) {
+            throw new RuntimeException("请选择正确的时间段（8:00 - 18:00）");
+        }
+    }
+
+    private void releaseAssignedStaff(ServiceOrder order) {
+        CompanyStaff assigned = order.getAssignedStaff();
+        if (assigned == null) {
+            return;
+        }
+        if (assigned.getStatus() != StaffStatus.IDLE) {
+            assigned.setStatus(StaffStatus.IDLE);
+            assigned.setUpdatedAt(Instant.now());
+            companyStaffRepository.save(assigned);
+        }
+        order.setAssignedStaff(null);
     }
 }

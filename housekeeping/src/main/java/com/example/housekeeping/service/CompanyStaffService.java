@@ -9,6 +9,7 @@ import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.enums.StaffStatus;
 import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,7 @@ public class CompanyStaffService {
         CompanyStaff staff = new CompanyStaff();
         staff.setCompany(company);
         applyRequest(staff, request);
+        staff.setStatus(StaffStatus.IDLE);
         staff.setCreatedAt(Instant.now());
         staff.setUpdatedAt(staff.getCreatedAt());
         CompanyStaff saved = companyStaffRepository.save(staff);
@@ -63,6 +65,9 @@ public class CompanyStaffService {
     @Transactional
     public void deleteStaff(Long staffId) {
         CompanyStaff staff = ensureStaffBelongsToCurrentCompany(staffId);
+        if (staff.getStatus() == StaffStatus.BUSY) {
+            throw new RuntimeException("该人员正在服务，暂无法删除");
+        }
         companyStaffRepository.delete(staff);
     }
 
@@ -78,6 +83,18 @@ public class CompanyStaffService {
         if (!order.getService().getCompany().getId().equals(staff.getCompany().getId())) {
             throw new RuntimeException("无法指派其他公司的订单");
         }
+        if (staff.getStatus() != StaffStatus.IDLE) {
+            throw new RuntimeException("请选择空闲状态的人员");
+        }
+        CompanyStaff previous = order.getAssignedStaff();
+        if (previous != null && !previous.getId().equals(staff.getId())) {
+            previous.setStatus(StaffStatus.IDLE);
+            previous.setUpdatedAt(Instant.now());
+            companyStaffRepository.save(previous);
+        }
+        staff.setStatus(StaffStatus.BUSY);
+        staff.setUpdatedAt(Instant.now());
+        order.setAssignedStaff(staff);
         order.setAssignedWorker(staff.getName());
         order.setWorkerContact(staff.getContact());
         ServiceOrderStatus status = order.getStatus();
@@ -85,6 +102,7 @@ public class CompanyStaffService {
             order.setProgressNote("已安排 " + staff.getName() + " 上门服务");
         }
         order.setUpdatedAt(Instant.now());
+        companyStaffRepository.save(staff);
         ServiceOrder saved = serviceOrderRepository.save(order);
         return serviceOrderService.mapToResponse(saved);
     }
@@ -124,6 +142,9 @@ public class CompanyStaffService {
             if (!staff.getCompany().getId().equals(company.getId())) {
                 throw new RuntimeException("无法操作其他公司的人员");
             }
+            if (staff.getStatus() == StaffStatus.BUSY) {
+                throw new RuntimeException("无法删除正在服务的人员");
+            }
         }
         companyStaffRepository.deleteAll(staffList);
     }
@@ -158,12 +179,15 @@ public class CompanyStaffService {
     }
 
     private CompanyStaffResponse map(CompanyStaff staff) {
+        StaffStatus status = staff.getStatus() == null ? StaffStatus.IDLE : staff.getStatus();
         return new CompanyStaffResponse(
             staff.getId(),
             staff.getName(),
             staff.getContact(),
             staff.getRole(),
             staff.getNotes(),
+            status.name(),
+            status.getDisplayName(),
             staff.getCreatedAt(),
             staff.getUpdatedAt()
         );
