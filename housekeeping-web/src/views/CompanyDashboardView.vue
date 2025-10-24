@@ -109,6 +109,10 @@
                 <label for="service-contact">联系方式</label>
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
+              <div class="form-field">
+                <label for="service-time">服务时间</label>
+                <input id="service-time" v-model="serviceForm.serviceTime" type="text" placeholder="如：08:00-18:00" />
+              </div>
               <div class="form-field form-field-full">
                 <label for="service-description">服务简介</label>
                 <textarea id="service-description" v-model="serviceForm.description" rows="3"></textarea>
@@ -156,6 +160,8 @@
                   <td>
                     <strong>{{ item.name }}</strong>
                     <div class="order-subtext">单位：{{ item.unit }}</div>
+                    <div class="order-subtext">服务时间：{{ item.serviceTime }}</div>
+                    <div class="order-subtext">空闲人员：{{ item.availableStaffCount }} 位</div>
                   </td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
                   <td>{{ item.contact }}</td>
@@ -283,6 +289,7 @@
                   <th>姓名</th>
                   <th>联系方式</th>
                   <th>岗位</th>
+                  <th>状态</th>
                   <th>备注</th>
                   <th>创建时间</th>
                   <th class="table-actions">操作</th>
@@ -302,6 +309,9 @@
                   <td>{{ item.name }}</td>
                   <td>{{ item.contact }}</td>
                   <td>{{ item.role || '—' }}</td>
+                  <td>
+                    <span :class="['status-tag', item.status === 'IDLE' ? 'idle' : 'busy']">{{ item.statusLabel }}</span>
+                  </td>
                   <td>{{ item.notes || '—' }}</td>
                   <td>{{ formatDateTime(item.createdAt) }}</td>
                   <td class="table-actions">
@@ -310,7 +320,7 @@
                   </td>
                 </tr>
                 <tr v-if="!staffList.length">
-                  <td colspan="7" class="empty-row">
+                  <td colspan="8" class="empty-row">
                     <span v-if="hasStaffFilter">未找到匹配的人员，尝试调整搜索条件。</span>
                     <span v-else>还没有添加人员，点击右上角按钮即可新增。</span>
                   </td>
@@ -411,8 +421,13 @@
                   <td>
                     <select v-model="staffAssignments[order.id]" class="staff-select">
                       <option value="">选择人员</option>
-                      <option v-for="staff in staffList" :key="staff.id" :value="staff.id">
-                        {{ staff.name }}<span v-if="staff.role">（{{ staff.role }}）</span>
+                      <option
+                        v-for="staff in staffList"
+                        :key="staff.id"
+                        :value="staff.id"
+                        :disabled="staff.status !== 'IDLE'"
+                      >
+                        {{ staff.name }}{{ staff.role ? '（' + staff.role + '）' : '' }} · {{ staff.statusLabel }}
                       </option>
                     </select>
                     <button
@@ -705,6 +720,7 @@ const serviceForm = reactive<CompanyServicePayload>({
   unit: '',
   price: 0,
   contact: '',
+  serviceTime: '',
   description: '',
 })
 
@@ -1108,6 +1124,7 @@ const resetServiceForm = () => {
   serviceForm.unit = ''
   serviceForm.price = 0
   serviceForm.contact = ''
+  serviceForm.serviceTime = ''
   serviceForm.description = ''
   editingServiceId.value = null
 }
@@ -1118,6 +1135,7 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
     serviceForm.unit = item.unit
     serviceForm.price = item.price
     serviceForm.contact = item.contact
+    serviceForm.serviceTime = item.serviceTime
     serviceForm.description = item.description || ''
     editingServiceId.value = item.id
   } else {
@@ -1132,7 +1150,12 @@ const closeServiceForm = () => {
 }
 
 const submitServiceForm = async () => {
-  if (!serviceForm.name.trim() || !serviceForm.unit.trim() || !serviceForm.contact.trim()) {
+  if (
+    !serviceForm.name.trim() ||
+    !serviceForm.unit.trim() ||
+    !serviceForm.contact.trim() ||
+    !serviceForm.serviceTime.trim()
+  ) {
     window.alert('请完整填写服务信息')
     return
   }
@@ -1147,6 +1170,7 @@ const submitServiceForm = async () => {
       unit: serviceForm.unit.trim(),
       price: Number(serviceForm.price),
       contact: serviceForm.contact.trim(),
+      serviceTime: serviceForm.serviceTime.trim(),
       description: serviceForm.description?.trim() || '',
     }
     if (editingServiceId.value) {
@@ -2217,6 +2241,24 @@ onUnmounted(() => {
 
 .status-refund_rejected {
   background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.status-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-tag.idle {
+  background: rgba(16, 185, 129, 0.16);
+  color: #0f766e;
+}
+
+.status-tag.busy {
+  background: rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
 }
 
 .table-wrapper {

@@ -37,4 +37,7 @@ public class HousekeepService {
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @Column(name = "service_time", nullable = false, length = 100)
+    private String serviceTime;
 }

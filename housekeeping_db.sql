@@ -39,6 +39,7 @@ CREATE TABLE `housekeep_service` (
   `price` decimal(12,2) NOT NULL COMMENT '服务价格',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
+  `service_time` varchar(100) NOT NULL COMMENT '服务时间范围',
   PRIMARY KEY (`id`),
   KEY `idx_company` (`company_id`),
   CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
@@ -61,6 +62,7 @@ CREATE TABLE `service_order` (
   `handled_by` bigint DEFAULT NULL COMMENT '处理人',
   `assigned_worker` varchar(100) DEFAULT NULL COMMENT '分配的家政人员',
   `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
+  `assigned_staff_id` bigint DEFAULT NULL COMMENT '分配的内部家政人员ID',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   `settlement_released` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已结算至商家',
@@ -68,9 +70,11 @@ CREATE TABLE `service_order` (
   PRIMARY KEY (`id`),
   KEY `idx_order_service` (`service_id`),
   KEY `idx_order_user` (`user_id`),
+  KEY `idx_order_staff` (`assigned_staff_id`),
   CONSTRAINT `fk_order_service` FOREIGN KEY (`service_id`) REFERENCES `housekeep_service` (`id`),
   CONSTRAINT `fk_order_user` FOREIGN KEY (`user_id`) REFERENCES `user_all` (`id`),
-  CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`)
+  CONSTRAINT `fk_order_handler` FOREIGN KEY (`handled_by`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_order_assigned_staff` FOREIGN KEY (`assigned_staff_id`) REFERENCES `company_staff` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政服务订单表';
 
 DROP TABLE IF EXISTS `service_favorite`;
@@ -144,6 +148,7 @@ CREATE TABLE `company_staff` (
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `role` varchar(100) DEFAULT NULL COMMENT '职位或技能',
   `notes` varchar(500) DEFAULT NULL COMMENT '备注信息',
+  `status` varchar(32) NOT NULL DEFAULT 'IDLE' COMMENT '人员状态：空闲/繁忙',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),

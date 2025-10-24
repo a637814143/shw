@@ -70,6 +70,8 @@ export interface HousekeepServiceItem {
   description?: string | null
   companyId: number
   companyName: string
+  serviceTime: string
+  availableStaffCount: number
 }
 
 export interface CompanyServicePage {
@@ -98,6 +100,7 @@ export interface ServiceOrderItem {
   refundReason?: string | null
   refundResponse?: string | null
   handledBy?: string | null
+  assignedStaffId?: number | null
   assignedWorker?: string | null
   workerContact?: string | null
   customerContactPhone?: string | null
@@ -174,6 +177,7 @@ export interface CompanyServicePayload {
   price: number
   contact: string
   description?: string
+  serviceTime: string
 }
 
 export interface RefundDecisionPayload {
@@ -340,6 +344,8 @@ export interface CompanyStaffItem {
   contact: string
   role?: string | null
   notes?: string | null
+  status: string
+  statusLabel: string
   createdAt: string
   updatedAt: string
 }

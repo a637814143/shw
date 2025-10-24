@@ -43,6 +43,7 @@
           <header class="dialog-header">
             <h2>预约 {{ bookingForm.service?.name }}</h2>
             <p>请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。</p>
+            <p v-if="bookingForm.service" class="dialog-hint">服务可预约时段：{{ bookingForm.service.serviceTime }}</p>
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
@@ -258,9 +259,29 @@
                   <dt>联系方式</dt>
                   <dd>{{ service.contact }}</dd>
                 </div>
+                <div>
+                  <dt>服务时间</dt>
+                  <dd>{{ service.serviceTime }}</dd>
+                </div>
+                <div>
+                  <dt>空闲人员</dt>
+                  <dd :class="service.availableStaffCount > 1 ? 'staff-available' : 'staff-low'">
+                    {{ service.availableStaffCount }} 位
+                  </dd>
+                </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
-              <button type="button" class="primary-button" @click="handleSelectService(service)">预约服务</button>
+              <button
+                type="button"
+                class="primary-button"
+                :disabled="service.availableStaffCount <= 1"
+                @click="handleSelectService(service)"
+              >
+                {{ service.availableStaffCount > 1 ? '预约服务' : '人员已满' }}
+              </button>
+              <p v-if="service.availableStaffCount <= 1" class="service-note warning">
+                当前空闲家政人员不足，请稍后再试。
+              </p>
             </article>
             <p v-if="!services.length" class="empty-tip">
               <span v-if="hasServiceFilter && allServices.length">没有找到符合条件的服务，换个关键词试试吧。</span>
@@ -1070,6 +1091,10 @@ const logout = () => {
 }
 
 const handleSelectService = (service: HousekeepServiceItem) => {
+  if (service.availableStaffCount <= 1) {
+    window.alert('当前空闲人员不足，暂无法预约')
+    return
+  }
   bookingForm.service = service
   bookingForm.scheduledAt = ''
   bookingForm.specialRequest = ''
@@ -1100,10 +1125,23 @@ const submitBooking = async () => {
     return
   }
 
+  const scheduledDate = new Date(bookingForm.scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    window.alert('请选择正确的时间段（8:00 - 18:00）')
+    return
+  }
+  const hour = scheduledDate.getHours()
+  const minute = scheduledDate.getMinutes()
+  const second = scheduledDate.getSeconds()
+  if (hour < 8 || hour > 18 || (hour === 18 && (minute > 0 || second > 0))) {
+    window.alert('请选择正确的时间段（8:00 - 18:00）')
+    return
+  }
+
   resetPaymentState()
   pendingOrderPayload.value = {
     serviceId: bookingForm.service.id,
-    scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+    scheduledAt: scheduledDate.toISOString(),
     specialRequest: bookingForm.specialRequest,
     serviceAddress: bookingForm.serviceAddress.trim(),
   }
@@ -1825,6 +1863,16 @@ onUnmounted(() => {
   color: rgba(148, 163, 184, 0.7);
 }
 
+.staff-available {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.staff-low {
+  color: #f97316;
+  font-weight: 600;
+}
+
 .service-desc {
   margin: 0;
   color: rgba(226, 232, 240, 0.75);
@@ -1838,6 +1886,19 @@ onUnmounted(() => {
   background: linear-gradient(120deg, #6366f1, #38bdf8);
   color: #0f172a;
   font-weight: 600;
+}
+
+.primary-button:disabled {
+  background: rgba(148, 163, 184, 0.35);
+  color: rgba(15, 23, 42, 0.6);
+  cursor: not-allowed;
+}
+
+.service-note.warning {
+  margin: 0;
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+  color: #facc15;
 }
 
 .table-wrapper {
@@ -2077,6 +2138,12 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+.dialog-hint {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.75);
+  font-size: 0.9rem;
 }
 
 .payment-card {

@@ -6,6 +6,8 @@ import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.StaffStatus;
+import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -31,6 +33,9 @@ public class HousekeepServiceManager {
 
     @Autowired
     private AccountLookupService accountLookupService;
+
+    @Autowired
+    private CompanyStaffRepository companyStaffRepository;
 
     @Transactional(readOnly = true)
     public List<HousekeepServiceResponse> listAllServices(String keyword) {
@@ -86,6 +91,7 @@ public class HousekeepServiceManager {
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -105,6 +111,7 @@ public class HousekeepServiceManager {
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -158,6 +165,10 @@ public class HousekeepServiceManager {
     }
 
     private HousekeepServiceResponse mapToResponse(HousekeepService service) {
+        int availableStaff = (int) companyStaffRepository.countByCompanyAndStatus(
+            service.getCompany(),
+            StaffStatus.IDLE
+        );
         return new HousekeepServiceResponse(
             service.getId(),
             service.getName(),
@@ -166,7 +177,9 @@ public class HousekeepServiceManager {
             service.getContact(),
             service.getDescription(),
             service.getCompany().getId(),
-            service.getCompany().getUsername()
+            service.getCompany().getUsername(),
+            service.getServiceTime(),
+            availableStaff
         );
     }
 
@@ -176,6 +189,13 @@ public class HousekeepServiceManager {
         }
         String trimmed = description.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeServiceTime(String serviceTime) {
+        if (serviceTime == null) {
+            return "";
+        }
+        return serviceTime.trim();
     }
 
     private String normalizeKeyword(String keyword) {

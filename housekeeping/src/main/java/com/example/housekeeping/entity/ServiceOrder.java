@@ -67,6 +67,10 @@ public class ServiceOrder {
     @Column(name = "worker_contact", length = 100)
     private String workerContact;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private CompanyStaff assignedStaff;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 

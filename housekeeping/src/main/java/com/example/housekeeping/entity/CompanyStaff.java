@@ -1,5 +1,6 @@
 package com.example.housekeeping.entity;
 
+import com.example.housekeeping.enums.StaffStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,6 +35,10 @@ public class CompanyStaff {
 
     @Column(name = "notes", length = 500)
     private String notes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private StaffStatus status;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
