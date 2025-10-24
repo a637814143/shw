@@ -80,9 +80,9 @@ public class ServiceOrderService {
         }
         int earnedPoints = calculateLoyaltyPoints(price);
 
-        UserAll company = service.getCompany();
         user.setMoney(user.getMoney().subtract(price));
-        company.setMoney(company.getMoney().add(price));
+        UserAll treasury = getTreasuryAccount();
+        treasury.setMoney(treasury.getMoney().add(price));
         user.setLoyaltyPoints(safeLoyalty(user.getLoyaltyPoints()) + earnedPoints);
 
         ServiceOrder order = new ServiceOrder();
@@ -97,10 +97,12 @@ public class ServiceOrderService {
         order.setLoyaltyPoints(earnedPoints);
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(order.getCreatedAt());
+        order.setSettlementReleased(false);
+        order.setSettlementReleasedAt(null);
 
         ServiceOrder saved = serviceOrderRepository.save(order);
         userAllRepository.save(user);
-        userAllRepository.save(company);
+        userAllRepository.save(treasury);
         return mapToResponse(saved);
     }
 
@@ -155,20 +157,6 @@ public class ServiceOrderService {
         order.setProgressNote("用户申请退款");
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));
-    }
-
-    @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listRefundRequestsForCompany() {
-        UserAll company = accountLookupService.getCurrentAccount();
-        ensureRole(company, AccountRole.COMPANY);
-        List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
-        if (services.isEmpty()) {
-            return List.of();
-        }
-        return serviceOrderRepository.findByServiceInAndStatus(services, ServiceOrderStatus.REFUND_REQUESTED)
-            .stream()
-            .map(this::mapToResponse)
-            .collect(Collectors.toList());
     }
 
     @Transactional
@@ -229,48 +217,98 @@ public class ServiceOrderService {
     @Transactional
     public ServiceOrderResponse handleRefund(Long orderId, RefundDecisionRequest request) {
         UserAll actor = accountLookupService.getCurrentAccount();
+        ensureRole(actor, AccountRole.ADMIN);
         ServiceOrder order = serviceOrderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("订单不存在"));
 
-        boolean isAdmin = AccountRole.ADMIN.getLabel().equals(actor.getUserType());
-        boolean isCompany = AccountRole.COMPANY.getLabel().equals(actor.getUserType());
-        if (isCompany && !order.getService().getCompany().getId().equals(actor.getId())) {
-            throw new RuntimeException("无权处理其他公司的退款");
-        }
-        if (!isAdmin && !isCompany) {
-            throw new RuntimeException("没有处理权限");
-        }
         if (order.getStatus() != ServiceOrderStatus.REFUND_REQUESTED) {
             throw new RuntimeException("订单当前无需处理");
         }
 
-        if (Boolean.TRUE.equals(request.getApprove())) {
-            BigDecimal amount = order.getAmount();
-            if (amount == null) {
-                throw new RuntimeException("订单金额异常");
-            }
-            UserAll user = order.getUser();
-            UserAll company = order.getService().getCompany();
-            if (company.getMoney().compareTo(amount) < 0) {
-                throw new RuntimeException("家政公司余额不足，无法退款");
+        boolean approve = Boolean.TRUE.equals(request.getApprove());
+        BigDecimal amount = order.getAmount();
+        if (amount == null) {
+            throw new RuntimeException("订单金额异常");
+        }
+        UserAll user = order.getUser();
+        UserAll company = order.getService().getCompany();
+        UserAll treasury = getTreasuryAccount();
+        boolean wasSettled = order.isSettlementReleased();
+
+        if (approve) {
+            if (wasSettled) {
+                if (company.getMoney().compareTo(amount) < 0) {
+                    throw new RuntimeException("家政公司余额不足，无法退款");
+                }
+                company.setMoney(company.getMoney().subtract(amount));
+            } else {
+                if (treasury.getMoney().compareTo(amount) < 0) {
+                    throw new RuntimeException("平台余额不足，无法退款");
+                }
+                treasury.setMoney(treasury.getMoney().subtract(amount));
             }
             user.setMoney(user.getMoney().add(amount));
-            company.setMoney(company.getMoney().subtract(amount));
             int earned = safeLoyalty(order.getLoyaltyPoints());
             user.setLoyaltyPoints(Math.max(0, safeLoyalty(user.getLoyaltyPoints()) - earned));
             order.setStatus(ServiceOrderStatus.REFUND_APPROVED);
             order.setProgressNote("订单已退款");
+            order.setSettlementReleased(false);
+            order.setSettlementReleasedAt(null);
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");
         }
+
         order.setRefundResponse(normalizeMessage(request.getMessage()));
         order.setHandledBy(actor);
         order.setUpdatedAt(Instant.now());
 
         ServiceOrder saved = serviceOrderRepository.save(order);
-        userAllRepository.save(order.getUser());
-        userAllRepository.save(order.getService().getCompany());
+        if (approve) {
+            userAllRepository.save(user);
+            if (wasSettled) {
+                userAllRepository.save(company);
+            } else {
+                userAllRepository.save(treasury);
+            }
+        }
+        return mapToResponse(saved);
+    }
+
+    @Transactional
+    public ServiceOrderResponse settleCompletedOrder(Long orderId) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+        ServiceOrder order = serviceOrderRepository.findById(orderId)
+            .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (order.isSettlementReleased()) {
+            throw new RuntimeException("该订单已完成结算");
+        }
+        if (order.getStatus() != ServiceOrderStatus.COMPLETED) {
+            throw new RuntimeException("仅已完成的订单可以结算");
+        }
+
+        BigDecimal amount = order.getAmount();
+        if (amount == null) {
+            throw new RuntimeException("订单金额异常");
+        }
+        UserAll company = order.getService().getCompany();
+        UserAll treasury = getTreasuryAccount();
+        if (treasury.getMoney().compareTo(amount) < 0) {
+            throw new RuntimeException("平台余额不足，请先充值");
+        }
+
+        treasury.setMoney(treasury.getMoney().subtract(amount));
+        company.setMoney(company.getMoney().add(amount));
+        Instant now = Instant.now();
+        order.setSettlementReleased(true);
+        order.setSettlementReleasedAt(now);
+        order.setUpdatedAt(now);
+
+        ServiceOrder saved = serviceOrderRepository.save(order);
+        userAllRepository.save(treasury);
+        userAllRepository.save(company);
         return mapToResponse(saved);
     }
 
@@ -344,10 +382,12 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listOrdersForAdmin() {
+    public List<ServiceOrderResponse> listOrdersForAdmin(String keyword) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
+        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findAll().stream()
+            .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceOrder::getCreatedAt).reversed())
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -384,7 +424,9 @@ public class ServiceOrderService {
             order.getUser().getContactPhone(),
             order.getUser().getContactAddress(),
             order.getCreatedAt(),
-            order.getUpdatedAt()
+            order.getUpdatedAt(),
+            order.isSettlementReleased(),
+            order.getSettlementReleasedAt()
         );
     }
 
@@ -402,6 +444,11 @@ public class ServiceOrderService {
             default:
                 return status;
         }
+    }
+
+    private UserAll getTreasuryAccount() {
+        return userAllRepository.findFirstByUserTypeOrderByIdAsc(AccountRole.ADMIN.getLabel())
+            .orElseThrow(() -> new RuntimeException("平台管理员账户未配置"));
     }
 
     private int calculateLoyaltyPoints(BigDecimal amount) {
@@ -448,7 +495,10 @@ public class ServiceOrderService {
                 order.getRefundReason(),
                 order.getRefundResponse(),
                 order.getAssignedWorker(),
-                order.getWorkerContact()
+                order.getWorkerContact(),
+                order.getStatus() == null ? null : order.getStatus().name(),
+                order.isSettlementReleased() ? "已结算" : "待结算",
+                order.getSettlementReleasedAt() == null ? null : order.getSettlementReleasedAt().toString()
             )
             .filter(Objects::nonNull)
             .map(String::toLowerCase)

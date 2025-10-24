@@ -20,6 +20,8 @@ public interface UserAllRepository extends JpaRepository<UserAll, Long> {
 
     List<UserAll> findByUserTypeOrderByIdAsc(String userType);
 
+    Optional<UserAll> findFirstByUserTypeOrderByIdAsc(String userType);
+
     @Query("""
         SELECT u FROM UserAll u
         WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))

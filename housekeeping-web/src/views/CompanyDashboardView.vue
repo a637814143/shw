@@ -3,7 +3,7 @@
     <header class="dashboard-header">
       <div>
         <h1 class="dashboard-title">家政公司工作台</h1>
-        <p class="dashboard-subtitle">维护服务项目、安排预约并及时处理用户退款</p>
+        <p class="dashboard-subtitle">维护服务项目、安排预约并高效连接客户</p>
       </div>
       <div class="header-actions">
         <img :src="avatarSrc" alt="账号头像" class="account-avatar" />
@@ -25,9 +25,9 @@
         <p class="stat-helper">提前规划人手与物料</p>
       </article>
       <article class="stat-card warning">
-        <p class="stat-label">待处理退款</p>
-        <p class="stat-value">{{ companyStats.pendingRefunds }}</p>
-        <p class="stat-helper">及时响应守护用户体验</p>
+        <p class="stat-label">进行中服务</p>
+        <p class="stat-value">{{ companyStats.inProgress }}</p>
+        <p class="stat-helper">实时掌握执行状态</p>
       </article>
       <article class="stat-card success">
         <p class="stat-label">团队成员</p>
@@ -599,47 +599,6 @@
           @send-message="handleSendMessage"
         />
 
-        <section v-else class="panel">
-          <header class="panel-header">
-            <div>
-              <h2>退款申请处理</h2>
-              <p>审核用户的退款申请，保障服务体验。</p>
-            </div>
-          </header>
-          <div class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>订单信息</th>
-                  <th>用户</th>
-                  <th>退款原因</th>
-                  <th>提交时间</th>
-                  <th class="table-actions">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="order in refundOrders" :key="order.id">
-                  <td>
-                    <strong>{{ order.serviceName }}</strong>
-                    <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
-                  </td>
-                  <td>{{ order.username }}</td>
-                  <td>{{ order.refundReason }}</td>
-                  <td>{{ formatDateTime(order.updatedAt) }}</td>
-                  <td class="table-actions actions-inline">
-                    <button type="button" class="link-button" @click="handleRefund(order, true)">同意</button>
-                    <button type="button" class="link-button danger" @click="handleRefund(order, false)">
-                      拒绝
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="!refundOrders.length">
-                  <td colspan="5" class="empty-row">暂无待处理的退款申请。</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
       </main>
     </div>
   </div>
@@ -656,12 +615,10 @@ import {
   deleteCompanyService,
   deleteCompanyServices,
   fetchCompanyOrders,
-  fetchCompanyRefunds,
   fetchCompanyServices,
   fetchCompanyReviews,
   fetchCompanyConversations,
   fetchCompanyMessages,
-  handleCompanyRefund,
   markCompanyConversationRead,
   sendCompanyMessage,
   updateCompanyOrderProgress,
@@ -691,7 +648,7 @@ import {
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
 import AccountProfileEditor from '../components/AccountProfileEditor.vue'
 
-type SectionKey = 'profile' | 'services' | 'appointments' | 'staff' | 'reviews' | 'messages' | 'refunds'
+type SectionKey = 'profile' | 'services' | 'appointments' | 'staff' | 'reviews' | 'messages'
 
 interface SectionMeta {
   key: SectionKey
@@ -722,7 +679,6 @@ const sections: SectionMeta[] = [
   { key: 'staff', icon: '🧑\u200d🤝\u200d🧑', label: '人员管理' },
   { key: 'reviews', icon: '✨', label: '服务口碑' },
   { key: 'messages', icon: '💬', label: '客户沟通' },
-  { key: 'refunds', icon: '💸', label: '退款审核' },
 ]
 
 const activeSection = ref<SectionKey>('services')
@@ -735,7 +691,6 @@ const serviceAveragePrice = ref(0)
 const serviceLoading = ref(false)
 const selectedServiceIds = ref<Set<number>>(new Set())
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
-const refundOrders = ref<ServiceOrderItem[]>([])
 const companyOrders = ref<ServiceOrderItem[]>([])
 const appointmentsLoading = ref(false)
 const appointmentSearch = ref('')
@@ -1009,14 +964,14 @@ const activeMessages = computed(() =>
 
 const companyStats = computed(() => {
   const totalServices = serviceTotal.value
-  const pendingRefunds = refundOrders.value.length
   const avgPrice = totalServices ? serviceAveragePrice.value : 0
   const balance = account.value?.balance ?? 0
   const upcoming = companyOrders.value.length
+  const inProgress = companyOrders.value.filter((order) => order.status === 'IN_PROGRESS').length
   const staffCount = staffList.value.length
   return {
     totalServices,
-    pendingRefunds,
+    inProgress,
     avgPrice,
     balance,
     upcoming,
@@ -1381,18 +1336,6 @@ const refreshAppointments = async () => {
   await Promise.all([loadCompanyOrders(), loadStaff()])
 }
 
-const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
-  const message = window.prompt('请输入处理说明（可选）：', order.refundResponse || '') || undefined
-  try {
-    await handleCompanyRefund(order.id, { approve, message })
-    await loadRefunds()
-    await loadAccount()
-    window.alert('已提交处理结果')
-  } catch (error) {
-    window.alert(error instanceof Error ? error.message : '处理失败')
-  }
-}
-
 const saveOrderProgress = async (order: ServiceOrderItem, status: ServiceOrderItem['status']) => {
   progressSaving[order.id] = true
   try {
@@ -1617,8 +1560,8 @@ const switchSection = async (key: SectionKey) => {
     await loadAccount()
     return
   }
-  if (key === 'refunds') {
-    await loadRefunds()
+  if (key === 'services') {
+    await loadServices()
   }
   if (key === 'appointments') {
     await refreshAppointments()
@@ -1699,14 +1642,6 @@ const loadStaff = async () => {
   }
 }
 
-const loadRefunds = async () => {
-  try {
-    refundOrders.value = await fetchCompanyRefunds()
-  } catch (error) {
-    console.error(error)
-  }
-}
-
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
@@ -1760,7 +1695,7 @@ const formatDateTime = (value: string) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadAccount(), loadServices(), loadRefunds(), loadStaff()])
+  await Promise.all([loadAccount(), loadServices(), loadStaff()])
   await refreshAppointments()
 })
 

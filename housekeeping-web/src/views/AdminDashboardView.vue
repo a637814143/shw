@@ -7,6 +7,7 @@
       </div>
       <div class="header-actions">
         <span class="welcome">管理员：{{ username }}</span>
+        <span class="wallet-balance">钱包余额：¥{{ adminBalanceText }}</span>
         <button type="button" class="logout-button" @click="logout">退出登录</button>
       </div>
     </header>
@@ -287,6 +288,87 @@
                 </tr>
                 <tr v-if="!adminOrders.length">
                   <td colspan="5" class="empty-row">暂无预约数据。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-else-if="activeSection === 'ledger'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>订单管理</h2>
+              <p>查看预约履约与结算状态，集中处理平台资金。</p>
+            </div>
+            <div class="user-actions">
+              <label class="visually-hidden" for="order-ledger-search">搜索订单</label>
+              <input
+                id="order-ledger-search"
+                v-model="orderSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务、用户或家政公司"
+                :disabled="orderLedgerLoading"
+              />
+              <button type="button" class="ghost-button" @click="loadOrderLedger" :disabled="orderLedgerLoading">
+                {{ orderLedgerLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+          <div v-if="orderLedgerLoading" class="loading-state">正在查询订单记录…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>用户 / 公司</th>
+                  <th>预约时间</th>
+                  <th>状态</th>
+                  <th>金额</th>
+                  <th class="table-actions">结算</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="order in orderLedger" :key="order.id">
+                  <td>
+                    <strong>{{ order.serviceName }}</strong>
+                    <div class="order-subtext">家政公司：{{ order.companyName }}</div>
+                    <div class="order-subtext muted">指派人员：{{ order.assignedWorker || '—' }}</div>
+                  </td>
+                  <td>
+                    <div>{{ order.username }}</div>
+                    <div class="order-subtext muted">{{ order.customerContactPhone || '—' }}</div>
+                  </td>
+                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
+                      {{ statusText(order.status) }}
+                    </span>
+                    <div class="order-subtext">{{ order.progressNote || '待更新' }}</div>
+                  </td>
+                  <td>¥{{ order.price.toFixed(2) }}</td>
+                  <td class="table-actions actions-inline">
+                    <div class="settlement-cell">
+                      <span class="settlement-status" :class="{ completed: order.settlementReleased }">
+                        {{ order.settlementReleased ? settlementSummary(order) : '待结算' }}
+                      </span>
+                      <button
+                        v-if="!order.settlementReleased"
+                        type="button"
+                        class="primary-button"
+                        :disabled="order.status !== 'COMPLETED' || settlementSaving[order.id]"
+                        @click="completeSettlement(order)"
+                      >
+                        {{ settlementSaving[order.id] ? '结算中…' : '完成交易' }}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="!orderLedger.length">
+                  <td colspan="6" class="empty-row">
+                    <span v-if="hasOrderFilter">未找到匹配的订单，请调整搜索条件。</span>
+                    <span v-else>暂无订单记录。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -746,6 +828,7 @@ import { useRouter } from 'vue-router'
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY, ROLE_LABELS } from '../constants/auth'
 import {
   assignAdminWorker,
+  settleAdminOrder,
   createDashboardAnnouncement,
   createDashboardCarousel,
   createDashboardTip,
@@ -761,6 +844,7 @@ import {
   fetchAdminRefunds,
   deleteAdminRefunds,
   fetchAdminTransactions,
+  fetchCurrentAccount,
   fetchAdminUsers,
   fetchDashboardAnnouncements,
   fetchDashboardCarousels,
@@ -777,6 +861,7 @@ import {
   type AccountTransactionItem,
   type AdminOverviewItem,
   type AssignWorkerPayload,
+  type AccountProfileItem,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
   type DashboardTipItem,
@@ -789,7 +874,7 @@ import {
 } from '../services/dashboard'
 
 
-type SectionKey = 'overview' | 'users' | 'orders' | 'transactions' | 'favorites' | 'content' | 'refunds'
+type SectionKey = 'overview' | 'users' | 'orders' | 'ledger' | 'transactions' | 'favorites' | 'content' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -804,6 +889,7 @@ const sections: SectionMeta[] = [
   { key: 'overview', icon: '✨', label: '数据总览' },
   { key: 'users', icon: '🧾', label: '用户管理' },
   { key: 'orders', icon: '📋', label: '预约调度' },
+  { key: 'ledger', icon: '💼', label: '订单管理' },
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
@@ -815,6 +901,9 @@ const activeSection = ref<SectionKey>('overview')
 const overview = ref<AdminOverviewItem | null>(null)
 const overviewLoading = ref(false)
 
+const adminAccount = ref<AccountProfileItem | null>(null)
+const adminBalanceText = computed(() => (adminAccount.value ? adminAccount.value.balance.toFixed(2) : '0.00'))
+
 const users = ref<UserAccountItem[]>([])
 const usersLoading = ref(false)
 const userSearch = ref('')
@@ -823,6 +912,12 @@ let userSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const adminOrders = ref<ServiceOrderItem[]>([])
 const ordersLoading = ref(false)
+
+const orderLedger = ref<ServiceOrderItem[]>([])
+const orderLedgerLoading = ref(false)
+const orderSearch = ref('')
+let orderSearchTimer: ReturnType<typeof setTimeout> | null = null
+const settlementSaving = reactive<Record<number, boolean>>({})
 
 const transactions = ref<AccountTransactionItem[]>([])
 const transactionsLoading = ref(false)
@@ -844,6 +939,7 @@ const allUsersSelected = computed(
   () => users.value.length > 0 && users.value.every((user) => selectedUserIds.value.has(user.id)),
 )
 const hasUserFilter = computed(() => userSearch.value.trim().length > 0)
+const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
 
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -874,6 +970,20 @@ const ensureAssignEdit = (orderId: number): AssignWorkerPayload => {
     }
   }
   return assignEdits[orderId]
+}
+
+const applyOrderUpdate = (updated: ServiceOrderItem) => {
+  const ledgerIndex = orderLedger.value.findIndex((item) => item.id === updated.id)
+  if (ledgerIndex >= 0) {
+    orderLedger.value.splice(ledgerIndex, 1, updated)
+  }
+  const adminIndex = adminOrders.value.findIndex((item) => item.id === updated.id)
+  if (adminIndex >= 0) {
+    adminOrders.value.splice(adminIndex, 1, updated)
+    const edit = ensureAssignEdit(updated.id)
+    edit.workerName = updated.assignedWorker ?? ''
+    edit.workerContact = updated.workerContact ?? ''
+  }
 }
 
 const carouselForm = reactive<{ title: string; imageUrl: string; serviceLink: string }>({
@@ -974,6 +1084,13 @@ const formatDateTime = (value: string) => {
   })
 }
 
+const settlementSummary = (order: ServiceOrderItem) => {
+  if (order.settlementReleasedAt) {
+    return `已结算 · ${formatDateTime(order.settlementReleasedAt)}`
+  }
+  return '已结算'
+}
+
 const formatDate = (value: string) => {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('zh-CN')
@@ -1068,6 +1185,8 @@ const switchSection = (key: SectionKey) => {
     loadUsers()
   } else if (key === 'orders') {
     loadAdminOrders()
+  } else if (key === 'ledger') {
+    loadOrderLedger()
   } else if (key === 'transactions') {
     loadTransactions()
   } else if (key === 'favorites') {
@@ -1094,6 +1213,14 @@ const loadOverview = async () => {
     console.error(error)
   } finally {
     overviewLoading.value = false
+  }
+}
+
+const loadAdminAccount = async () => {
+  try {
+    adminAccount.value = await fetchCurrentAccount()
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -1129,6 +1256,18 @@ const loadAdminOrders = async () => {
     console.error(error)
   } finally {
     ordersLoading.value = false
+  }
+}
+
+const loadOrderLedger = async () => {
+  orderLedgerLoading.value = true
+  try {
+    const keyword = orderSearch.value.trim()
+    orderLedger.value = await fetchAdminOrders(keyword ? { keyword } : undefined)
+  } catch (error) {
+    console.error(error)
+  } finally {
+    orderLedgerLoading.value = false
   }
 }
 
@@ -1249,6 +1388,16 @@ watch(userSearch, () => {
   userSearchTimer = setTimeout(async () => {
     await loadUsers()
     userSearchTimer = null
+  }, 300)
+})
+
+watch(orderSearch, () => {
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+  }
+  orderSearchTimer = setTimeout(async () => {
+    await loadOrderLedger()
+    orderSearchTimer = null
   }, 300)
 })
 
@@ -1591,6 +1740,23 @@ const saveAssignment = async (order: ServiceOrderItem) => {
   }
 }
 
+const completeSettlement = async (order: ServiceOrderItem) => {
+  if (order.settlementReleased || order.status !== 'COMPLETED') {
+    return
+  }
+  settlementSaving[order.id] = true
+  try {
+    const updated = await settleAdminOrder(order.id)
+    applyOrderUpdate(updated)
+    await loadAdminAccount()
+    window.alert('结算完成')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '结算失败')
+  } finally {
+    settlementSaving[order.id] = false
+  }
+}
+
 const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
   const message = approve ? '确认同意该退款？' : '确认拒绝该退款？'
   if (!window.confirm(message)) return
@@ -1788,7 +1954,7 @@ const handleBulkDeleteAnnouncements = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadUsers(), loadRefunds()])
+  await Promise.all([loadOverview(), loadUsers(), loadRefunds(), loadAdminAccount(), loadOrderLedger()])
 })
 
 onUnmounted(() => {
@@ -1811,6 +1977,10 @@ onUnmounted(() => {
   if (announcementSearchTimer) {
     clearTimeout(announcementSearchTimer)
     announcementSearchTimer = null
+  }
+  if (orderSearchTimer) {
+    clearTimeout(orderSearchTimer)
+    orderSearchTimer = null
   }
 })
 </script>
@@ -1860,6 +2030,11 @@ onUnmounted(() => {
   gap: 1rem;
   font-size: 0.95rem;
   color: rgba(226, 232, 240, 0.9);
+}
+
+.wallet-balance {
+  font-weight: 600;
+  color: #38bdf8;
 }
 
 .logout-button {
@@ -2155,6 +2330,22 @@ onUnmounted(() => {
 
 .assign-grid .primary-button {
   grid-column: span 2;
+}
+
+.settlement-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.settlement-status {
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.7);
+}
+
+.settlement-status.completed {
+  color: #4ade80;
 }
 
 .status-badge {

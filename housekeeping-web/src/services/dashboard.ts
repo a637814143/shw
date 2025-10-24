@@ -104,6 +104,8 @@ export interface ServiceOrderItem {
   customerAddress?: string | null
   createdAt: string
   updatedAt: string
+  settlementReleased: boolean
+  settlementReleasedAt?: string | null
 }
 
 export interface ServiceReviewItem {
@@ -723,22 +725,6 @@ export const assignCompanyStaff = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchCompanyRefunds = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/company/services/refunds'), withAuthHeaders())
-  return handleResponse<ServiceOrderItem[]>(response)
-}
-
-export const handleCompanyRefund = async (
-  orderId: number,
-  payload: RefundDecisionPayload,
-): Promise<ServiceOrderItem> => {
-  const response = await fetch(buildUrl(`/api/company/services/refunds/${orderId}`), {
-    ...withAuthHeaders({ method: 'POST' }),
-    body: JSON.stringify(payload),
-  })
-  return handleResponse<ServiceOrderItem>(response)
-}
-
 export const fetchCompanyOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
   const url = new URL(buildUrl('/api/company/services/orders'))
   if (params?.keyword) {
@@ -941,9 +927,18 @@ export const fetchAdminManagers = async (): Promise<UserAccountItem[]> => {
   return handleResponse<UserAccountItem[]>(response)
 }
 
-export const fetchAdminOrders = async (): Promise<ServiceOrderItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/orders'), withAuthHeaders())
+export const fetchAdminOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+  const url = new URL(buildUrl('/api/admin/orders'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const settleAdminOrder = async (orderId: number): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/admin/orders/${orderId}/settle`), withAuthHeaders({ method: 'POST' }))
+  return handleResponse<ServiceOrderItem>(response)
 }
 
 export const assignAdminWorker = async (

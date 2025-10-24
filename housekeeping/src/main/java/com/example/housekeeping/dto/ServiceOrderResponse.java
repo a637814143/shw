@@ -33,6 +33,8 @@ public class ServiceOrderResponse {
     private String customerAddress;
     private Instant createdAt;
     private Instant updatedAt;
+    private boolean settlementReleased;
+    private Instant settlementReleasedAt;
 
     public ServiceOrderResponse(Long id, Long serviceId, String serviceName, String unit, BigDecimal price,
                                 String contact, String companyName, String username, ServiceOrderStatus status,
@@ -40,7 +42,7 @@ public class ServiceOrderResponse {
                                 String refundReason, String refundResponse, String handledBy,
                                 String assignedWorker, String workerContact,
                                 String customerContactPhone, String customerAddress,
-                                Instant createdAt, Instant updatedAt) {
+                                Instant createdAt, Instant updatedAt, boolean settlementReleased, Instant settlementReleasedAt) {
         this.id = id;
         this.serviceId = serviceId;
         this.serviceName = serviceName;
@@ -64,6 +66,8 @@ public class ServiceOrderResponse {
         this.customerAddress = customerAddress;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.settlementReleased = settlementReleased;
+        this.settlementReleasedAt = settlementReleasedAt;
     }
 
     public Long getId() {
@@ -156,5 +160,13 @@ public class ServiceOrderResponse {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public boolean isSettlementReleased() {
+        return settlementReleased;
+    }
+
+    public Instant getSettlementReleasedAt() {
+        return settlementReleasedAt;
     }
 }

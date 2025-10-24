@@ -63,6 +63,8 @@ CREATE TABLE `service_order` (
   `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
+  `settlement_released` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已结算至商家',
+  `settlement_released_at` datetime DEFAULT NULL COMMENT '结算时间',
   PRIMARY KEY (`id`),
   KEY `idx_order_service` (`service_id`),
   KEY `idx_order_user` (`user_id`),
