@@ -36,13 +36,24 @@
             <h2>家政服务</h2>
             <p>以下服务由家政公司实时更新，游客可浏览但暂无法预约。</p>
           </div>
-          <button type="button" class="ghost-button" @click="loadServices" :disabled="servicesLoading">
-            刷新列表
-          </button>
+          <div class="service-actions">
+            <label class="service-search">
+              <span class="sr-only">搜索家政服务</span>
+              <input
+                v-model.trim="serviceSearch"
+                type="search"
+                placeholder="搜索服务或公司名称"
+                aria-label="搜索家政服务"
+              />
+            </label>
+            <button type="button" class="ghost-button" @click="loadServices" :disabled="servicesLoading">
+              刷新列表
+            </button>
+          </div>
         </header>
         <p v-if="servicesError" class="error-tip">{{ servicesError }}</p>
         <div v-else class="service-grid">
-          <article v-for="service in services" :key="service.id" class="service-card">
+          <article v-for="service in filteredServices" :key="service.id" class="service-card">
             <h3 class="service-title">{{ service.name }}</h3>
             <p class="service-company">提供方：{{ service.companyName }}</p>
             <dl class="service-meta">
@@ -62,7 +73,9 @@
             <p v-if="service.description" class="service-desc">{{ service.description }}</p>
             <p class="service-note">请登录后预约服务。</p>
           </article>
-          <p v-if="!services.length && !servicesLoading" class="empty-tip">暂无家政服务，稍后再来看看。</p>
+          <p v-if="!filteredServices.length && !servicesLoading" class="empty-tip">
+            {{ serviceSearch ? '未找到匹配的服务，请尝试调整搜索词。' : '暂无家政服务，稍后再来看看。' }}
+          </p>
         </div>
       </section>
 
@@ -128,6 +141,19 @@ const activeTab = ref<TouristTab>('home')
 const services = ref<HousekeepServiceItem[]>([])
 const servicesLoading = ref(false)
 const servicesError = ref('')
+const serviceSearch = ref('')
+const filteredServices = computed(() => {
+  if (!serviceSearch.value) {
+    return services.value
+  }
+  const keyword = serviceSearch.value.toLowerCase()
+  return services.value.filter((service) => {
+    const nameMatch = service.name?.toLowerCase().includes(keyword)
+    const companyMatch = service.companyName?.toLowerCase().includes(keyword)
+    const descriptionMatch = service.description?.toLowerCase().includes(keyword)
+    return nameMatch || companyMatch || descriptionMatch
+  })
+})
 
 const tips = ref<DashboardTipItem[]>([])
 const tipsLoading = ref(false)
@@ -331,6 +357,46 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.service-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-search {
+  position: relative;
+}
+
+.service-search input {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.5);
+  background: #ffffff;
+  min-width: 220px;
+  font-size: 14px;
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.service-search input:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .panel-header h2 {
