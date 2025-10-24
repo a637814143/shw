@@ -936,6 +936,14 @@ export const fetchAdminOrders = async (params?: { keyword?: string }): Promise<S
   return handleResponse<ServiceOrderItem[]>(response)
 }
 
+export const deleteAdminOrders = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/orders'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
+}
+
 export const settleAdminOrder = async (orderId: number): Promise<ServiceOrderItem> => {
   const response = await fetch(buildUrl(`/api/admin/orders/${orderId}/settle`), withAuthHeaders({ method: 'POST' }))
   return handleResponse<ServiceOrderItem>(response)
@@ -952,14 +960,38 @@ export const assignAdminWorker = async (
   return handleResponse<ServiceOrderItem>(response)
 }
 
-export const fetchAdminTransactions = async (): Promise<AccountTransactionItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/transactions'), withAuthHeaders())
+export const fetchAdminTransactions = async (params?: { keyword?: string }): Promise<AccountTransactionItem[]> => {
+  const url = new URL(buildUrl('/api/admin/transactions'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<AccountTransactionItem[]>(response)
 }
 
-export const fetchAdminFavorites = async (): Promise<ServiceFavoriteItem[]> => {
-  const response = await fetch(buildUrl('/api/admin/favorites'), withAuthHeaders())
+export const deleteAdminTransactions = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/transactions'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const fetchAdminFavorites = async (params?: { keyword?: string }): Promise<ServiceFavoriteItem[]> => {
+  const url = new URL(buildUrl('/api/admin/favorites'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceFavoriteItem[]>(response)
+}
+
+export const deleteAdminFavorites = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/favorites'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const createDashboardTip = async (payload: DashboardTipItem): Promise<DashboardTipItem> => {

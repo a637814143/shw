@@ -301,6 +301,15 @@
               <p>查看预约履约与结算状态，集中处理平台资金。</p>
             </div>
             <div class="user-actions">
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasLedgerSelection || orderLedgerLoading"
+                @click="handleBulkDeleteLedgerOrders"
+              >
+                删除选中<span v-if="selectedLedgerCount">（{{ selectedLedgerCount }}）</span>
+              </button>
+              <span class="muted helper-note">仅支持删除已结算订单</span>
               <label class="visually-hidden" for="order-ledger-search">搜索订单</label>
               <input
                 id="order-ledger-search"
@@ -320,6 +329,15 @@
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allLedgerSelected"
+                      :disabled="orderLedgerLoading || !deletableLedgerOrders.length"
+                      @change="toggleSelectAllLedger(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选可删除订单"
+                    />
+                  </th>
                   <th>服务</th>
                   <th>用户 / 公司</th>
                   <th>预约时间</th>
@@ -330,6 +348,15 @@
               </thead>
               <tbody>
                 <tr v-for="order in orderLedger" :key="order.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedLedgerIds.has(order.id)"
+                      :disabled="orderLedgerLoading || !canDeleteLedgerOrder(order)"
+                      @change="toggleLedgerSelection(order.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择订单 ${order.serviceName}`"
+                    />
+                  </td>
                   <td>
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">家政公司：{{ order.companyName }}</div>
@@ -365,7 +392,7 @@
                   </td>
                 </tr>
                 <tr v-if="!orderLedger.length">
-                  <td colspan="6" class="empty-row">
+                  <td colspan="7" class="empty-row">
                     <span v-if="hasOrderFilter">未找到匹配的订单，请调整搜索条件。</span>
                     <span v-else>暂无订单记录。</span>
                   </td>
@@ -381,15 +408,43 @@
               <h2>充值与调整流水</h2>
               <p>记录用户自助充值、积分兑换及管理员调整。</p>
             </div>
-            <button type="button" class="ghost-button" @click="loadTransactions" :disabled="transactionsLoading">
-              {{ transactionsLoading ? '刷新中…' : '刷新流水' }}
-            </button>
+            <div class="user-actions">
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasTransactionSelection || transactionsLoading"
+                @click="handleBulkDeleteTransactions"
+              >
+                删除选中<span v-if="selectedTransactionCount">（{{ selectedTransactionCount }}）</span>
+              </button>
+              <label class="visually-hidden" for="transaction-search">搜索流水</label>
+              <input
+                id="transaction-search"
+                v-model="transactionSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索账号、类型或备注"
+                :disabled="transactionsLoading"
+              />
+              <button type="button" class="ghost-button" @click="loadTransactions" :disabled="transactionsLoading">
+                {{ transactionsLoading ? '刷新中…' : '刷新流水' }}
+              </button>
+            </div>
           </header>
           <div v-if="transactionsLoading" class="loading-state">正在同步流水记录…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allTransactionsSelected"
+                      :disabled="transactionsLoading || !transactions.length"
+                      @change="toggleSelectAllTransactions(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选流水记录"
+                    />
+                  </th>
                   <th>时间</th>
                   <th>账号</th>
                   <th>类型</th>
@@ -399,6 +454,15 @@
               </thead>
               <tbody>
                 <tr v-for="item in transactions" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedTransactionIds.has(item.id)"
+                      :disabled="transactionsLoading"
+                      @change="toggleTransactionSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择流水 ${item.username}`"
+                    />
+                  </td>
                   <td>{{ formatDateTime(item.createdAt) }}</td>
                   <td>{{ item.username }}</td>
                   <td>{{ transactionText(item.type) }}</td>
@@ -406,7 +470,10 @@
                   <td>{{ item.note || '—' }}</td>
                 </tr>
                 <tr v-if="!transactions.length">
-                  <td colspan="5" class="empty-row">暂无充值或调整记录。</td>
+                  <td colspan="6" class="empty-row">
+                    <span v-if="hasTransactionFilter">未找到匹配的流水记录。</span>
+                    <span v-else>暂无充值或调整记录。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -419,15 +486,43 @@
               <h2>收藏洞察</h2>
               <p>了解用户偏好，为内容与服务运营提供数据依据。</p>
             </div>
-            <button type="button" class="ghost-button" @click="loadFavorites" :disabled="favoritesLoading">
-              {{ favoritesLoading ? '刷新中…' : '刷新数据' }}
-            </button>
+            <div class="user-actions">
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasFavoriteSelection || favoritesLoading"
+                @click="handleBulkDeleteFavorites"
+              >
+                删除选中<span v-if="selectedFavoriteCount">（{{ selectedFavoriteCount }}）</span>
+              </button>
+              <label class="visually-hidden" for="favorite-search">搜索收藏</label>
+              <input
+                id="favorite-search"
+                v-model="favoriteSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索用户、服务或公司"
+                :disabled="favoritesLoading"
+              />
+              <button type="button" class="ghost-button" @click="loadFavorites" :disabled="favoritesLoading">
+                {{ favoritesLoading ? '刷新中…' : '刷新数据' }}
+              </button>
+            </div>
           </header>
           <div v-if="favoritesLoading" class="loading-state">正在加载收藏列表…</div>
           <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allFavoritesSelected"
+                      :disabled="favoritesLoading || !favorites.length"
+                      @change="toggleSelectAllFavorites(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选收藏记录"
+                    />
+                  </th>
                   <th>用户</th>
                   <th>收藏服务</th>
                   <th>所属公司</th>
@@ -436,13 +531,25 @@
               </thead>
               <tbody>
                 <tr v-for="item in favorites" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedFavoriteIds.has(item.id)"
+                      :disabled="favoritesLoading"
+                      @change="toggleFavoriteSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择收藏 ${item.serviceName}`"
+                    />
+                  </td>
                   <td>{{ item.username }}</td>
                   <td>{{ item.serviceName }}</td>
                   <td>{{ item.companyName }}</td>
                   <td>{{ formatDateTime(item.createdAt) }}</td>
                 </tr>
                 <tr v-if="!favorites.length">
-                  <td colspan="4" class="empty-row">暂未产生收藏数据。</td>
+                  <td colspan="5" class="empty-row">
+                    <span v-if="hasFavoriteFilter">未找到符合条件的收藏记录。</span>
+                    <span v-else>暂未产生收藏数据。</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -838,6 +945,9 @@ import {
   deleteDashboardCarousels,
   deleteDashboardTip,
   deleteDashboardTips,
+  deleteAdminFavorites,
+  deleteAdminOrders,
+  deleteAdminTransactions,
   fetchAdminFavorites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -917,13 +1027,20 @@ const orderLedger = ref<ServiceOrderItem[]>([])
 const orderLedgerLoading = ref(false)
 const orderSearch = ref('')
 let orderSearchTimer: ReturnType<typeof setTimeout> | null = null
+const selectedLedgerIds = ref<Set<number>>(new Set())
 const settlementSaving = reactive<Record<number, boolean>>({})
 
 const transactions = ref<AccountTransactionItem[]>([])
 const transactionsLoading = ref(false)
+const transactionSearch = ref('')
+const selectedTransactionIds = ref<Set<number>>(new Set())
+let transactionSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const favorites = ref<ServiceFavoriteItem[]>([])
 const favoritesLoading = ref(false)
+const favoriteSearch = ref('')
+const selectedFavoriteIds = ref<Set<number>>(new Set())
+let favoriteSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const refundOrders = ref<ServiceOrderItem[]>([])
 const refundsLoading = ref(false)
@@ -940,6 +1057,26 @@ const allUsersSelected = computed(
 )
 const hasUserFilter = computed(() => userSearch.value.trim().length > 0)
 const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
+const deletableLedgerOrders = computed(() => orderLedger.value.filter((item) => item.settlementReleased))
+const allLedgerSelected = computed(
+  () =>
+    deletableLedgerOrders.value.length > 0 &&
+    deletableLedgerOrders.value.every((item) => selectedLedgerIds.value.has(item.id)),
+)
+const selectedLedgerCount = computed(() => selectedLedgerIds.value.size)
+const hasLedgerSelection = computed(() => selectedLedgerIds.value.size > 0)
+const hasTransactionFilter = computed(() => transactionSearch.value.trim().length > 0)
+const allTransactionsSelected = computed(
+  () => transactions.value.length > 0 && transactions.value.every((item) => selectedTransactionIds.value.has(item.id)),
+)
+const selectedTransactionCount = computed(() => selectedTransactionIds.value.size)
+const hasTransactionSelection = computed(() => selectedTransactionIds.value.size > 0)
+const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
+const allFavoritesSelected = computed(
+  () => favorites.value.length > 0 && favorites.value.every((item) => selectedFavoriteIds.value.has(item.id)),
+)
+const selectedFavoriteCount = computed(() => selectedFavoriteIds.value.size)
+const hasFavoriteSelection = computed(() => selectedFavoriteIds.value.size > 0)
 
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -972,10 +1109,142 @@ const ensureAssignEdit = (orderId: number): AssignWorkerPayload => {
   return assignEdits[orderId]
 }
 
+const canDeleteLedgerOrder = (order: ServiceOrderItem) => order.settlementReleased
+
+const pruneLedgerSelection = () => {
+  if (!selectedLedgerIds.value.size) {
+    return
+  }
+  const allowed = new Set(deletableLedgerOrders.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedLedgerIds.value.forEach((id) => {
+    if (allowed.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedLedgerIds.value = next
+  }
+}
+
+const toggleLedgerSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedLedgerIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedLedgerIds.value = next
+}
+
+const toggleSelectAllLedger = (checked: boolean) => {
+  if (!checked) {
+    selectedLedgerIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedLedgerIds.value)
+  deletableLedgerOrders.value.forEach((item) => next.add(item.id))
+  selectedLedgerIds.value = next
+}
+
+const clearLedgerSelection = () => {
+  selectedLedgerIds.value = new Set()
+}
+
+const pruneTransactionSelection = () => {
+  if (!selectedTransactionIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(transactions.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedTransactionIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedTransactionIds.value = next
+  }
+}
+
+const toggleTransactionSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedTransactionIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedTransactionIds.value = next
+}
+
+const toggleSelectAllTransactions = (checked: boolean) => {
+  if (!checked) {
+    selectedTransactionIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedTransactionIds.value)
+  transactions.value.forEach((item) => next.add(item.id))
+  selectedTransactionIds.value = next
+}
+
+const clearTransactionSelection = () => {
+  selectedTransactionIds.value = new Set()
+}
+
+const pruneFavoriteSelection = () => {
+  if (!selectedFavoriteIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(favorites.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedFavoriteIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedFavoriteIds.value = next
+  }
+}
+
+const toggleFavoriteSelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedFavoriteIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedFavoriteIds.value = next
+}
+
+const toggleSelectAllFavorites = (checked: boolean) => {
+  if (!checked) {
+    selectedFavoriteIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedFavoriteIds.value)
+  favorites.value.forEach((item) => next.add(item.id))
+  selectedFavoriteIds.value = next
+}
+
+const clearFavoriteSelection = () => {
+  selectedFavoriteIds.value = new Set()
+}
+
 const applyOrderUpdate = (updated: ServiceOrderItem) => {
   const ledgerIndex = orderLedger.value.findIndex((item) => item.id === updated.id)
   if (ledgerIndex >= 0) {
     orderLedger.value.splice(ledgerIndex, 1, updated)
+    pruneLedgerSelection()
   }
   const adminIndex = adminOrders.value.findIndex((item) => item.id === updated.id)
   if (adminIndex >= 0) {
@@ -1264,6 +1533,7 @@ const loadOrderLedger = async () => {
   try {
     const keyword = orderSearch.value.trim()
     orderLedger.value = await fetchAdminOrders(keyword ? { keyword } : undefined)
+    pruneLedgerSelection()
   } catch (error) {
     console.error(error)
   } finally {
@@ -1274,7 +1544,9 @@ const loadOrderLedger = async () => {
 const loadTransactions = async () => {
   transactionsLoading.value = true
   try {
-    transactions.value = await fetchAdminTransactions()
+    const keyword = transactionSearch.value.trim()
+    transactions.value = await fetchAdminTransactions(keyword ? { keyword } : undefined)
+    pruneTransactionSelection()
   } catch (error) {
     console.error(error)
   } finally {
@@ -1285,7 +1557,9 @@ const loadTransactions = async () => {
 const loadFavorites = async () => {
   favoritesLoading.value = true
   try {
-    favorites.value = await fetchAdminFavorites()
+    const keyword = favoriteSearch.value.trim()
+    favorites.value = await fetchAdminFavorites(keyword ? { keyword } : undefined)
+    pruneFavoriteSelection()
   } catch (error) {
     console.error(error)
   } finally {
@@ -1381,6 +1655,62 @@ const handleDeleteSingleRefund = async (order: ServiceOrderItem) => {
   }
 }
 
+const handleBulkDeleteLedgerOrders = async () => {
+  if (!selectedLedgerIds.value.size) {
+    return
+  }
+  const invalid = Array.from(selectedLedgerIds.value).filter(
+    (id) => !deletableLedgerOrders.value.some((order) => order.id === id),
+  )
+  if (invalid.length) {
+    window.alert('仅已结算的订单可以删除，请重新选择。')
+    pruneLedgerSelection()
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedLedgerIds.value.size} 条订单记录？`)) {
+    return
+  }
+  try {
+    await deleteAdminOrders(Array.from(selectedLedgerIds.value))
+    clearLedgerSelection()
+    await loadOrderLedger()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleBulkDeleteTransactions = async () => {
+  if (!selectedTransactionIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedTransactionIds.value.size} 条流水记录？`)) {
+    return
+  }
+  try {
+    await deleteAdminTransactions(Array.from(selectedTransactionIds.value))
+    clearTransactionSelection()
+    await loadTransactions()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const handleBulkDeleteFavorites = async () => {
+  if (!selectedFavoriteIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedFavoriteIds.value.size} 条收藏记录？`)) {
+    return
+  }
+  try {
+    await deleteAdminFavorites(Array.from(selectedFavoriteIds.value))
+    clearFavoriteSelection()
+    await loadFavorites()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
 watch(userSearch, () => {
   if (userSearchTimer) {
     clearTimeout(userSearchTimer)
@@ -1398,6 +1728,26 @@ watch(orderSearch, () => {
   orderSearchTimer = setTimeout(async () => {
     await loadOrderLedger()
     orderSearchTimer = null
+  }, 300)
+})
+
+watch(transactionSearch, () => {
+  if (transactionSearchTimer) {
+    clearTimeout(transactionSearchTimer)
+  }
+  transactionSearchTimer = setTimeout(async () => {
+    await loadTransactions()
+    transactionSearchTimer = null
+  }, 300)
+})
+
+watch(favoriteSearch, () => {
+  if (favoriteSearchTimer) {
+    clearTimeout(favoriteSearchTimer)
+  }
+  favoriteSearchTimer = setTimeout(async () => {
+    await loadFavorites()
+    favoriteSearchTimer = null
   }, 300)
 })
 
@@ -1509,6 +1859,10 @@ const loadRefunds = async () => {
     refundsLoading.value = false
   }
 }
+
+watch(orderLedger, pruneLedgerSelection)
+watch(transactions, pruneTransactionSelection)
+watch(favorites, pruneFavoriteSelection)
 
 const pruneCarouselSelection = () => {
   if (!selectedCarouselIds.value.size) return
@@ -1982,6 +2336,14 @@ onUnmounted(() => {
     clearTimeout(orderSearchTimer)
     orderSearchTimer = null
   }
+  if (transactionSearchTimer) {
+    clearTimeout(transactionSearchTimer)
+    transactionSearchTimer = null
+  }
+  if (favoriteSearchTimer) {
+    clearTimeout(favoriteSearchTimer)
+    favoriteSearchTimer = null
+  }
 })
 </script>
 
@@ -2195,6 +2557,12 @@ onUnmounted(() => {
   justify-content: flex-end;
 }
 
+.helper-note {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.6);
+  white-space: nowrap;
+}
+
 .search-input {
   min-width: 220px;
   padding: 0.45rem 0.8rem;
@@ -2257,6 +2625,17 @@ onUnmounted(() => {
 
 .data-table tbody tr:hover {
   background: rgba(148, 163, 184, 0.08);
+}
+
+.table-checkbox {
+  width: 52px;
+  text-align: center;
+}
+
+.table-checkbox input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .inline-form {
@@ -2686,28 +3065,40 @@ onUnmounted(() => {
   gap: 8px;
   padding: 6px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(30, 41, 59, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
 }
 
 .chip-button {
-  border: none;
-  background: transparent;
-  padding: 6px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+  padding: 6px 16px;
   border-radius: 999px;
   cursor: pointer;
-  color: rgba(30, 41, 59, 0.65);
-  transition: background 0.2s ease, color 0.2s ease;
+  color: #f8fafc;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.5);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .chip-button.active {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(37, 99, 235, 0.2));
-  color: rgba(30, 41, 59, 0.95);
-  font-weight: 600;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.45), rgba(14, 165, 233, 0.35));
+  border-color: rgba(96, 165, 250, 0.65);
+  color: #0f172a;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
 }
 
 .chip-button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.chip-button:not(:disabled):hover {
+  border-color: rgba(148, 163, 184, 0.6);
+  background: rgba(59, 130, 246, 0.25);
+  color: #bfdbfe;
 }
 
 @media (max-width: 1080px) {

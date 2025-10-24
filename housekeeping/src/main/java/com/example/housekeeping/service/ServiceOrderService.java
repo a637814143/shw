@@ -378,7 +378,62 @@ public class ServiceOrderService {
     public void deleteOrdersForCurrentUser(List<Long> ids) {
         UserAll user = accountLookupService.getCurrentAccount();
         ensureRole(user, AccountRole.USER);
-        deleteOrders(ids, order -> order.getUser() != null && Objects.equals(order.getUser().getId(), user.getId()));
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinctIds = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinctIds.isEmpty()) {
+            return;
+        }
+
+        List<ServiceOrder> orders = serviceOrderRepository.findAllById(distinctIds);
+        if (orders.size() != distinctIds.size()) {
+            throw new RuntimeException("部分订单不存在或已被删除");
+        }
+
+        for (ServiceOrder order : orders) {
+            if (order.getUser() == null || !Objects.equals(order.getUser().getId(), user.getId())) {
+                throw new RuntimeException("只能删除当前账号的订单");
+            }
+            ServiceOrderStatus status = order.getStatus();
+            if (status != ServiceOrderStatus.COMPLETED && status != ServiceOrderStatus.REFUND_APPROVED) {
+                throw new RuntimeException("仅已完成或已退款的订单可以删除");
+            }
+        }
+
+        orders.forEach(companyMessageRepository::deleteByOrder);
+        serviceOrderRepository.deleteAll(orders);
+    }
+
+    @Transactional
+    public void deleteOrdersForAdmin(List<Long> ids) {
+        UserAll admin = accountLookupService.getCurrentAccount();
+        ensureRole(admin, AccountRole.ADMIN);
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        Set<Long> distinctIds = ids.stream()
+            .filter(Objects::nonNull)
+            .collect(Collectors.toCollection(HashSet::new));
+        if (distinctIds.isEmpty()) {
+            return;
+        }
+
+        List<ServiceOrder> orders = serviceOrderRepository.findAllById(distinctIds);
+        if (orders.size() != distinctIds.size()) {
+            throw new RuntimeException("部分订单不存在或已被删除");
+        }
+
+        for (ServiceOrder order : orders) {
+            if (!order.isSettlementReleased()) {
+                throw new RuntimeException("仅已结算的订单可以删除");
+            }
+        }
+
+        orders.forEach(companyMessageRepository::deleteByOrder);
+        serviceOrderRepository.deleteAll(orders);
     }
 
     @Transactional(readOnly = true)

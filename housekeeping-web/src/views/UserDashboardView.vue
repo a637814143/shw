@@ -306,7 +306,7 @@
                     <input
                       type="checkbox"
                       :checked="allVisibleOrdersSelected"
-                      :disabled="ordersLoading || !visibleOrders.length"
+                      :disabled="ordersLoading || !deletableVisibleOrders.length"
                       @change="toggleSelectAllOrders(($event.target as HTMLInputElement).checked)"
                       aria-label="全选订单"
                     />
@@ -326,7 +326,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedOrderIds.has(order.id)"
-                      :disabled="ordersLoading"
+                      :disabled="ordersLoading || !canDeleteOrder(order)"
                       @change="toggleOrderSelection(order.id, ($event.target as HTMLInputElement).checked)"
                       :aria-label="`选择订单 ${order.serviceName}`"
                     />
@@ -382,10 +382,11 @@
                     <button
                       type="button"
                       class="link-button danger"
-                      :disabled="ordersLoading"
+                      :disabled="ordersLoading || !canDeleteOrder(order)"
+                      :title="canDeleteOrder(order) ? '' : '仅已完成或已退款的订单可以删除'"
                       @click="handleDeleteOrder(order)"
                     >
-                      删除
+                      删除订单
                     </button>
                   </td>
                 </tr>
@@ -773,6 +774,9 @@ const matchesUserOrderSearch = (order: ServiceOrderItem, keyword: string) => {
   return fields.some((field) => normalizeUserSearchValue(field).includes(target))
 }
 
+const canDeleteOrder = (order: ServiceOrderItem) =>
+  order.status === 'COMPLETED' || order.status === 'REFUND_APPROVED'
+
 const matchesUserReviewSearch = (review: ServiceReviewItem, keyword: string) => {
   if (!keyword) {
     return true
@@ -791,9 +795,13 @@ const visibleOrders = computed(() => {
 })
 
 const hasOrderFilter = computed(() => orderSearch.value.trim().length > 0)
-
+const deletableOrders = computed(() => orders.value.filter((order) => canDeleteOrder(order)))
+const deletableOrderIds = computed(() => new Set(deletableOrders.value.map((item) => item.id)))
+const deletableVisibleOrders = computed(() => visibleOrders.value.filter((order) => canDeleteOrder(order)))
 const allVisibleOrdersSelected = computed(
-  () => visibleOrders.value.length > 0 && visibleOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
+  () =>
+    deletableVisibleOrders.value.length > 0 &&
+    deletableVisibleOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
 )
 
 const selectedOrderCount = computed(() => selectedOrderIds.value.size)
@@ -883,11 +891,11 @@ const pruneOrderSelection = () => {
   if (!selectedOrderIds.value.size) {
     return
   }
-  const visibleIds = new Set(orders.value.map((item) => item.id))
+  const allowedIds = deletableOrderIds.value
   let changed = false
   const next = new Set<number>()
   selectedOrderIds.value.forEach((id) => {
-    if (visibleIds.has(id)) {
+    if (allowedIds.has(id)) {
       next.add(id)
     } else {
       changed = true
@@ -901,7 +909,9 @@ const pruneOrderSelection = () => {
 const toggleOrderSelection = (id: number, checked: boolean) => {
   const next = new Set(selectedOrderIds.value)
   if (checked) {
-    next.add(id)
+    if (deletableOrderIds.value.has(id)) {
+      next.add(id)
+    }
   } else {
     next.delete(id)
   }
@@ -914,7 +924,7 @@ const toggleSelectAllOrders = (checked: boolean) => {
     return
   }
   const next = new Set(selectedOrderIds.value)
-  visibleOrders.value.forEach((item) => next.add(item.id))
+  deletableVisibleOrders.value.forEach((item) => next.add(item.id))
   selectedOrderIds.value = next
 }
 
@@ -1215,6 +1225,10 @@ const checkPaymentResult = async () => {
 }
 
 const handleDeleteOrder = async (order: ServiceOrderItem) => {
+  if (!canDeleteOrder(order)) {
+    window.alert('仅已完成或已退款的订单可以删除')
+    return
+  }
   if (!window.confirm(`确定删除订单“${order.serviceName}”（${order.companyName}）吗？`)) {
     return
   }
@@ -1231,6 +1245,12 @@ const handleDeleteOrder = async (order: ServiceOrderItem) => {
 
 const handleBulkDeleteOrders = async () => {
   if (!selectedOrderIds.value.size) {
+    return
+  }
+  const invalid = Array.from(selectedOrderIds.value).filter((id) => !deletableOrderIds.value.has(id))
+  if (invalid.length) {
+    window.alert('仅已完成或已退款的订单可以删除，请重新选择。')
+    pruneOrderSelection()
     return
   }
   if (!window.confirm(`确认删除选中的 ${selectedOrderIds.value.size} 个订单记录吗？`)) {
