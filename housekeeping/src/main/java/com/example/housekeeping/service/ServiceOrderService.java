@@ -235,6 +235,8 @@ public class ServiceOrderService {
         UserAll treasury = getTreasuryAccount();
         boolean wasSettled = order.isSettlementReleased();
 
+        Instant now = Instant.now();
+
         if (approve) {
             if (wasSettled) {
                 if (company.getMoney().compareTo(amount) < 0) {
@@ -252,8 +254,8 @@ public class ServiceOrderService {
             user.setLoyaltyPoints(Math.max(0, safeLoyalty(user.getLoyaltyPoints()) - earned));
             order.setStatus(ServiceOrderStatus.REFUND_APPROVED);
             order.setProgressNote("订单已退款");
-            order.setSettlementReleased(false);
-            order.setSettlementReleasedAt(null);
+            order.setSettlementReleased(true);
+            order.setSettlementReleasedAt(now);
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");
@@ -261,7 +263,7 @@ public class ServiceOrderService {
 
         order.setRefundResponse(normalizeMessage(request.getMessage()));
         order.setHandledBy(actor);
-        order.setUpdatedAt(Instant.now());
+        order.setUpdatedAt(now);
 
         ServiceOrder saved = serviceOrderRepository.save(order);
         if (approve) {

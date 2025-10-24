@@ -329,11 +329,6 @@ export interface PointsExchangePayload {
   points: number
 }
 
-export interface AssignWorkerPayload {
-  workerName: string
-  workerContact: string
-}
-
 export interface CompanyStaffItem {
   id: number
   name: string
@@ -946,17 +941,6 @@ export const deleteAdminOrders = async (ids: number[]): Promise<void> => {
 
 export const settleAdminOrder = async (orderId: number): Promise<ServiceOrderItem> => {
   const response = await fetch(buildUrl(`/api/admin/orders/${orderId}/settle`), withAuthHeaders({ method: 'POST' }))
-  return handleResponse<ServiceOrderItem>(response)
-}
-
-export const assignAdminWorker = async (
-  orderId: number,
-  payload: AssignWorkerPayload,
-): Promise<ServiceOrderItem> => {
-  const response = await fetch(buildUrl(`/api/admin/orders/${orderId}/assign`), {
-    ...withAuthHeaders({ method: 'POST' }),
-    body: JSON.stringify(payload),
-  })
   return handleResponse<ServiceOrderItem>(response)
 }
 

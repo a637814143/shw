@@ -463,114 +463,198 @@
             <h2>提交服务评价</h2>
             <p>感谢分享真实感受，平台会及时反馈给家政公司。</p>
           </header>
-          <form class="form-grid" @submit.prevent="handleSubmitReview">
-            <div class="form-field">
-              <label for="review-service">评价的服务</label>
-              <select id="review-service" v-model="reviewForm.serviceId">
-                <option disabled value="">请选择服务</option>
-                <option v-for="service in reviewableServices" :key="service.id" :value="service.id">
-                  {{ service.name }}（{{ service.companyName }}）
-                </option>
-              </select>
+          <div class="review-toolbar">
+            <div class="review-search">
+              <label class="visually-hidden" for="user-review-search">搜索评价或服务</label>
+              <input
+                id="user-review-search"
+                v-model="reviewSearch"
+                class="search-input"
+                type="search"
+                :disabled="userReviewsLoading"
+                placeholder="搜索服务名称、公司或评价内容"
+              />
             </div>
-            <div class="form-field">
-              <label for="review-rating">评分（1-5分）</label>
-              <input id="review-rating" v-model.number="reviewForm.rating" type="number" min="1" max="5" />
-            </div>
-            <div class="form-field form-field-full">
-              <label for="review-content">评价内容</label>
-              <textarea id="review-content" v-model="reviewForm.content" rows="4" placeholder="描述您的服务体验"></textarea>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="primary-button" :disabled="reviewSubmitting">
-                {{ reviewSubmitting ? '提交中…' : '提交评价' }}
+            <div class="review-tabs" role="tablist" aria-label="评价筛选">
+              <button
+                type="button"
+                class="tab-button"
+                :class="{ active: reviewTab === 'reviewed' }"
+                :aria-pressed="reviewTab === 'reviewed'"
+                @click="setReviewTab('reviewed')"
+              >
+                已评价
+              </button>
+              <button
+                type="button"
+                class="tab-button"
+                :class="{ active: reviewTab === 'unreviewed' }"
+                :aria-pressed="reviewTab === 'unreviewed'"
+                @click="setReviewTab('unreviewed')"
+              >
+                未评价
               </button>
             </div>
-          </form>
-
-          <div class="service-actions">
-            <label class="visually-hidden" for="user-review-search">搜索评价</label>
-            <input
-              id="user-review-search"
-              v-model="reviewSearch"
-              class="search-input"
-              type="search"
-              :disabled="userReviewsLoading"
-              placeholder="搜索服务、评分或内容关键词"
-            />
-            <button
-              type="button"
-              class="secondary-button danger"
-              :disabled="!hasUserReviewSelection || userReviewsLoading"
-              @click="handleBulkDeleteUserReviews"
-            >
-              删除选中<span v-if="selectedUserReviewCount">（{{ selectedUserReviewCount }}）</span>
-            </button>
-            <button type="button" class="secondary-button" :disabled="userReviewsLoading" @click="loadUserReviews">
-              刷新评价
-            </button>
           </div>
-          <div class="table-wrapper">
+
+          <div v-if="reviewTab === 'reviewed'" class="review-section">
+            <div class="review-actions">
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasUserReviewSelection || userReviewsLoading"
+                @click="handleBulkDeleteUserReviews"
+              >
+                删除选中<span v-if="selectedUserReviewCount">（{{ selectedUserReviewCount }}）</span>
+              </button>
+              <button type="button" class="secondary-button" :disabled="userReviewsLoading" @click="loadUserReviews">
+                刷新评价
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="table-checkbox">
+                      <input
+                        type="checkbox"
+                        :checked="allVisibleUserReviewsSelected"
+                        :disabled="userReviewsLoading || !visibleUserReviews.length"
+                        @change="toggleSelectAllUserReviews(($event.target as HTMLInputElement).checked)"
+                        aria-label="全选评价"
+                      />
+                    </th>
+                    <th>服务</th>
+                    <th>评分与内容</th>
+                    <th class="table-actions">时间与操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in visibleUserReviews" :key="item.id">
+                    <td class="table-checkbox">
+                      <input
+                        type="checkbox"
+                        :checked="selectedUserReviewIds.has(item.id)"
+                        :disabled="userReviewsLoading"
+                        @change="toggleUserReviewSelection(item.id, ($event.target as HTMLInputElement).checked)"
+                        :aria-label="`选择评价 ${item.serviceName}`"
+                      />
+                    </td>
+                    <td>
+                      <div class="review-service">
+                        <strong>{{ item.serviceName }}</strong>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="review-rating">评分：{{ item.rating }} 分</div>
+                      <p class="review-text">{{ item.content || '暂无评价内容' }}</p>
+                    </td>
+                    <td class="table-actions actions-inline">
+                      <span class="order-subtext">发表于 {{ formatDateTime(item.createdAt) }}</span>
+                      <button
+                        type="button"
+                        class="link-button danger"
+                        :disabled="userReviewsLoading"
+                        @click="handleDeleteUserReview(item)"
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="userReviewsLoading">
+                    <td colspan="4" class="empty-row">评价加载中…</td>
+                  </tr>
+                  <tr v-else-if="!visibleUserReviews.length">
+                    <td colspan="4" class="empty-row">
+                      <span v-if="hasReviewSearch">没有找到相关评价，尝试调整搜索关键词。</span>
+                      <span v-else>暂无评价记录，完成订单后即可发布评价。</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div v-else class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th class="table-checkbox">
-                    <input
-                      type="checkbox"
-                      :checked="allVisibleUserReviewsSelected"
-                      :disabled="userReviewsLoading || !visibleUserReviews.length"
-                      @change="toggleSelectAllUserReviews(($event.target as HTMLInputElement).checked)"
-                      aria-label="全选评价"
-                    />
-                  </th>
                   <th>服务</th>
-                  <th>评分与内容</th>
-                  <th class="table-actions">时间与操作</th>
+                  <th>最近预约</th>
+                  <th class="table-actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in visibleUserReviews" :key="item.id">
-                  <td class="table-checkbox">
-                    <input
-                      type="checkbox"
-                      :checked="selectedUserReviewIds.has(item.id)"
-                      :disabled="userReviewsLoading"
-                      @change="toggleUserReviewSelection(item.id, ($event.target as HTMLInputElement).checked)"
-                      :aria-label="`选择评价 ${item.serviceName}`"
-                    />
-                  </td>
+                <tr v-for="service in pendingReviewServices" :key="service.id">
                   <td>
-                    <div class="review-service">
-                      <strong>{{ item.serviceName }}</strong>
-                    </div>
+                    <strong>{{ service.name }}</strong>
+                    <div class="order-subtext muted">服务公司：{{ service.companyName }}</div>
                   </td>
-                  <td>
-                    <div class="review-rating">评分：{{ item.rating }} 分</div>
-                    <p class="review-text">{{ item.content || '暂无评价内容' }}</p>
-                  </td>
+                  <td>{{ service.lastScheduledAt ? formatDateTime(service.lastScheduledAt) : '—' }}</td>
                   <td class="table-actions actions-inline">
-                    <span class="order-subtext">发表于 {{ formatDateTime(item.createdAt) }}</span>
-                    <button
-                      type="button"
-                      class="link-button danger"
-                      :disabled="userReviewsLoading"
-                      @click="handleDeleteUserReview(item)"
-                    >
-                      删除
+                    <button type="button" class="primary-button" @click="openReviewModal(service)">
+                      去评价
                     </button>
                   </td>
                 </tr>
-                <tr v-if="userReviewsLoading">
-                  <td colspan="4" class="empty-row">评价加载中…</td>
+                <tr v-if="ordersLoading || userReviewsLoading">
+                  <td colspan="3" class="empty-row">数据加载中…</td>
                 </tr>
-                <tr v-else-if="!visibleUserReviews.length">
-                  <td colspan="4" class="empty-row">
-                    <span v-if="hasUserReviewFilter">没有找到相关评价，尝试调整搜索关键词。</span>
-                    <span v-else>暂无评价记录，完成订单后即可发布评价。</span>
+                <tr v-else-if="!pendingReviewServices.length">
+                  <td colspan="3" class="empty-row">
+                    <span v-if="hasReviewSearch">没有匹配的待评价服务。</span>
+                    <span v-else>暂无待评价的服务，完成订单后即可发布评价。</span>
                   </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div
+            v-if="reviewModalVisible"
+            class="review-modal-backdrop"
+            role="dialog"
+            aria-modal="true"
+            :aria-label="reviewModalService ? `为 ${reviewModalService.name} 提交评价` : '提交评价'"
+          >
+            <div class="review-modal">
+              <header class="review-modal-header">
+                <h3>提交评价</h3>
+                <p v-if="reviewModalService" class="review-modal-subtitle">
+                  {{ reviewModalService.name }} · {{ reviewModalService.companyName }}
+                </p>
+              </header>
+              <form class="review-modal-form" @submit.prevent="submitPendingReview">
+                <div class="form-field">
+                  <label for="modal-review-rating">评分（1-5分）</label>
+                  <input
+                    id="modal-review-rating"
+                    v-model.number="reviewModalForm.rating"
+                    type="number"
+                    min="1"
+                    max="5"
+                    required
+                  />
+                </div>
+                <div class="form-field">
+                  <label for="modal-review-content">评价内容</label>
+                  <textarea
+                    id="modal-review-content"
+                    v-model="reviewModalForm.content"
+                    rows="4"
+                    placeholder="描述您的服务体验"
+                    required
+                  ></textarea>
+                </div>
+                <div class="modal-actions">
+                  <button type="button" class="secondary-button" @click="closeReviewModal" :disabled="reviewSubmitting">
+                    取消
+                  </button>
+                  <button type="submit" class="primary-button" :disabled="reviewSubmitting">
+                    {{ reviewSubmitting ? '提交中…' : '提交评价' }}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </section>
       </main>
@@ -635,6 +719,13 @@ interface SectionMeta {
   label: string
 }
 
+interface ReviewableServiceSummary {
+  id: number
+  name: string
+  companyName: string
+  lastScheduledAt: string | null
+}
+
 type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
 
 type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
@@ -692,11 +783,10 @@ const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
 const paymentSession = ref<PaymentSessionInfo | null>(null)
 
-const reviewForm = reactive<{ serviceId: number | ''; rating: number; content: string }>({
-  serviceId: '',
-  rating: 5,
-  content: '',
-})
+const reviewTab = ref<'reviewed' | 'unreviewed'>('reviewed')
+const reviewModalVisible = ref(false)
+const reviewModalService = ref<ReviewableServiceSummary | null>(null)
+const reviewModalForm = reactive<{ rating: number; content: string }>({ rating: 5, content: '' })
 const reviewSubmitting = ref(false)
 
 const walletForm = reactive<{ amount: number | null }>({ amount: null })
@@ -815,7 +905,7 @@ const visibleUserReviews = computed(() => {
   return userReviews.value.filter((item) => matchesUserReviewSearch(item, keyword))
 })
 
-const hasUserReviewFilter = computed(() => reviewSearch.value.trim().length > 0)
+const hasReviewSearch = computed(() => reviewSearch.value.trim().length > 0)
 
 const allVisibleUserReviewsSelected = computed(
   () =>
@@ -849,18 +939,42 @@ const upcomingOrders = computed(() => {
     .slice(0, 5)
 })
 
-const reviewableServices = computed(() => {
-  const uniqueMap = new Map<number, { id: number; name: string; companyName: string }>()
+const reviewedServiceIds = computed(() => new Set(userReviews.value.map((item) => item.serviceId)))
+
+const reviewableServices = computed<ReviewableServiceSummary[]>(() => {
+  const summaryMap = new Map<number, ReviewableServiceSummary>()
   orders.value.forEach((order) => {
-    if (!uniqueMap.has(order.serviceId)) {
-      uniqueMap.set(order.serviceId, {
+    const lastScheduledAt = order.scheduledAt ?? null
+    const existing = summaryMap.get(order.serviceId)
+    if (!existing) {
+      summaryMap.set(order.serviceId, {
         id: order.serviceId,
         name: order.serviceName,
         companyName: order.companyName,
+        lastScheduledAt,
       })
+      return
+    }
+    const existingTime = existing.lastScheduledAt ? new Date(existing.lastScheduledAt).getTime() : -Infinity
+    const orderTime = lastScheduledAt ? new Date(lastScheduledAt).getTime() : -Infinity
+    if (orderTime > existingTime) {
+      existing.lastScheduledAt = lastScheduledAt
     }
   })
-  return Array.from(uniqueMap.values())
+  return Array.from(summaryMap.values())
+})
+
+const pendingReviewServices = computed(() => {
+  const keyword = reviewSearch.value.trim().toLowerCase()
+  const reviewedIds = reviewedServiceIds.value
+  return reviewableServices.value
+    .filter((service) => !reviewedIds.has(service.id))
+    .filter((service) => {
+      if (!keyword) {
+        return true
+      }
+      return [service.name, service.companyName].some((field) => field.toLowerCase().includes(keyword))
+    })
 })
 
 const loadAccount = async () => {
@@ -1301,23 +1415,52 @@ const toggleFavorite = async (service: HousekeepServiceItem) => {
   }
 }
 
-const handleSubmitReview = async () => {
-  if (!reviewForm.serviceId) {
-    window.alert('请选择要评价的服务')
+const setReviewTab = (tab: 'reviewed' | 'unreviewed') => {
+  reviewTab.value = tab
+  if (tab !== 'reviewed') {
+    selectedUserReviewIds.value = new Set()
+  }
+}
+
+const openReviewModal = (service: ReviewableServiceSummary) => {
+  reviewModalService.value = service
+  reviewModalForm.rating = 5
+  reviewModalForm.content = ''
+  reviewSubmitting.value = false
+  reviewModalVisible.value = true
+}
+
+const closeReviewModal = () => {
+  reviewModalVisible.value = false
+  reviewModalService.value = null
+  reviewModalForm.rating = 5
+  reviewModalForm.content = ''
+  reviewSubmitting.value = false
+}
+
+const submitPendingReview = async () => {
+  if (!reviewModalService.value) {
+    return
+  }
+  const rating = Math.max(1, Math.min(5, Number(reviewModalForm.rating)))
+  const content = reviewModalForm.content.trim()
+  if (!content) {
+    window.alert('请填写评价内容')
     return
   }
   reviewSubmitting.value = true
   try {
     await submitUserReview({
-      serviceId: Number(reviewForm.serviceId),
-      rating: reviewForm.rating,
-      content: reviewForm.content,
+      serviceId: reviewModalService.value.id,
+      rating,
+      content,
     })
-    reviewForm.content = ''
     await loadUserReviews()
+    reviewTab.value = 'reviewed'
+    closeReviewModal()
     window.alert('评价提交成功')
   } catch (error) {
-    console.error(error)
+    window.alert(error instanceof Error ? error.message : '提交评价失败，请稍后重试')
   } finally {
     reviewSubmitting.value = false
   }
@@ -1906,6 +2049,109 @@ onUnmounted(() => {
   gap: 0.75rem;
   font-size: 0.85rem;
   color: rgba(148, 163, 184, 0.7);
+}
+
+.review-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.review-search {
+  flex: 1 1 260px;
+}
+
+.review-tabs {
+  display: inline-flex;
+  gap: 0.75rem;
+  padding: 0.35rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.tab-button {
+  padding: 0.45rem 1.25rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.75);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.tab-button.active {
+  background: linear-gradient(120deg, #6366f1, #38bdf8);
+  color: #0f172a;
+  box-shadow: 0 12px 22px rgba(99, 102, 241, 0.3);
+}
+
+.tab-button:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+}
+
+.review-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.review-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 40;
+}
+
+.review-modal {
+  width: min(440px, 100%);
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.45);
+}
+
+.review-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #f8fafc;
+}
+
+.review-modal-subtitle {
+  margin: 0.35rem 0 0;
+  color: rgba(226, 232, 240, 0.7);
+  font-size: 0.95rem;
+}
+
+.review-modal-form .form-field textarea {
+  min-height: 120px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 
 .review-service {

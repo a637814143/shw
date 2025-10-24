@@ -226,74 +226,6 @@
           </div>
         </section>
 
-        <section v-else-if="activeSection === 'orders'" class="panel">
-          <header class="panel-header">
-            <div>
-              <h2>服务预约调度</h2>
-              <p>跨公司统一分配家政人员，实时跟进上门进度。</p>
-            </div>
-            <button type="button" class="ghost-button" @click="loadAdminOrders" :disabled="ordersLoading">
-              {{ ordersLoading ? '刷新中…' : '刷新列表' }}
-            </button>
-          </header>
-          <div v-if="ordersLoading" class="loading-state">正在获取预约数据…</div>
-          <div v-else class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>服务</th>
-                  <th>预约时间</th>
-                  <th>状态</th>
-                  <th>当前指派</th>
-                  <th>指派家政人员</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="order in adminOrders" :key="order.id">
-                  <td>
-                    <strong>{{ order.serviceName }}</strong>
-                    <div class="order-subtext">用户：{{ order.username }} · {{ order.companyName }}</div>
-                  </td>
-                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
-                  <td>
-                    <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
-                    <div class="order-subtext">{{ order.progressNote || '待更新' }}</div>
-                  </td>
-                  <td>
-                    <div class="order-subtext">{{ order.assignedWorker || '未指派' }}</div>
-                    <div class="order-subtext muted">{{ order.workerContact || '—' }}</div>
-                  </td>
-                  <td>
-                    <div class="assign-grid">
-                      <input
-                        v-model="ensureAssignEdit(order.id).workerName"
-                        type="text"
-                        placeholder="人员姓名"
-                      />
-                      <input
-                        v-model="ensureAssignEdit(order.id).workerContact"
-                        type="text"
-                        placeholder="联系方式"
-                      />
-                      <button
-                        type="button"
-                        class="primary-button"
-                        :disabled="assignSaving[order.id]"
-                        @click="saveAssignment(order)"
-                      >
-                        {{ assignSaving[order.id] ? '指派中…' : '保存指派' }}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="!adminOrders.length">
-                  <td colspan="5" class="empty-row">暂无预约数据。</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
         <section v-else-if="activeSection === 'ledger'" class="panel">
           <header class="panel-header">
             <div>
@@ -934,7 +866,6 @@ import { useRouter } from 'vue-router'
 
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY, ROLE_LABELS } from '../constants/auth'
 import {
-  assignAdminWorker,
   settleAdminOrder,
   createDashboardAnnouncement,
   createDashboardCarousel,
@@ -970,7 +901,6 @@ import {
   updateDashboardTip,
   type AccountTransactionItem,
   type AdminOverviewItem,
-  type AssignWorkerPayload,
   type AccountProfileItem,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
@@ -984,7 +914,7 @@ import {
 } from '../services/dashboard'
 
 
-type SectionKey = 'overview' | 'users' | 'orders' | 'ledger' | 'transactions' | 'favorites' | 'content' | 'refunds'
+type SectionKey = 'overview' | 'users' | 'ledger' | 'transactions' | 'favorites' | 'content' | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -998,7 +928,6 @@ const username = computed(() => sessionStorage.getItem(AUTH_ACCOUNT_KEY) ?? 'adm
 const sections: SectionMeta[] = [
   { key: 'overview', icon: '✨', label: '数据总览' },
   { key: 'users', icon: '🧾', label: '用户管理' },
-  { key: 'orders', icon: '📋', label: '预约调度' },
   { key: 'ledger', icon: '💼', label: '订单管理' },
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
@@ -1019,9 +948,6 @@ const usersLoading = ref(false)
 const userSearch = ref('')
 const selectedUserIds = ref<Set<number>>(new Set())
 let userSearchTimer: ReturnType<typeof setTimeout> | null = null
-
-const adminOrders = ref<ServiceOrderItem[]>([])
-const ordersLoading = ref(false)
 
 const orderLedger = ref<ServiceOrderItem[]>([])
 const orderLedgerLoading = ref(false)
@@ -1095,19 +1021,6 @@ let announcementSearchTimer: ReturnType<typeof setTimeout> | null = null
 const walletEdits = reactive<Record<number, number>>({})
 const loyaltyEdits = reactive<Record<number, number>>({})
 const passwordEdits = reactive<Record<number, string>>({})
-
-const assignEdits = reactive<Record<number, AssignWorkerPayload>>({})
-const assignSaving = reactive<Record<number, boolean>>({})
-
-const ensureAssignEdit = (orderId: number): AssignWorkerPayload => {
-  if (!assignEdits[orderId]) {
-    assignEdits[orderId] = {
-      workerName: '',
-      workerContact: '',
-    }
-  }
-  return assignEdits[orderId]
-}
 
 const canDeleteLedgerOrder = (order: ServiceOrderItem) => order.settlementReleased
 
@@ -1245,13 +1158,6 @@ const applyOrderUpdate = (updated: ServiceOrderItem) => {
   if (ledgerIndex >= 0) {
     orderLedger.value.splice(ledgerIndex, 1, updated)
     pruneLedgerSelection()
-  }
-  const adminIndex = adminOrders.value.findIndex((item) => item.id === updated.id)
-  if (adminIndex >= 0) {
-    adminOrders.value.splice(adminIndex, 1, updated)
-    const edit = ensureAssignEdit(updated.id)
-    edit.workerName = updated.assignedWorker ?? ''
-    edit.workerContact = updated.workerContact ?? ''
   }
 }
 
@@ -1452,8 +1358,6 @@ const switchSection = (key: SectionKey) => {
   activeSection.value = key
   if (key === 'users') {
     loadUsers()
-  } else if (key === 'orders') {
-    loadAdminOrders()
   } else if (key === 'ledger') {
     loadOrderLedger()
   } else if (key === 'transactions') {
@@ -1509,22 +1413,6 @@ const loadUsers = async () => {
     clearUserSelection()
   } finally {
     usersLoading.value = false
-  }
-}
-
-const loadAdminOrders = async () => {
-  ordersLoading.value = true
-  try {
-    adminOrders.value = await fetchAdminOrders()
-    adminOrders.value.forEach((order) => {
-      const edit = ensureAssignEdit(order.id)
-      edit.workerName = order.assignedWorker ?? ''
-      edit.workerContact = order.workerContact ?? ''
-    })
-  } catch (error) {
-    console.error(error)
-  } finally {
-    ordersLoading.value = false
   }
 }
 
@@ -2077,23 +1965,6 @@ const handleBulkDeleteUsers = async () => {
   }
 }
 
-const saveAssignment = async (order: ServiceOrderItem) => {
-  const payload = ensureAssignEdit(order.id)
-  if (!payload.workerName || !payload.workerContact) {
-    window.alert('请填写人员姓名与联系方式')
-    return
-  }
-  assignSaving[order.id] = true
-  try {
-    await assignAdminWorker(order.id, payload)
-    await loadAdminOrders()
-  } catch (error) {
-    console.error(error)
-  } finally {
-    assignSaving[order.id] = false
-  }
-}
-
 const completeSettlement = async (order: ServiceOrderItem) => {
   if (order.settlementReleased || order.status !== 'COMPLETED') {
     return
@@ -2122,6 +1993,7 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
       selectedRefundIds.value = next
     }
     await loadRefunds()
+    await loadOrderLedger()
     await loadOverview()
   } catch (error) {
     console.error(error)
@@ -2645,7 +2517,6 @@ onUnmounted(() => {
 }
 
 .inline-form input,
-.assign-grid input,
 .content-form input,
 .content-form textarea {
   background: rgba(15, 23, 42, 0.6);
@@ -2656,7 +2527,6 @@ onUnmounted(() => {
 }
 
 .inline-form input:focus,
-.assign-grid input:focus,
 .content-form input:focus,
 .content-form textarea:focus {
   outline: none;
@@ -2698,17 +2568,6 @@ onUnmounted(() => {
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: transparent;
   color: rgba(226, 232, 240, 0.8);
-}
-
-.assign-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.assign-grid .primary-button {
-  grid-column: span 2;
 }
 
 .settlement-cell {
