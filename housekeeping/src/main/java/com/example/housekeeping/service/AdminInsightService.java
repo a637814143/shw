@@ -28,7 +28,6 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -79,11 +78,9 @@ public class AdminInsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<AccountTransactionResponse> listRecentTransactions(String keyword) {
+    public List<AccountTransactionResponse> listRecentTransactions() {
         ensureAdmin();
-        String normalizedKeyword = normalizeKeyword(keyword);
         return accountTransactionRepository.findTop50ByOrderByCreatedAtDesc().stream()
-            .filter(txn -> matchesTransactionKeyword(txn, normalizedKeyword))
             .map(txn -> new AccountTransactionResponse(
                 txn.getId(),
                 txn.getUser().getUsername(),
@@ -96,11 +93,9 @@ public class AdminInsightService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceFavoriteResponse> listFavorites(String keyword) {
+    public List<ServiceFavoriteResponse> listFavorites() {
         ensureAdmin();
-        String normalizedKeyword = normalizeKeyword(keyword);
         return serviceFavoriteRepository.findAll().stream()
-            .filter(favorite -> matchesFavoriteKeyword(favorite, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceFavorite::getCreatedAt).reversed())
             .map(favorite -> new ServiceFavoriteResponse(
                 favorite.getId(),
@@ -111,38 +106,6 @@ public class AdminInsightService {
                 favorite.getCreatedAt()
             ))
             .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public void deleteTransactions(List<Long> ids) {
-        ensureAdmin();
-        if (ids == null || ids.isEmpty()) {
-            return;
-        }
-        List<Long> distinct = ids.stream()
-            .filter(Objects::nonNull)
-            .distinct()
-            .collect(Collectors.toList());
-        if (distinct.isEmpty()) {
-            return;
-        }
-        accountTransactionRepository.deleteAllById(distinct);
-    }
-
-    @Transactional
-    public void deleteFavorites(List<Long> ids) {
-        ensureAdmin();
-        if (ids == null || ids.isEmpty()) {
-            return;
-        }
-        List<Long> distinct = ids.stream()
-            .filter(Objects::nonNull)
-            .distinct()
-            .collect(Collectors.toList());
-        if (distinct.isEmpty()) {
-            return;
-        }
-        serviceFavoriteRepository.deleteAllById(distinct);
     }
 
     private UserAll ensureAdmin() {
@@ -193,42 +156,5 @@ public class AdminInsightService {
         metrics.add(new AdminOverviewResponse.AppointmentMetric("已完成", counts.getOrDefault(ServiceOrderStatus.COMPLETED, 0L)));
         metrics.add(new AdminOverviewResponse.AppointmentMetric("退款处理", counts.getOrDefault(ServiceOrderStatus.REFUND_REQUESTED, 0L)));
         return metrics;
-    }
-
-    private String normalizeKeyword(String keyword) {
-        if (keyword == null) {
-            return null;
-        }
-        String trimmed = keyword.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private boolean matchesTransactionKeyword(AccountTransaction transaction, String keyword) {
-        if (keyword == null) {
-            return true;
-        }
-        String lower = keyword.toLowerCase();
-        return (transaction.getUser() != null
-                && transaction.getUser().getUsername() != null
-                && transaction.getUser().getUsername().toLowerCase().contains(lower))
-            || (transaction.getNote() != null && transaction.getNote().toLowerCase().contains(lower))
-            || transaction.getType().name().toLowerCase().contains(lower);
-    }
-
-    private boolean matchesFavoriteKeyword(ServiceFavorite favorite, String keyword) {
-        if (keyword == null) {
-            return true;
-        }
-        String lower = keyword.toLowerCase();
-        return (favorite.getUser() != null
-                && favorite.getUser().getUsername() != null
-                && favorite.getUser().getUsername().toLowerCase().contains(lower))
-            || (favorite.getService() != null
-                && favorite.getService().getName() != null
-                && favorite.getService().getName().toLowerCase().contains(lower))
-            || (favorite.getService() != null
-                && favorite.getService().getCompany() != null
-                && favorite.getService().getCompany().getUsername() != null
-                && favorite.getService().getCompany().getUsername().toLowerCase().contains(lower));
     }
 }

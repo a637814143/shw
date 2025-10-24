@@ -114,16 +114,8 @@ public class AdminManagementController {
     }
 
     @GetMapping("/orders")
-    public Result<List<ServiceOrderResponse>> listOrders(
-        @RequestParam(value = "keyword", required = false) String keyword
-    ) {
-        return Result.success(serviceOrderService.listOrdersForAdmin(keyword));
-    }
-
-    @DeleteMapping("/orders")
-    public Result<Void> deleteOrders(@Valid @RequestBody IdListRequest request) {
-        serviceOrderService.deleteOrdersForAdmin(request.getIds());
-        return Result.success("删除成功", null);
+    public Result<List<ServiceOrderResponse>> listOrders() {
+        return Result.success(serviceOrderService.listOrdersForAdmin());
     }
 
     @PostMapping("/orders/{orderId}/assign")
@@ -133,28 +125,12 @@ public class AdminManagementController {
     }
 
     @GetMapping("/transactions")
-    public Result<List<AccountTransactionResponse>> listTransactions(
-        @RequestParam(value = "keyword", required = false) String keyword
-    ) {
-        return Result.success(adminInsightService.listRecentTransactions(keyword));
-    }
-
-    @DeleteMapping("/transactions")
-    public Result<Void> deleteTransactions(@Valid @RequestBody IdListRequest request) {
-        adminInsightService.deleteTransactions(request.getIds());
-        return Result.success("删除成功", null);
+    public Result<List<AccountTransactionResponse>> listTransactions() {
+        return Result.success(adminInsightService.listRecentTransactions());
     }
 
     @GetMapping("/favorites")
-    public Result<List<ServiceFavoriteResponse>> listFavorites(
-        @RequestParam(value = "keyword", required = false) String keyword
-    ) {
-        return Result.success(adminInsightService.listFavorites(keyword));
-    }
-
-    @DeleteMapping("/favorites")
-    public Result<Void> deleteFavorites(@Valid @RequestBody IdListRequest request) {
-        adminInsightService.deleteFavorites(request.getIds());
-        return Result.success("删除成功", null);
+    public Result<List<ServiceFavoriteResponse>> listFavorites() {
+        return Result.success(adminInsightService.listFavorites());
     }
 }

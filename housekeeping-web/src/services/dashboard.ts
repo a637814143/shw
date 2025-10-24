@@ -359,6 +359,26 @@ export const fetchPublicServices = async (params?: { keyword?: string }): Promis
   return handleResponse<HousekeepServiceItem[]>(response)
 }
 
+export const fetchPublicTips = async (params?: { keyword?: string }): Promise<DashboardTipItem[]> => {
+  const url = new URL(buildUrl('/api/public/dashboard/tips'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString())
+  return handleResponse<DashboardTipItem[]>(response)
+}
+
+export const fetchPublicAnnouncements = async (
+  params?: { keyword?: string },
+): Promise<DashboardAnnouncementItem[]> => {
+  const url = new URL(buildUrl('/api/public/dashboard/announcements'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  const response = await fetch(url.toString())
+  return handleResponse<DashboardAnnouncementItem[]>(response)
+}
+
 export const fetchServiceReviews = async (serviceId: number): Promise<ServiceReviewItem[]> => {
   const response = await fetch(buildUrl(`/api/public/services/${serviceId}/reviews`))
   return handleResponse<ServiceReviewItem[]>(response)

@@ -112,9 +112,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import {
-  fetchDashboardAnnouncements,
-  fetchDashboardTips,
+  fetchPublicAnnouncements,
   fetchPublicServices,
+  fetchPublicTips,
   type DashboardAnnouncementItem,
   type DashboardTipItem,
   type HousekeepServiceItem,
@@ -169,7 +169,7 @@ const loadTips = async () => {
   tipsLoading.value = true
   tipsError.value = ''
   try {
-    tips.value = await fetchDashboardTips()
+    tips.value = await fetchPublicTips()
   } catch (error) {
     tipsError.value =
       error instanceof Error ? error.message : '加载居家贴士失败，请稍后再试。'
@@ -182,7 +182,7 @@ const loadAnnouncements = async () => {
   announcementsLoading.value = true
   announcementsError.value = ''
   try {
-    announcements.value = await fetchDashboardAnnouncements()
+    announcements.value = await fetchPublicAnnouncements()
   } catch (error) {
     announcementsError.value =
       error instanceof Error ? error.message : '加载系统公告失败，请稍后再试。'
