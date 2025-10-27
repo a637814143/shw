@@ -110,6 +110,15 @@
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
               <div class="form-field">
+                <label for="service-time">服务时间</label>
+                <input
+                  id="service-time"
+                  v-model="serviceForm.serviceTime"
+                  type="text"
+                  placeholder="如：工作日 9:00-18:00 / 2 小时"
+                />
+              </div>
+              <div class="form-field">
                 <label for="service-category">服务分类</label>
                 <select
                   id="service-category"
@@ -176,6 +185,7 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
+                  <th>服务时间</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -199,6 +209,7 @@
                   <td>{{ item.categoryName || '—' }}</td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
                   <td>{{ item.contact }}</td>
+                  <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
@@ -206,10 +217,10 @@
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="7" class="empty-row">服务加载中…</td>
+                  <td colspan="8" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="7" class="empty-row">
+                  <td colspan="8" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -809,6 +820,7 @@ const serviceForm = reactive<CompanyServicePayload>({
   unit: '',
   price: 0,
   contact: '',
+  serviceTime: '按需预约',
   description: '',
   categoryId: 0,
 })
@@ -1225,6 +1237,7 @@ const resetServiceForm = () => {
   serviceForm.unit = ''
   serviceForm.price = 0
   serviceForm.contact = ''
+  serviceForm.serviceTime = '按需预约'
   serviceForm.description = ''
   serviceForm.categoryId = serviceCategories.value[0]?.id ?? 0
   editingServiceId.value = null
@@ -1236,6 +1249,7 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
     serviceForm.unit = item.unit
     serviceForm.price = item.price
     serviceForm.contact = item.contact
+    serviceForm.serviceTime = item.serviceTime || '按需预约'
     serviceForm.description = item.description || ''
     serviceForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
     editingServiceId.value = item.id
@@ -1255,6 +1269,10 @@ const submitServiceForm = async () => {
     window.alert('请完整填写服务信息')
     return
   }
+  if (!serviceForm.serviceTime.trim()) {
+    window.alert('请填写服务时间')
+    return
+  }
   if (serviceForm.price <= 0) {
     window.alert('请填写有效的价格')
     return
@@ -1270,6 +1288,7 @@ const submitServiceForm = async () => {
       unit: serviceForm.unit.trim(),
       price: Number(serviceForm.price),
       contact: serviceForm.contact.trim(),
+      serviceTime: serviceForm.serviceTime.trim(),
       description: serviceForm.description?.trim() || '',
       categoryId: serviceForm.categoryId,
     }
@@ -1819,11 +1838,12 @@ const loadServiceCategories = async () => {
     serviceCategories.value = []
   }
   if (serviceCategories.value.length) {
+    const firstCategory = serviceCategories.value[0]!
     if (!serviceForm.categoryId) {
-      serviceForm.categoryId = serviceCategories.value[0].id
+      serviceForm.categoryId = firstCategory.id
     }
     if (!staffForm.categoryId) {
-      staffForm.categoryId = serviceCategories.value[0].id
+      staffForm.categoryId = firstCategory.id
     }
   }
 }

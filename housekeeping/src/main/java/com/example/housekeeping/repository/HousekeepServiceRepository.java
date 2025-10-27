@@ -27,6 +27,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         """,
@@ -36,6 +37,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         """)
@@ -49,6 +51,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     List<HousekeepService> searchByKeyword(@Param("keyword") String keyword);

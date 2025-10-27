@@ -103,6 +103,7 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -124,6 +125,7 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -185,6 +187,7 @@ public class HousekeepServiceManager {
             service.getUnit(),
             service.getPrice(),
             service.getContact(),
+            formatServiceTime(service),
             service.getDescription(),
             service.getCompany().getId(),
             service.getCompany().getUsername(),
@@ -216,6 +219,18 @@ public class HousekeepServiceManager {
         }
         String trimmed = description.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeServiceTime(String serviceTime) {
+        if (serviceTime == null) {
+            return "按需预约";
+        }
+        String trimmed = serviceTime.trim();
+        return trimmed.isEmpty() ? "按需预约" : trimmed;
+    }
+
+    private String formatServiceTime(HousekeepService service) {
+        return normalizeServiceTime(service.getServiceTime());
     }
 
     private String normalizeKeyword(String keyword) {

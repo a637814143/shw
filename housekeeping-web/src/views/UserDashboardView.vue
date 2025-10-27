@@ -43,6 +43,7 @@
           <header class="dialog-header">
             <h2>预约 {{ bookingForm.service?.name }}</h2>
             <p>请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。</p>
+            <p class="dialog-subtext">建议服务时间：{{ bookingForm.service?.serviceTime || '按需预约' }}</p>
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
@@ -257,6 +258,10 @@
                 <div>
                   <dt>联系方式</dt>
                   <dd>{{ service.contact }}</dd>
+                </div>
+                <div>
+                  <dt>服务时间</dt>
+                  <dd>{{ service.serviceTime }}</dd>
                 </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
@@ -1000,7 +1005,14 @@ const applyServiceFilter = () => {
     return
   }
   services.value = allServices.value.filter((item) => {
-    const fields = [item.name, item.unit, item.contact, item.companyName, item.description || '']
+    const fields = [
+      item.name,
+      item.unit,
+      item.contact,
+      item.serviceTime,
+      item.companyName,
+      item.description || '',
+    ]
     return fields.some((field) => field.toLowerCase().includes(keyword))
   })
 }
@@ -2438,6 +2450,12 @@ onUnmounted(() => {
 .dialog-header h2 {
   margin: 0;
   font-size: 1.5rem;
+}
+
+.dialog-subtext {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .dialog-field {

@@ -67,6 +67,7 @@ export interface HousekeepServiceItem {
   unit: string
   price: number
   contact: string
+  serviceTime: string
   description?: string | null
   companyId: number
   companyName: string
@@ -179,6 +180,7 @@ export interface CompanyServicePayload {
   unit: string
   price: number
   contact: string
+  serviceTime: string
   description?: string
   categoryId: number
 }

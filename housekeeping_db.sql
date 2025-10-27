@@ -30,18 +30,31 @@ CREATE TABLE `housekeep` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政内容信息表';
 
+DROP TABLE IF EXISTS `service_category`;
+CREATE TABLE `service_category` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name` varchar(100) NOT NULL COMMENT '分类名称',
+  `description` varchar(255) DEFAULT NULL COMMENT '分类描述',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_category_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政服务分类';
+
 DROP TABLE IF EXISTS `housekeep_service`;
 CREATE TABLE `housekeep_service` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `company_id` bigint NOT NULL COMMENT '所属家政公司',
+  `category_id` bigint DEFAULT NULL COMMENT '服务分类',
   `name` varchar(200) NOT NULL COMMENT '服务名称',
   `unit` varchar(50) NOT NULL COMMENT '计价单位',
   `price` decimal(12,2) NOT NULL COMMENT '服务价格',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
+  `service_time` varchar(100) NOT NULL DEFAULT '按需预约' COMMENT '服务时段或耗时',
   `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
   PRIMARY KEY (`id`),
   KEY `idx_company` (`company_id`),
-  CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+  KEY `idx_service_category` (`category_id`),
+  CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_service_category` FOREIGN KEY (`category_id`) REFERENCES `service_category` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司发布的服务';
 
 DROP TABLE IF EXISTS `service_order`;
@@ -140,15 +153,19 @@ DROP TABLE IF EXISTS `company_staff`;
 CREATE TABLE `company_staff` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `company_id` bigint NOT NULL COMMENT '所属家政公司',
+  `category_id` bigint DEFAULT NULL COMMENT '服务分类',
   `staff_name` varchar(100) NOT NULL COMMENT '人员姓名',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `role` varchar(100) DEFAULT NULL COMMENT '职位或技能',
   `notes` varchar(500) DEFAULT NULL COMMENT '备注信息',
+  `assigned` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已分配',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_staff_company` (`company_id`),
-  CONSTRAINT `fk_staff_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+  KEY `idx_staff_category` (`category_id`),
+  CONSTRAINT `fk_staff_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_staff_category` FOREIGN KEY (`category_id`) REFERENCES `service_category` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司人员信息';
 
 -- 初始化系统管理员账号

@@ -137,6 +137,10 @@
                 <dt>联系方式</dt>
                 <dd>{{ service.contact }}</dd>
               </div>
+              <div>
+                <dt>服务时间</dt>
+                <dd>{{ service.serviceTime }}</dd>
+              </div>
             </dl>
             <p v-if="service.description" class="service-desc">{{ service.description }}</p>
             <p class="service-note">请登录后预约服务。</p>
@@ -219,7 +223,8 @@ const filteredServices = computed(() => {
     const nameMatch = service.name?.toLowerCase().includes(keyword)
     const companyMatch = service.companyName?.toLowerCase().includes(keyword)
     const descriptionMatch = service.description?.toLowerCase().includes(keyword)
-    return nameMatch || companyMatch || descriptionMatch
+    const timeMatch = service.serviceTime?.toLowerCase().includes(keyword)
+    return nameMatch || companyMatch || descriptionMatch || timeMatch
   })
 })
 

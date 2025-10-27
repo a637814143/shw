@@ -27,6 +27,10 @@ public class HousekeepServiceRequest {
     @Size(max = 100, message = "联系方式过长")
     private String contact;
 
+    @NotBlank(message = "服务时间不能为空")
+    @Size(max = 100, message = "服务时间过长")
+    private String serviceTime;
+
     @Size(max = 500, message = "描述过长")
     private String description;
 
@@ -63,6 +67,14 @@ public class HousekeepServiceRequest {
 
     public void setContact(String contact) {
         this.contact = contact;
+    }
+
+    public String getServiceTime() {
+        return serviceTime;
+    }
+
+    public void setServiceTime(String serviceTime) {
+        this.serviceTime = serviceTime;
     }
 
     public String getDescription() {

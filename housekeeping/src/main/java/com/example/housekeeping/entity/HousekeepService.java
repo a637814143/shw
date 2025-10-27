@@ -39,6 +39,9 @@ public class HousekeepService {
     @Column(name = "contact", nullable = false, length = 100)
     private String contact;
 
+    @Column(name = "service_time", nullable = false, length = 100)
+    private String serviceTime = "按需预约";
+
     @Column(name = "description", length = 500)
     private String description;
 }

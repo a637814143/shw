@@ -581,8 +581,8 @@
                   <td>{{ item.name }}</td>
                   <td>{{ item.description || '—' }}</td>
                   <td>{{ item.serviceCount }}</td>
-                  <td>{{ item.totalStaff }}</td>
-                  <td>{{ item.availableStaff }}</td>
+                  <td>{{ item.totalStaffCount }}</td>
+                  <td>{{ item.availableStaffCount }}</td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="editCategory(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteCategory(item)">删除</button>
