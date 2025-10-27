@@ -513,7 +513,7 @@
                     v-model="carouselSearch"
                     class="search-input"
                     type="search"
-                    placeholder="按标题或链接搜索"
+                    placeholder="按标题搜索"
                     :disabled="contentLoading"
                   />
                   <button
@@ -537,8 +537,28 @@
               </header>
               <form class="content-form" @submit.prevent="submitCarousel">
                 <input v-model="carouselForm.title" type="text" placeholder="标题" required />
-                <input v-model="carouselForm.imageUrl" type="url" placeholder="图片地址" required />
-                <input v-model="carouselForm.serviceLink" type="text" placeholder="关联服务或跳转链接（可选）" />
+                <input
+                  ref="carouselImageInput"
+                  class="visually-hidden"
+                  type="file"
+                  accept="image/*"
+                  @change="handleCarouselImageChange"
+                />
+                <div class="form-upload">
+                  <button
+                    type="button"
+                    class="ghost-button"
+                    :disabled="carouselSaving"
+                    @click="triggerCarouselImageSelect"
+                  >
+                    选择图片
+                  </button>
+                  <span v-if="carouselImageName" class="file-hint">{{ carouselImageName }}</span>
+                  <span v-else class="file-hint muted">尚未选择图片</span>
+                </div>
+                <div v-if="carouselForm.imageUrl" class="upload-preview">
+                  <img :src="carouselForm.imageUrl" alt="轮播图预览" />
+                </div>
                 <div class="form-actions">
                   <button type="submit" class="primary-button" :disabled="carouselSaving">
                     {{ carouselSaving ? '保存中…' : carouselEditing ? '更新轮播' : '新增轮播' }}
@@ -561,8 +581,10 @@
                     />
                     <div>
                       <strong>{{ item.title }}</strong>
-                      <p class="muted">{{ item.imageUrl }}</p>
-                      <p class="muted">{{ item.serviceLink || '无跳转' }}</p>
+                      <div class="carousel-preview">
+                        <img :src="item.imageUrl" alt="轮播图图片" class="carousel-thumb" />
+                      </div>
+                      <p v-if="item.serviceLink" class="muted">跳转：{{ item.serviceLink }}</p>
                     </div>
                   </div>
                   <div class="list-actions">
@@ -1166,6 +1188,8 @@ const carouselForm = reactive<{ title: string; imageUrl: string; serviceLink: st
   imageUrl: '',
   serviceLink: '',
 })
+const carouselImageInput = ref<HTMLInputElement | null>(null)
+const carouselImageName = ref('')
 const tipForm = reactive<{ title: string; content: string }>({ title: '', content: '' })
 const announcementForm = reactive<{ title: string; content: string }>({ title: '', content: '' })
 
@@ -2000,11 +2024,50 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
   }
 }
 
+const triggerCarouselImageSelect = () => {
+  if (carouselSaving.value) {
+    return
+  }
+  carouselImageInput.value?.click()
+}
+
+const handleCarouselImageChange = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    window.alert('请选择图片文件')
+    target.value = ''
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') {
+      carouselForm.imageUrl = reader.result
+      carouselImageName.value = file.name
+    } else {
+      window.alert('读取图片失败，请重试。')
+      carouselForm.imageUrl = ''
+      carouselImageName.value = ''
+    }
+    target.value = ''
+  }
+  reader.onerror = () => {
+    window.alert('读取图片失败，请重试。')
+    target.value = ''
+  }
+  reader.readAsDataURL(file)
+}
+
 const editCarousel = (item: DashboardCarouselItem) => {
   carouselEditing.value = item.id
   carouselForm.title = item.title
   carouselForm.imageUrl = item.imageUrl
   carouselForm.serviceLink = item.serviceLink ?? ''
+  carouselImageName.value = item.imageUrl ? '已加载现有图片' : ''
 }
 
 const resetCarousel = () => {
@@ -2012,9 +2075,17 @@ const resetCarousel = () => {
   carouselForm.title = ''
   carouselForm.imageUrl = ''
   carouselForm.serviceLink = ''
+  carouselImageName.value = ''
+  if (carouselImageInput.value) {
+    carouselImageInput.value.value = ''
+  }
 }
 
 const submitCarousel = async () => {
+  if (!carouselForm.imageUrl) {
+    window.alert('请先选择图片')
+    return
+  }
   carouselSaving.value = true
   try {
     if (carouselEditing.value) {
@@ -2823,6 +2894,31 @@ onUnmounted(() => {
   gap: 0.65rem;
 }
 
+.form-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.file-hint {
+  font-size: 0.85rem;
+  color: rgba(226, 232, 240, 0.85);
+}
+
+.upload-preview {
+  max-width: 240px;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.upload-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .content-form textarea {
   resize: vertical;
   min-height: 90px;
@@ -2845,6 +2941,22 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.carousel-preview {
+  margin-top: 0.5rem;
+  max-width: 220px;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.carousel-thumb {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
 }
 
 .content-item-details {
