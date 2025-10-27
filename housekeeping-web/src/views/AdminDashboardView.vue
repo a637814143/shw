@@ -1184,9 +1184,6 @@ const allFavoritesSelected = computed(
 const selectedFavoriteCount = computed(() => selectedFavoriteIds.value.size)
 const hasFavoriteSelection = computed(() => selectedFavoriteIds.value.size > 0)
 
-const selectedCategoryCount = computed(() => selectedCategoryIds.value.size)
-const hasCategorySelection = computed(() => selectedCategoryIds.value.size > 0)
-
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
 const announcements = ref<DashboardAnnouncementItem[]>([])
