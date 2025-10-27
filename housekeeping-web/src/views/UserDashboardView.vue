@@ -730,6 +730,10 @@ type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'm
 
 type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 
+type PendingPaymentAction =
+  | { kind: 'order'; payload: CreateOrderPayload }
+  | { kind: 'recharge'; payload: { amount: number } }
+
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
 
@@ -777,7 +781,7 @@ const paymentChecking = ref(false)
 const paymentStatus = ref<PaymentStatus>('idle')
 const paymentMessage = ref('')
 const paymentError = ref('')
-const pendingOrderPayload = ref<CreateOrderPayload | null>(null)
+const pendingPaymentAction = ref<PendingPaymentAction | null>(null)
 const paymentServiceName = ref('')
 const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
@@ -1211,7 +1215,7 @@ const resetPaymentState = () => {
   paymentMessage.value = ''
   paymentError.value = ''
   paymentChecking.value = false
-  pendingOrderPayload.value = null
+  pendingPaymentAction.value = null
   paymentServiceName.value = ''
   paymentCompanyName.value = ''
   paymentAmount.value = null
@@ -1225,11 +1229,14 @@ const submitBooking = async () => {
   }
 
   resetPaymentState()
-  pendingOrderPayload.value = {
-    serviceId: bookingForm.service.id,
-    scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
-    specialRequest: bookingForm.specialRequest,
-    serviceAddress: bookingForm.serviceAddress.trim(),
+  pendingPaymentAction.value = {
+    kind: 'order',
+    payload: {
+      serviceId: bookingForm.service.id,
+      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+      specialRequest: bookingForm.specialRequest,
+      serviceAddress: bookingForm.serviceAddress.trim(),
+    },
   }
   paymentServiceName.value = bookingForm.service.name
   paymentCompanyName.value = bookingForm.service.companyName
@@ -1265,13 +1272,13 @@ const checkPaymentResult = async () => {
   if (paymentChecking.value) {
     return
   }
-  if (!pendingOrderPayload.value) {
+  if (!pendingPaymentAction.value) {
     if (paymentStatus.value === 'success') {
       closePaymentDialog()
       return
     }
     paymentStatus.value = 'failed'
-    paymentError.value = '当前没有待支付的订单，请重新选择服务。'
+    paymentError.value = '当前没有待支付的事项，请重新操作。'
     return
   }
 
@@ -1303,29 +1310,35 @@ const checkPaymentResult = async () => {
     }
 
     if (gatewayResult.status === 'CONFIRMED') {
-      const payload = pendingOrderPayload.value
+      const action = pendingPaymentAction.value
       try {
-        await createUserOrder(payload)
-        await Promise.all([loadOrders(), loadAccount()])
-        pendingOrderPayload.value = null
+        if (action.kind === 'order') {
+          await createUserOrder(action.payload)
+          await Promise.all([loadOrders(), loadAccount()])
+          bookingForm.service = null
+          bookingForm.scheduledAt = ''
+          bookingForm.specialRequest = ''
+          bookingForm.serviceAddress = ''
+          paymentMessage.value = '支付成功，订单已创建。'
+        } else {
+          account.value = await rechargeUserWallet({ amount: action.payload.amount })
+          walletForm.amount = null
+          paymentMessage.value = '支付成功，余额已更新。'
+        }
+        pendingPaymentAction.value = null
         paymentStatus.value = 'success'
-        paymentMessage.value = '支付成功，订单已创建。'
-        bookingForm.service = null
-        bookingForm.scheduledAt = ''
-        bookingForm.specialRequest = ''
-        bookingForm.serviceAddress = ''
       } catch (orderError) {
         console.error(orderError)
         paymentStatus.value = 'failed'
-        paymentError.value =
-          orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
+        const fallbackMessage = action.kind === 'order' ? '下单失败，请稍后再试。' : '充值失败，请稍后再试。'
+        paymentError.value = orderError instanceof Error ? orderError.message : fallbackMessage
       }
     } else {
       paymentStatus.value = 'failed'
       paymentError.value =
         gatewayResult.message || '未能获取支付结果，请确认后再试。'
       if (gatewayResult.status === 'DECLINED') {
-        pendingOrderPayload.value = null
+        pendingPaymentAction.value = null
       }
     }
   } catch (error) {
@@ -1503,12 +1516,27 @@ const submitRecharge = async () => {
     return
   }
   walletSaving.value = true
+  resetPaymentState()
+  const amount = Number(walletForm.amount)
+  pendingPaymentAction.value = { kind: 'recharge', payload: { amount } }
+  paymentServiceName.value = '钱包充值'
+  paymentCompanyName.value = '账户中心'
+  paymentAmount.value = amount
+
+  const payload: CreatePaymentSessionPayload = {
+    serviceName: '钱包充值',
+    companyName: '账户中心',
+    amount,
+  }
+
   try {
-    account.value = await rechargeUserWallet({ amount: walletForm.amount })
-    walletForm.amount = null
-    window.alert('充值成功')
+    const sessionInfo = await createQrPaymentSession(payload)
+    paymentSession.value = sessionInfo
+    paymentDialogVisible.value = true
   } catch (error) {
     console.error(error)
+    window.alert('生成支付二维码失败，请稍后再试。')
+    resetPaymentState()
   } finally {
     walletSaving.value = false
   }
