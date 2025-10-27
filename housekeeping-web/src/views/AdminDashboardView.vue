@@ -496,13 +496,27 @@
                   </button>
                 </div>
               </header>
-              <form class="content-form" @submit.prevent="submitCarousel">
-                <input v-model="carouselForm.title" type="text" placeholder="标题" required />
-                <input v-model="carouselForm.imageUrl" type="url" placeholder="图片地址" required />
-                <input v-model="carouselForm.serviceLink" type="text" placeholder="关联服务或跳转链接（可选）" />
-                <div class="form-actions">
-                  <button type="submit" class="primary-button" :disabled="carouselSaving">
-                    {{ carouselSaving ? '保存中…' : carouselEditing ? '更新轮播' : '新增轮播' }}
+                <form class="content-form" @submit.prevent="submitCarousel">
+                  <input v-model="carouselForm.title" type="text" placeholder="标题" required />
+                  <input
+                    ref="carouselFileInput"
+                    type="file"
+                    accept="image/*"
+                    @change="handleCarouselImageChange"
+                    :disabled="carouselSaving"
+                  />
+                  <p class="form-hint">支持 PNG/JPEG/GIF，大小不超过 1MB，若不更换图片将沿用当前轮播图。</p>
+                  <p v-if="carouselImageName" class="muted upload-summary">已选择：{{ carouselImageName }}</p>
+                  <img
+                    v-if="carouselForm.imageUrl"
+                    :src="carouselForm.imageUrl"
+                    alt="轮播图预览"
+                    class="carousel-preview"
+                  />
+                  <input v-model="carouselForm.serviceLink" type="text" placeholder="关联服务或跳转链接（可选）" />
+                  <div class="form-actions">
+                    <button type="submit" class="primary-button" :disabled="carouselSaving">
+                      {{ carouselSaving ? '保存中…' : carouselEditing ? '更新轮播' : '新增轮播' }}
                   </button>
                   <button type="button" class="secondary-button" @click="resetCarousel" :disabled="carouselSaving">
                     重置
@@ -991,6 +1005,8 @@ const carouselForm = reactive<{ title: string; imageUrl: string; serviceLink: st
   imageUrl: '',
   serviceLink: '',
 })
+const carouselFileInput = ref<HTMLInputElement | null>(null)
+const carouselImageName = ref('')
 const tipForm = reactive<{ title: string; content: string }>({ title: '', content: '' })
 const announcementForm = reactive<{ title: string; content: string }>({ title: '', content: '' })
 
@@ -1035,6 +1051,70 @@ const adminStats = computed(() => {
     pendingRefunds: pendingRefundCount.value,
   }
 })
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+      } else {
+        reject(new Error('无法解析图片内容'))
+      }
+    }
+    reader.onerror = () => reject(new Error('读取图片失败'))
+    reader.readAsDataURL(file)
+  })
+
+const describeCarouselImage = (value: string) => {
+  if (!value) {
+    return ''
+  }
+  if (value.startsWith('data:')) {
+    return '已上传图片'
+  }
+  try {
+    const url = new URL(value)
+    const filename = url.pathname.split('/').filter(Boolean).pop()
+    return filename || url.hostname
+  } catch (error) {
+    const segments = value.split('/')
+    return segments[segments.length - 1] || '已上传图片'
+  }
+}
+
+const handleCarouselImageChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    window.alert('请选择图片文件')
+    if (input) input.value = ''
+    return
+  }
+  const maxSize = 1024 * 1024
+  if (file.size > maxSize) {
+    window.alert('图片大小需不超过 1MB')
+    if (input) input.value = ''
+    return
+  }
+  try {
+    const base64 = await readFileAsDataUrl(file)
+    carouselForm.imageUrl = base64
+    carouselImageName.value = file.name
+  } catch (error) {
+    console.error(error)
+    window.alert('读取图片失败，请重试')
+    carouselForm.imageUrl = ''
+    carouselImageName.value = ''
+  } finally {
+    if (input) {
+      input.value = ''
+    }
+  }
+}
 
 const normalUserCount = computed(
   () => Math.max(0, adminStats.value.totalUsers - adminStats.value.totalCompanies - adminStats.value.totalAdmins),
@@ -1779,6 +1859,10 @@ const editCarousel = (item: DashboardCarouselItem) => {
   carouselForm.title = item.title
   carouselForm.imageUrl = item.imageUrl
   carouselForm.serviceLink = item.serviceLink ?? ''
+  carouselImageName.value = describeCarouselImage(item.imageUrl)
+  if (carouselFileInput.value) {
+    carouselFileInput.value.value = ''
+  }
 }
 
 const resetCarousel = () => {
@@ -1786,9 +1870,17 @@ const resetCarousel = () => {
   carouselForm.title = ''
   carouselForm.imageUrl = ''
   carouselForm.serviceLink = ''
+  carouselImageName.value = ''
+  if (carouselFileInput.value) {
+    carouselFileInput.value.value = ''
+  }
 }
 
 const submitCarousel = async () => {
+  if (!carouselForm.imageUrl) {
+    window.alert('请先上传轮播图图片')
+    return
+  }
   carouselSaving.value = true
   try {
     if (carouselEditing.value) {
@@ -2276,6 +2368,13 @@ onUnmounted(() => {
   color: #f8fafc;
 }
 
+.content-form input[type='file'] {
+  padding: 0.5rem 0.75rem;
+  border-style: dashed;
+  background: rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+}
+
 .inline-form input:focus,
 .assign-grid input:focus,
 .content-form input:focus,
@@ -2283,6 +2382,26 @@ onUnmounted(() => {
   outline: none;
   border-color: rgba(99, 102, 241, 0.55);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.form-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.6);
+}
+
+.upload-summary {
+  margin: 0.25rem 0 0;
+}
+
+.carousel-preview {
+  margin-top: 0.75rem;
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.3);
 }
 
 .link-button {
