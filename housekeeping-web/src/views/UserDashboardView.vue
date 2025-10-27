@@ -425,10 +425,10 @@
           <div class="wallet-grid">
             <form class="wallet-card" @submit.prevent="submitRecharge">
               <h3>快捷充值</h3>
-              <p>充值金额将实时到账，用于预约服务。</p>
+              <p>充值金额将实时到账，用于预约服务，提交后需扫码确认支付。</p>
               <input v-model.number="walletForm.amount" type="number" min="0.01" step="0.01" placeholder="充值金额" />
               <button type="submit" class="primary-button" :disabled="walletSaving">
-                {{ walletSaving ? '充值中…' : '确认充值' }}
+                {{ walletSaving ? '生成中…' : '生成充值二维码' }}
               </button>
             </form>
             <form class="wallet-card" @submit.prevent="submitExchange">
@@ -638,6 +638,10 @@ type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'm
 
 type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 
+type PendingPaymentContext =
+  | { type: 'order'; orderPayload: CreateOrderPayload }
+  | { type: 'wallet'; rechargeAmount: number }
+
 const router = useRouter()
 const account = ref<AccountProfileItem | null>(null)
 
@@ -685,7 +689,7 @@ const paymentChecking = ref(false)
 const paymentStatus = ref<PaymentStatus>('idle')
 const paymentMessage = ref('')
 const paymentError = ref('')
-const pendingOrderPayload = ref<CreateOrderPayload | null>(null)
+const pendingPaymentContext = ref<PendingPaymentContext | null>(null)
 const paymentServiceName = ref('')
 const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
@@ -1087,7 +1091,7 @@ const resetPaymentState = () => {
   paymentMessage.value = ''
   paymentError.value = ''
   paymentChecking.value = false
-  pendingOrderPayload.value = null
+  pendingPaymentContext.value = null
   paymentServiceName.value = ''
   paymentCompanyName.value = ''
   paymentAmount.value = null
@@ -1101,11 +1105,14 @@ const submitBooking = async () => {
   }
 
   resetPaymentState()
-  pendingOrderPayload.value = {
-    serviceId: bookingForm.service.id,
-    scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
-    specialRequest: bookingForm.specialRequest,
-    serviceAddress: bookingForm.serviceAddress.trim(),
+  pendingPaymentContext.value = {
+    type: 'order',
+    orderPayload: {
+      serviceId: bookingForm.service.id,
+      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+      specialRequest: bookingForm.specialRequest,
+      serviceAddress: bookingForm.serviceAddress.trim(),
+    },
   }
   paymentServiceName.value = bookingForm.service.name
   paymentCompanyName.value = bookingForm.service.companyName
@@ -1141,13 +1148,14 @@ const checkPaymentResult = async () => {
   if (paymentChecking.value) {
     return
   }
-  if (!pendingOrderPayload.value) {
+  const context = pendingPaymentContext.value
+  if (!context) {
     if (paymentStatus.value === 'success') {
       closePaymentDialog()
       return
     }
     paymentStatus.value = 'failed'
-    paymentError.value = '当前没有待支付的订单，请重新选择服务。'
+    paymentError.value = '当前没有待处理的支付请求，请重新发起操作。'
     return
   }
 
@@ -1179,29 +1187,46 @@ const checkPaymentResult = async () => {
     }
 
     if (gatewayResult.status === 'CONFIRMED') {
-      const payload = pendingOrderPayload.value
-      try {
-        await createUserOrder(payload)
-        await Promise.all([loadOrders(), loadAccount()])
-        pendingOrderPayload.value = null
-        paymentStatus.value = 'success'
-        paymentMessage.value = '支付成功，订单已创建。'
-        bookingForm.service = null
-        bookingForm.scheduledAt = ''
-        bookingForm.specialRequest = ''
-        bookingForm.serviceAddress = ''
-      } catch (orderError) {
-        console.error(orderError)
-        paymentStatus.value = 'failed'
-        paymentError.value =
-          orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
+      if (context.type === 'order') {
+        try {
+          await createUserOrder(context.orderPayload)
+          await Promise.all([loadOrders(), loadAccount()])
+          pendingPaymentContext.value = null
+          paymentStatus.value = 'success'
+          paymentMessage.value = '支付成功，订单已创建。'
+          bookingForm.service = null
+          bookingForm.scheduledAt = ''
+          bookingForm.specialRequest = ''
+          bookingForm.serviceAddress = ''
+        } catch (orderError) {
+          console.error(orderError)
+          paymentStatus.value = 'failed'
+          paymentError.value =
+            orderError instanceof Error ? orderError.message : '下单失败，请稍后再试。'
+        }
+      } else if (context.type === 'wallet') {
+        try {
+          account.value = await rechargeUserWallet({
+            amount: context.rechargeAmount,
+            qrToken: token,
+          })
+          pendingPaymentContext.value = null
+          paymentStatus.value = 'success'
+          paymentMessage.value = '支付成功，钱包余额已更新。'
+          walletForm.amount = null
+        } catch (walletError) {
+          console.error(walletError)
+          paymentStatus.value = 'failed'
+          paymentError.value =
+            walletError instanceof Error ? walletError.message : '充值失败，请稍后再试。'
+        }
       }
     } else {
       paymentStatus.value = 'failed'
       paymentError.value =
         gatewayResult.message || '未能获取支付结果，请确认后再试。'
       if (gatewayResult.status === 'DECLINED') {
-        pendingOrderPayload.value = null
+        pendingPaymentContext.value = null
       }
     }
   } catch (error) {
@@ -1340,12 +1365,29 @@ const submitRecharge = async () => {
     return
   }
   walletSaving.value = true
+  resetPaymentState()
+  pendingPaymentContext.value = {
+    type: 'wallet',
+    rechargeAmount: walletForm.amount,
+  }
+  paymentServiceName.value = '钱包充值'
+  paymentCompanyName.value = '生活号账户'
+  paymentAmount.value = walletForm.amount
+
+  const payload: CreatePaymentSessionPayload = {
+    serviceName: '钱包充值',
+    companyName: account.value?.displayName || account.value?.username || '生活号账户',
+    amount: walletForm.amount,
+  }
+
   try {
-    account.value = await rechargeUserWallet({ amount: walletForm.amount })
-    walletForm.amount = null
-    window.alert('充值成功')
+    const sessionInfo = await createQrPaymentSession(payload)
+    paymentSession.value = sessionInfo
+    paymentDialogVisible.value = true
   } catch (error) {
     console.error(error)
+    window.alert('生成支付二维码失败，请稍后再试。')
+    resetPaymentState()
   } finally {
     walletSaving.value = false
   }

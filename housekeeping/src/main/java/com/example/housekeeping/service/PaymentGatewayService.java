@@ -115,6 +115,13 @@ public class PaymentGatewayService {
             .build();
     }
 
+    public void consumeSession(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        sessions.remove(token);
+    }
+
     private void purgeExpiredSessions() {
         Instant now = Instant.now();
         sessions.entrySet().removeIf(entry -> {

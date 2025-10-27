@@ -323,6 +323,7 @@ export interface UserConversationItem {
 
 export interface WalletRechargePayload {
   amount: number
+  qrToken: string
 }
 
 export interface PointsExchangePayload {
