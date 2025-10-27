@@ -2,6 +2,7 @@ package com.example.housekeeping.dto;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -28,6 +29,9 @@ public class HousekeepServiceRequest {
 
     @Size(max = 500, message = "描述过长")
     private String description;
+
+    @NotNull(message = "请选择服务分类")
+    private Long categoryId;
 
     public String getName() {
         return name;
@@ -67,5 +71,13 @@ public class HousekeepServiceRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Long getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(Long categoryId) {
+        this.categoryId = categoryId;
     }
 }

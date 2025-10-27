@@ -5,11 +5,14 @@ import com.example.housekeeping.dto.CompanyStaffRequest;
 import com.example.housekeeping.dto.CompanyStaffResponse;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.entity.CompanyStaff;
+import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
 import com.example.housekeeping.repository.CompanyStaffRepository;
+import com.example.housekeeping.repository.ServiceCategoryRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 家政公司人员管理。
@@ -39,6 +43,9 @@ public class CompanyStaffService {
     @Autowired
     private ServiceOrderService serviceOrderService;
 
+    @Autowired
+    private ServiceCategoryRepository serviceCategoryRepository;
+
     @Transactional
     public CompanyStaffResponse createStaff(CompanyStaffRequest request) {
         UserAll company = ensureCompanyAccount();
@@ -47,6 +54,7 @@ public class CompanyStaffService {
         applyRequest(staff, request);
         staff.setCreatedAt(Instant.now());
         staff.setUpdatedAt(staff.getCreatedAt());
+        staff.setAssigned(false);
         CompanyStaff saved = companyStaffRepository.save(staff);
         return map(saved);
     }
@@ -54,6 +62,12 @@ public class CompanyStaffService {
     @Transactional
     public CompanyStaffResponse updateStaff(Long staffId, CompanyStaffRequest request) {
         CompanyStaff staff = ensureStaffBelongsToCurrentCompany(staffId);
+        if (staff.isAssigned()) {
+            Long originalCategoryId = staff.getCategory() == null ? null : staff.getCategory().getId();
+            if (!Objects.equals(originalCategoryId, request.getCategoryId())) {
+                throw new RuntimeException("该人员已被指派，无法变更服务分类");
+            }
+        }
         applyRequest(staff, request);
         staff.setUpdatedAt(Instant.now());
         CompanyStaff saved = companyStaffRepository.save(staff);
@@ -63,6 +77,9 @@ public class CompanyStaffService {
     @Transactional
     public void deleteStaff(Long staffId) {
         CompanyStaff staff = ensureStaffBelongsToCurrentCompany(staffId);
+        if (staff.isAssigned()) {
+            throw new RuntimeException("该人员已被指派，请先完成或取消当前预约");
+        }
         companyStaffRepository.delete(staff);
     }
 
@@ -78,24 +95,50 @@ public class CompanyStaffService {
         if (!order.getService().getCompany().getId().equals(staff.getCompany().getId())) {
             throw new RuntimeException("无法指派其他公司的订单");
         }
+        HousekeepService service = order.getService();
+        ServiceCategory category = service.getCategory();
+        if (category == null || staff.getCategory() == null
+            || !category.getId().equals(staff.getCategory().getId())) {
+            throw new RuntimeException("该人员不属于当前服务的分类");
+        }
+        if (staff.isAssigned() && (order.getAssignedStaff() == null
+            || !order.getAssignedStaff().getId().equals(staff.getId()))) {
+            throw new RuntimeException("该人员已指派至其他预约");
+        }
+        CompanyStaff previous = order.getAssignedStaff();
+        if (previous != null && !previous.getId().equals(staff.getId())) {
+            previous.setAssigned(false);
+            previous.setUpdatedAt(Instant.now());
+            companyStaffRepository.save(previous);
+        }
         order.setAssignedWorker(staff.getName());
         order.setWorkerContact(staff.getContact());
+        order.setAssignedStaff(staff);
         ServiceOrderStatus status = order.getStatus();
         if (status == null || status == ServiceOrderStatus.SCHEDULED || status == ServiceOrderStatus.PENDING) {
             order.setProgressNote("已安排 " + staff.getName() + " 上门服务");
         }
         order.setUpdatedAt(Instant.now());
+        staff.setAssigned(true);
+        staff.setUpdatedAt(Instant.now());
+        companyStaffRepository.save(staff);
         ServiceOrder saved = serviceOrderRepository.save(order);
         return serviceOrderService.mapToResponse(saved);
     }
 
     @Transactional
-    public List<CompanyStaffResponse> listStaff(String keyword) {
+    public List<CompanyStaffResponse> listStaff(String keyword, Long categoryId) {
         UserAll company = ensureCompanyAccount();
         String normalized = normalizeOptional(keyword);
-        List<CompanyStaff> staff = normalized == null
+        ServiceCategory category = categoryId == null ? null : resolveCategory(categoryId);
+        List<CompanyStaff> staff = category == null
             ? companyStaffRepository.findByCompany(company)
-            : companyStaffRepository.searchByCompanyAndKeyword(company, normalized);
+            : companyStaffRepository.findByCompanyAndCategory(company, category);
+        if (normalized != null) {
+            staff = staff.stream()
+                .filter(item -> matchesKeyword(item, normalized))
+                .collect(Collectors.toList());
+        }
         return staff.stream()
             .sorted(Comparator.comparing(CompanyStaff::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .map(this::map)
@@ -124,6 +167,9 @@ public class CompanyStaffService {
             if (!staff.getCompany().getId().equals(company.getId())) {
                 throw new RuntimeException("无法操作其他公司的人员");
             }
+            if (staff.isAssigned()) {
+                throw new RuntimeException("部分人员已被指派，无法删除");
+            }
         }
         companyStaffRepository.deleteAll(staffList);
     }
@@ -131,7 +177,9 @@ public class CompanyStaffService {
     private void applyRequest(CompanyStaff staff, CompanyStaffRequest request) {
         staff.setName(request.getName().trim());
         staff.setContact(request.getContact().trim());
-        staff.setRole(normalizeOptional(request.getRole()));
+        ServiceCategory category = resolveCategory(request.getCategoryId());
+        staff.setCategory(category);
+        staff.setRole(null);
         staff.setNotes(normalizeOptional(request.getNotes()));
     }
 
@@ -158,15 +206,39 @@ public class CompanyStaffService {
     }
 
     private CompanyStaffResponse map(CompanyStaff staff) {
+        ServiceCategory category = staff.getCategory();
         return new CompanyStaffResponse(
             staff.getId(),
             staff.getName(),
             staff.getContact(),
-            staff.getRole(),
             staff.getNotes(),
             staff.getCreatedAt(),
-            staff.getUpdatedAt()
+            staff.getUpdatedAt(),
+            category == null ? null : category.getId(),
+            category == null ? null : category.getName(),
+            staff.isAssigned()
         );
+    }
+
+    private boolean matchesKeyword(CompanyStaff staff, String keyword) {
+        String lower = keyword.toLowerCase();
+        return Stream.of(
+                staff.getName(),
+                staff.getContact(),
+                staff.getNotes(),
+                staff.getCategory() == null ? null : staff.getCategory().getName()
+            )
+            .filter(Objects::nonNull)
+            .map(String::toLowerCase)
+            .anyMatch(value -> value.contains(lower));
+    }
+
+    private ServiceCategory resolveCategory(Long categoryId) {
+        if (categoryId == null) {
+            throw new RuntimeException("请选择服务分类");
+        }
+        return serviceCategoryRepository.findById(categoryId)
+            .orElseThrow(() -> new RuntimeException("服务分类不存在"));
     }
 
     private String normalizeOptional(String value) {

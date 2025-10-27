@@ -70,6 +70,9 @@ export interface HousekeepServiceItem {
   description?: string | null
   companyId: number
   companyName: string
+  categoryId?: number | null
+  categoryName?: string | null
+  availableStaffCount: number
 }
 
 export interface CompanyServicePage {
@@ -106,6 +109,9 @@ export interface ServiceOrderItem {
   updatedAt: string
   settlementReleased: boolean
   settlementReleasedAt?: string | null
+  categoryId?: number | null
+  categoryName?: string | null
+  assignedStaffId?: number | null
 }
 
 export interface ServiceReviewItem {
@@ -174,6 +180,7 @@ export interface CompanyServicePayload {
   price: number
   contact: string
   description?: string
+  categoryId: number
 }
 
 export interface RefundDecisionPayload {
@@ -329,28 +336,47 @@ export interface PointsExchangePayload {
   points: number
 }
 
+export interface ServiceCategoryItem {
+  id: number
+  name: string
+  description?: string | null
+  serviceCount: number
+  totalStaffCount: number
+  availableStaffCount: number
+}
+
+export interface ServiceCategoryPayload {
+  name: string
+  description?: string
+}
+
 export interface CompanyStaffItem {
   id: number
   name: string
   contact: string
-  role?: string | null
   notes?: string | null
   createdAt: string
   updatedAt: string
+  categoryId?: number | null
+  categoryName?: string | null
+  assigned: boolean
 }
 
 export interface CompanyStaffPayload {
   name: string
   contact: string
-  role?: string
+  categoryId: number
   notes?: string
 }
 
 // 公共接口
-export const fetchPublicServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+export const fetchPublicServices = async (params?: { keyword?: string; categoryId?: number }): Promise<HousekeepServiceItem[]> => {
   const url = new URL(buildUrl('/api/public/services'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<HousekeepServiceItem[]>(response)
@@ -406,10 +432,13 @@ export const deleteCompanyReviews = async (ids: number[]): Promise<void> => {
 }
 
 // 普通用户接口
-export const fetchUserServices = async (params?: { keyword?: string }): Promise<HousekeepServiceItem[]> => {
+export const fetchUserServices = async (params?: { keyword?: string; categoryId?: number }): Promise<HousekeepServiceItem[]> => {
   const url = new URL(buildUrl('/api/user/services'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<HousekeepServiceItem[]>(response)
@@ -664,10 +693,13 @@ export const deleteCompanyServices = async (ids: number[]): Promise<void> => {
   await handleResponse<null>(response)
 }
 
-export const fetchCompanyStaff = async (params?: { keyword?: string }): Promise<CompanyStaffItem[]> => {
+export const fetchCompanyStaff = async (params?: { keyword?: string; categoryId?: number }): Promise<CompanyStaffItem[]> => {
   const url = new URL(buildUrl('/api/company/staff'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<CompanyStaffItem[]>(response)
@@ -718,6 +750,52 @@ export const assignCompanyStaff = async (
     body: JSON.stringify({ orderId }),
   })
   return handleResponse<ServiceOrderItem>(response)
+}
+
+export const fetchServiceCategories = async (): Promise<ServiceCategoryItem[]> => {
+  const response = await fetch(buildUrl('/api/public/service-categories'), withAuthHeaders())
+  return handleResponse<ServiceCategoryItem[]>(response)
+}
+
+export const fetchAdminServiceCategories = async (): Promise<ServiceCategoryItem[]> => {
+  const response = await fetch(buildUrl('/api/admin/service-categories'), withAuthHeaders())
+  return handleResponse<ServiceCategoryItem[]>(response)
+}
+
+export const createAdminServiceCategory = async (
+  payload: ServiceCategoryPayload,
+): Promise<ServiceCategoryItem> => {
+  const response = await fetch(buildUrl('/api/admin/service-categories'), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ServiceCategoryItem>(response)
+}
+
+export const updateAdminServiceCategory = async (
+  id: number,
+  payload: ServiceCategoryPayload,
+): Promise<ServiceCategoryItem> => {
+  const response = await fetch(buildUrl(`/api/admin/service-categories/${id}`), {
+    ...withAuthHeaders({ method: 'PUT' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<ServiceCategoryItem>(response)
+}
+
+export const deleteAdminServiceCategory = async (id: number): Promise<void> => {
+  const response = await fetch(buildUrl(`/api/admin/service-categories/${id}`), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+  })
+  await handleResponse<null>(response)
+}
+
+export const deleteAdminServiceCategories = async (ids: number[]): Promise<void> => {
+  const response = await fetch(buildUrl('/api/admin/service-categories/batch'), {
+    ...withAuthHeaders({ method: 'DELETE' }),
+    body: JSON.stringify({ ids }),
+  })
+  await handleResponse<null>(response)
 }
 
 export const fetchCompanyOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {

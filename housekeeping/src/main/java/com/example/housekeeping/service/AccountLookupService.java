@@ -1,6 +1,7 @@
 package com.example.housekeeping.service;
 
 import com.example.housekeeping.entity.UserAll;
+import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.repository.UserAllRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -27,5 +28,12 @@ public class AccountLookupService {
             throw new RuntimeException("未找到登录信息");
         }
         return getByUsername(authentication.getName());
+    }
+
+    public void ensureCurrentAccountRole(AccountRole role) {
+        UserAll account = getCurrentAccount();
+        if (!role.getLabel().equals(account.getUserType())) {
+            throw new RuntimeException("权限不足");
+        }
     }
 }

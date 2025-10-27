@@ -29,8 +29,10 @@ public class PublicServiceController {
 
     @GetMapping
     public Result<List<HousekeepServiceResponse>> listServices(@RequestParam(value = "keyword", required = false)
-                                                               String keyword) {
-        return Result.success(housekeepServiceManager.listAllServices(keyword));
+                                                               String keyword,
+                                                               @RequestParam(value = "categoryId", required = false)
+                                                               Long categoryId) {
+        return Result.success(housekeepServiceManager.listAllServices(keyword, categoryId));
     }
 
     @GetMapping("/{serviceId}/reviews")

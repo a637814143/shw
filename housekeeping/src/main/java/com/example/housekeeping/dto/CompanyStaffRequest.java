@@ -1,6 +1,7 @@
 package com.example.housekeeping.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -16,8 +17,8 @@ public class CompanyStaffRequest {
     @Size(max = 100, message = "联系方式长度不得超过100个字符")
     private String contact;
 
-    @Size(max = 100, message = "职位长度不得超过100个字符")
-    private String role;
+    @NotNull(message = "请选择服务分类")
+    private Long categoryId;
 
     @Size(max = 500, message = "备注长度不得超过500个字符")
     private String notes;
@@ -38,12 +39,12 @@ public class CompanyStaffRequest {
         this.contact = contact;
     }
 
-    public String getRole() {
-        return role;
+    public Long getCategoryId() {
+        return categoryId;
     }
 
-    public void setRole(String role) {
-        this.role = role;
+    public void setCategoryId(Long categoryId) {
+        this.categoryId = categoryId;
     }
 
     public String getNotes() {

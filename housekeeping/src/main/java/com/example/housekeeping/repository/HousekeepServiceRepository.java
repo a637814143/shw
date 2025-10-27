@@ -1,6 +1,7 @@
 package com.example.housekeeping.repository;
 
 import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,8 @@ import java.util.List;
 public interface HousekeepServiceRepository extends JpaRepository<HousekeepService, Long> {
 
     List<HousekeepService> findByCompany(UserAll company);
+
+    List<HousekeepService> findByCompanyAndCategory(UserAll company, ServiceCategory category);
 
     Page<HousekeepService> findByCompany(UserAll company, Pageable pageable);
 
@@ -55,4 +58,6 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
         WHERE s.company = :company
         """)
     Double findAveragePriceByCompany(@Param("company") UserAll company);
+
+    long countByCategory(ServiceCategory category);
 }
