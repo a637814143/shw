@@ -520,12 +520,13 @@
                     </span>
                   </td>
                   <td>
-                    <input
+                    <textarea
                       v-model="progressNoteEdits[order.id]"
-                      type="text"
-                      class="progress-input"
+                      class="progress-input progress-textarea"
                       placeholder="填写最新进度"
-                    />
+                      rows="2"
+                      :title="progressNoteEdits[order.id] || ''"
+                    ></textarea>
                   </td>
                   <td>
                     <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
@@ -2469,6 +2470,14 @@ onUnmounted(() => {
   padding: 8px 10px;
   font-size: 13px;
   background: rgba(248, 250, 255, 0.92);
+}
+
+.progress-textarea {
+  min-height: 54px;
+  resize: vertical;
+  line-height: 1.5;
+  color: #0f172a;
+  display: block;
 }
 
 .staff-select {
