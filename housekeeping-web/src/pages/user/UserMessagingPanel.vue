@@ -7,13 +7,13 @@
             <h2>客服沟通中心</h2>
             <label class="thread-search">
               <span aria-hidden="true" class="thread-search-icon">🔍</span>
+              <span class="sr-only">搜索会话</span>
               <input
                 v-model="searchTerm"
                 type="search"
                 name="conversation-search"
                 autocomplete="off"
                 placeholder="搜索服务、公司或消息"
-                aria-label="搜索服务、公司或消息"
               />
             </label>
           </div>
@@ -436,19 +436,6 @@ const submitMessage = () => {
   font-size: 12px;
   color: var(--brand-text-muted);
   margin-top: 6px;
-  gap: 8px;
-}
-
-.thread-meta span {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.thread-meta time {
-  flex-shrink: 0;
 }
 
 .thread-preview {
@@ -649,6 +636,17 @@ const submitMessage = () => {
 .ghost-button:not(:disabled):hover {
   transform: translateY(-1px);
   background: rgba(59, 130, 246, 0.14);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
 }
 
 @media (max-width: 1200px) {
