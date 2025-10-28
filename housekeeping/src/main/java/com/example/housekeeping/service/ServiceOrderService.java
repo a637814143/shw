@@ -356,7 +356,8 @@ public class ServiceOrderService {
         order.setAssignedWorker(workerName);
         order.setWorkerContact(workerContact);
         if (order.getStatus() == ServiceOrderStatus.SCHEDULED || order.getStatus() == ServiceOrderStatus.PENDING) {
-            order.setProgressNote("已安排 " + workerName + " 负责服务");
+            String phonePart = workerContact.isEmpty() ? "" : "（" + workerContact + "）";
+            order.setProgressNote("已安排" + workerName + phonePart + "上门服务");
         }
         order.setUpdatedAt(Instant.now());
         return mapToResponse(serviceOrderRepository.save(order));

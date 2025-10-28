@@ -141,9 +141,16 @@
                 <dt>服务时间</dt>
                 <dd>{{ service.serviceTime }}</dd>
               </div>
+              <div>
+                <dt>空闲人员</dt>
+                <dd>{{ service.availableStaffCount }} 人</dd>
+              </div>
             </dl>
             <p v-if="service.description" class="service-desc">{{ service.description }}</p>
-            <p class="service-note">请登录后预约服务。</p>
+            <footer class="service-card-footer">
+              <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
+              <p class="service-note">请登录后预约服务。</p>
+            </footer>
           </article>
           <p v-if="!filteredServices.length && !servicesLoading" class="empty-tip">
             {{ serviceSearch ? '未找到匹配的服务，请尝试调整搜索词。' : '暂无家政服务，稍后再来看看。' }}
@@ -782,6 +789,26 @@ onMounted(async () => {
   color: #475569;
   line-height: 1.5;
   font-size: 14px;
+}
+
+.service-card-footer {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.service-category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--brand-primary);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .service-note {
