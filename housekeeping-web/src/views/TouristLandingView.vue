@@ -91,7 +91,7 @@
               <span class="step-index">03</span>
               <div>
                 <h3>预约优质服务</h3>
-                <p>选择合适的家政公司和服务时间，享受一站式服务体验。</p>
+                <p>选择合适的家政公司和服务时长，享受一站式服务体验。</p>
               </div>
             </li>
           </ol>
@@ -138,7 +138,7 @@
                 <dd>{{ service.contact }}</dd>
               </div>
               <div>
-                <dt>服务时间</dt>
+                <dt>服务时长</dt>
                 <dd>{{ service.serviceTime }}</dd>
               </div>
               <div>

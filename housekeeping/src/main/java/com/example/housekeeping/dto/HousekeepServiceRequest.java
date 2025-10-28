@@ -27,8 +27,8 @@ public class HousekeepServiceRequest {
     @Size(max = 100, message = "联系方式过长")
     private String contact;
 
-    @NotBlank(message = "服务时间不能为空")
-    @Size(max = 100, message = "服务时间过长")
+    @NotBlank(message = "服务时长不能为空")
+    @Size(max = 100, message = "服务时长过长")
     private String serviceTime;
 
     @Size(max = 500, message = "描述过长")

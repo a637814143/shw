@@ -133,12 +133,12 @@
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
               <div class="form-field">
-                <label for="service-time">服务时间</label>
+                <label for="service-time">服务时长</label>
                 <input
                   id="service-time"
                   v-model="serviceForm.serviceTime"
                   type="text"
-                  placeholder="如：工作日 9:00-18:00 / 2 小时"
+                  placeholder="如：2 小时 / 工作日 9:00-18:00"
                 />
               </div>
               <div class="form-field">
@@ -186,7 +186,7 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
-                  <th>服务时间</th>
+                  <th>服务时长</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -477,6 +477,7 @@
                     />
                   </th>
                   <th>服务</th>
+                  <th>服务时长</th>
                   <th>服务类别</th>
                   <th>预约时间</th>
                   <th>用户</th>
@@ -511,6 +512,7 @@
                       用户需求：{{ order.specialRequest }}
                     </div>
                   </td>
+                  <td>{{ order.serviceTime || '按需预约' }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
                   <td>{{ formatDateTime(order.scheduledAt) }}</td>
                   <td>{{ order.username }}</td>
@@ -561,10 +563,10 @@
                   </td>
                 </tr>
                 <tr v-if="appointmentsLoading">
-                  <td colspan="9" class="empty-row">预约数据加载中…</td>
+                  <td colspan="10" class="empty-row">预约数据加载中…</td>
                 </tr>
                 <tr v-else-if="!visibleCompanyOrders.length">
-                  <td colspan="9" class="empty-row">
+                  <td colspan="10" class="empty-row">
                     <span v-if="hasAppointmentFilter">未找到匹配的预约，请调整搜索条件。</span>
                     <span v-else>暂无预约记录，用户预约后会自动出现在此处。</span>
                   </td>
@@ -1344,7 +1346,7 @@ const submitServiceForm = async () => {
     return
   }
   if (!serviceForm.serviceTime.trim()) {
-    window.alert('请填写服务时间')
+    window.alert('请填写服务时长')
     return
   }
   if (serviceForm.price <= 0) {

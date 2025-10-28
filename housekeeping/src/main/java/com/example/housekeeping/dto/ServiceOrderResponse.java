@@ -14,6 +14,7 @@ public class ServiceOrderResponse {
     private Long serviceId;
     private String serviceName;
     private String unit;
+    private String serviceTime;
     private BigDecimal price;
     private String contact;
     private String companyName;
@@ -39,7 +40,7 @@ public class ServiceOrderResponse {
     private String categoryName;
     private Long assignedStaffId;
 
-    public ServiceOrderResponse(Long id, Long serviceId, String serviceName, String unit, BigDecimal price,
+    public ServiceOrderResponse(Long id, Long serviceId, String serviceName, String unit, String serviceTime, BigDecimal price,
                                 String contact, String companyName, String username, ServiceOrderStatus status,
                                 Instant scheduledAt, String specialRequest, String serviceAddress, String progressNote, Integer loyaltyPoints,
                                 String refundReason, String refundResponse, String handledBy,
@@ -51,6 +52,7 @@ public class ServiceOrderResponse {
         this.serviceId = serviceId;
         this.serviceName = serviceName;
         this.unit = unit;
+        this.serviceTime = serviceTime;
         this.price = price;
         this.contact = contact;
         this.companyName = companyName;
@@ -91,6 +93,10 @@ public class ServiceOrderResponse {
 
     public String getUnit() {
         return unit;
+    }
+
+    public String getServiceTime() {
+        return serviceTime;
     }
 
     public BigDecimal getPrice() {
