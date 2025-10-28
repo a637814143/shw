@@ -471,9 +471,9 @@
                     <input
                       type="checkbox"
                       :checked="allVisibleOrdersSelected"
-                      :disabled="appointmentsLoading || !visibleCompanyOrders.length"
+                      :disabled="appointmentsLoading || !deletableVisibleCompanyOrders.length"
                       @change="toggleSelectAllOrders(($event.target as HTMLInputElement).checked)"
-                      aria-label="全选预约"
+                      aria-label="全选可删除的预约"
                     />
                   </th>
                   <th>服务</th>
@@ -493,7 +493,7 @@
                     <input
                       type="checkbox"
                       :checked="selectedOrderIds.has(order.id)"
-                      :disabled="appointmentsLoading"
+                      :disabled="appointmentsLoading || !canDeleteCompanyOrder(order)"
                       @change="toggleOrderSelection(order.id, ($event.target as HTMLInputElement).checked)"
                       :aria-label="`选择预约 ${order.serviceName}`"
                     />
@@ -555,7 +555,8 @@
                     <button
                       type="button"
                       class="link-button danger"
-                      :disabled="appointmentsLoading"
+                      :disabled="appointmentsLoading || !canDeleteCompanyOrder(order)"
+                      :title="canDeleteCompanyOrder(order) ? '' : '仅已完成的预约可以删除'"
                       @click="handleDeleteOrder(order)"
                     >
                       删除
@@ -1010,11 +1011,11 @@ const pruneOrderSelection = () => {
   if (!selectedOrderIds.value.size) {
     return
   }
-  const visibleIds = new Set(companyOrders.value.map((item) => item.id))
+  const allowedIds = deletableOrderIds.value
   let changed = false
   const next = new Set<number>()
   selectedOrderIds.value.forEach((id) => {
-    if (visibleIds.has(id)) {
+    if (allowedIds.has(id)) {
       next.add(id)
     } else {
       changed = true
@@ -1028,6 +1029,9 @@ const pruneOrderSelection = () => {
 const toggleOrderSelection = (id: number, checked: boolean) => {
   const next = new Set(selectedOrderIds.value)
   if (checked) {
+    if (!deletableOrderIds.value.has(id)) {
+      return
+    }
     next.add(id)
   } else {
     next.delete(id)
@@ -1041,7 +1045,7 @@ const toggleSelectAllOrders = (checked: boolean) => {
     return
   }
   const next = new Set(selectedOrderIds.value)
-  visibleCompanyOrders.value.forEach((item) => next.add(item.id))
+  deletableVisibleCompanyOrders.value.forEach((item) => next.add(item.id))
   selectedOrderIds.value = next
 }
 
@@ -1188,6 +1192,8 @@ const matchesOrderSearch = (order: ServiceOrderItem, keyword: string) => {
   return fields.some((field) => normalizeSearchValue(field).includes(target))
 }
 
+const canDeleteCompanyOrder = (order: ServiceOrderItem) => order.status === 'COMPLETED'
+
 const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
   if (!keyword) {
     return true
@@ -1212,14 +1218,20 @@ const visibleCompanyOrders = computed(() => {
   })
 })
 
+const deletableCompanyOrders = computed(() => companyOrders.value.filter((order) => canDeleteCompanyOrder(order)))
+const deletableOrderIds = computed(() => new Set(deletableCompanyOrders.value.map((item) => item.id)))
+const deletableVisibleCompanyOrders = computed(() =>
+  visibleCompanyOrders.value.filter((order) => canDeleteCompanyOrder(order)),
+)
+
 const hasAppointmentFilter = computed(
   () => appointmentSearch.value.trim().length > 0 || appointmentCategoryFilter.value !== 'all',
 )
 
 const allVisibleOrdersSelected = computed(
   () =>
-    visibleCompanyOrders.value.length > 0 &&
-    visibleCompanyOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
+    deletableVisibleCompanyOrders.value.length > 0 &&
+    deletableVisibleCompanyOrders.value.every((item) => selectedOrderIds.value.has(item.id)),
 )
 
 const selectedOrderCount = computed(() => selectedOrderIds.value.size)
@@ -1258,6 +1270,8 @@ const reviewStats = computed(() => {
 
 watch(companyOrders, pruneOrderSelection)
 watch(visibleCompanyOrders, pruneOrderSelection)
+watch(deletableCompanyOrders, pruneOrderSelection)
+watch(deletableVisibleCompanyOrders, pruneOrderSelection)
 watch(companyReviews, pruneReviewSelection)
 watch(visibleCompanyReviews, pruneReviewSelection)
 
@@ -1557,6 +1571,10 @@ const confirmAssignment = async () => {
 }
 
 const handleDeleteOrder = async (order: ServiceOrderItem) => {
+  if (!canDeleteCompanyOrder(order)) {
+    window.alert('仅已完成的预约可以删除')
+    return
+  }
   if (!window.confirm(`确认删除预约“${order.serviceName}”（${order.username}）吗？`)) {
     return
   }
@@ -1575,11 +1593,17 @@ const handleBulkDeleteOrders = async () => {
   if (!selectedOrderIds.value.size) {
     return
   }
-  if (!window.confirm(`确认删除选中的 ${selectedOrderIds.value.size} 条预约记录吗？`)) {
+  const deletable = Array.from(selectedOrderIds.value).filter((id) => deletableOrderIds.value.has(id))
+  if (!deletable.length) {
+    window.alert('仅已完成的预约可以删除')
+    clearOrderSelection()
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${deletable.length} 条预约记录吗？`)) {
     return
   }
   try {
-    await deleteCompanyOrders(Array.from(selectedOrderIds.value))
+    await deleteCompanyOrders(deletable)
     clearOrderSelection()
     await loadCompanyOrders()
   } catch (error) {
