@@ -163,7 +163,6 @@
           <header class="panel-header">
             <div>
               <h2>精选推荐</h2>
-              <p>浏览轮播专题、热门贴士与系统公告，打造 Apple 级视觉体验。</p>
             </div>
             <button type="button" class="ghost-button" @click="refreshDiscover" :disabled="discoverLoading">
               {{ discoverLoading ? '刷新中…' : '刷新内容' }}
@@ -174,7 +173,6 @@
             <section class="carousel">
               <header class="section-title">
                 <h3>主题轮播</h3>
-                <p>点击图片可查看详情或跳转服务。</p>
               </header>
               <div class="carousel-track" role="region" aria-label="精选轮播">
                 <article v-for="item in carousels" :key="item.id" class="carousel-card">

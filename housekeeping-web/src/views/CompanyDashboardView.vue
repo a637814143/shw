@@ -310,7 +310,7 @@
               @click="staffCategoryFilter = category.id"
             >
               {{ category.name }}
-              <span class="chip-count">{{ category.availableStaffCount }}</span>
+              <span class="chip-count">{{ category.totalStaffCount ?? 0 }}</span>
             </button>
             <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
           </div>
