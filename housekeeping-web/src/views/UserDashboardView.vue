@@ -48,7 +48,13 @@
           <div class="dialog-body">
             <label class="dialog-field">
               <span>预约时间</span>
-              <input v-model="bookingForm.scheduledAt" type="datetime-local" required />
+              <input
+                v-model="bookingForm.scheduledAt"
+                type="datetime-local"
+                required
+                :min="bookingMinConstraint || undefined"
+                :max="bookingMaxConstraint || undefined"
+              />
             </label>
             <label class="dialog-field">
               <span>服务地址</span>
@@ -853,6 +859,23 @@ const parseBookingDateTime = (value: string) => {
 
 const formatBookingDateTime = (date: string, hour: number, minute: number) =>
   `${date}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+
+const bookingSelectedDate = computed(() => {
+  const parsed = parseBookingDateTime(bookingForm.scheduledAt)
+  return parsed ? parsed.datePart : ''
+})
+
+const bookingMinConstraint = computed(() =>
+  bookingSelectedDate.value
+    ? formatBookingDateTime(bookingSelectedDate.value, BOOKING_ALLOWED_START_HOUR, 0)
+    : null,
+)
+
+const bookingMaxConstraint = computed(() =>
+  bookingSelectedDate.value
+    ? formatBookingDateTime(bookingSelectedDate.value, BOOKING_ALLOWED_END_HOUR, 0)
+    : null,
+)
 
 const normalizeBookingTime = (value: string) => {
   const parsed = parseBookingDateTime(value)

@@ -491,6 +491,7 @@ public class ServiceOrderService {
             service.getId(),
             service.getName(),
             service.getUnit(),
+            service.getServiceTime(),
             order.getAmount(),
             service.getContact(),
             service.getCompany().getUsername(),

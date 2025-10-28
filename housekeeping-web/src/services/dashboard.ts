@@ -89,6 +89,7 @@ export interface ServiceOrderItem {
   serviceId: number
   serviceName: string
   unit: string
+  serviceTime?: string | null
   price: number
   contact: string
   companyName: string
