@@ -75,9 +75,10 @@ public class CompanyServiceController {
 
     @GetMapping("/orders")
     public Result<List<ServiceOrderResponse>> listActiveOrders(
-        @RequestParam(value = "keyword", required = false) String keyword
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "categoryId", required = false) Long categoryId
     ) {
-        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword));
+        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword, categoryId));
     }
 
     @DeleteMapping("/orders/{orderId}")

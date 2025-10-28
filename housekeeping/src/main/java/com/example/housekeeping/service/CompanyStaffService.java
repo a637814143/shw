@@ -117,6 +117,7 @@ public class CompanyStaffService {
         ServiceOrderStatus status = order.getStatus();
         if (status == null || status == ServiceOrderStatus.SCHEDULED || status == ServiceOrderStatus.PENDING) {
             order.setProgressNote("已安排 " + staff.getName() + " 上门服务");
+            order.setStatus(ServiceOrderStatus.IN_PROGRESS);
         }
         order.setUpdatedAt(Instant.now());
         staff.setAssigned(true);

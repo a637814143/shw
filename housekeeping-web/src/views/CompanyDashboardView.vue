@@ -441,6 +441,28 @@
               </button>
             </div>
           </header>
+          <div class="category-menu appointment-category-menu" role="tablist" aria-label="服务类别筛选预约">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: appointmentCategoryFilter === 'all' }"
+              @click="handleSelectAppointmentCategory('all')"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="`appointment-${category.id}`"
+              type="button"
+              class="category-chip"
+              :class="{ active: appointmentCategoryFilter === category.id }"
+              @click="handleSelectAppointmentCategory(category.id)"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
@@ -482,6 +504,9 @@
                     <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
                     <div class="order-subtext">用户电话：{{ order.customerContactPhone || '未提供' }}</div>
                     <div class="order-subtext">用户地址：{{ order.customerAddress || '—' }}</div>
+                    <div v-if="order.assignedWorker" class="order-subtext">
+                      指派人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
+                    </div>
                     <div v-if="order.specialRequest" class="order-subtext highlight">
                       用户需求：{{ order.specialRequest }}
                     </div>
@@ -506,9 +531,6 @@
                     <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
                       指派人员
                     </button>
-                    <div v-if="order.assignedWorker" class="order-subtext">
-                      当前：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
-                    </div>
                   </td>
                   <td class="table-actions actions-inline">
                     <button
@@ -518,14 +540,6 @@
                       @click="saveOrderProgress(order, 'SCHEDULED')"
                     >
                       重置
-                    </button>
-                    <button
-                      type="button"
-                      class="link-button"
-                      :disabled="progressSaving[order.id] || appointmentsLoading"
-                      @click="saveOrderProgress(order, 'IN_PROGRESS')"
-                    >
-                      服务中
                     </button>
                     <button
                       type="button"
@@ -834,6 +848,7 @@ let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const companyOrders = ref<ServiceOrderItem[]>([])
 const appointmentsLoading = ref(false)
 const appointmentSearch = ref('')
+const appointmentCategoryFilter = ref<number | 'all'>('all')
 const selectedOrderIds = ref<Set<number>>(new Set())
 const serviceFormVisible = ref(false)
 const serviceSaving = ref(false)
@@ -1105,6 +1120,10 @@ watch(staffCategoryFilter, async () => {
   await loadStaff()
 })
 
+watch(appointmentCategoryFilter, async () => {
+  await loadCompanyOrders()
+})
+
 const clearStaffFilter = async () => {
   if (!staffSearch.value) {
     return
@@ -1178,13 +1197,22 @@ const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
 
 const visibleCompanyOrders = computed(() => {
   const keyword = appointmentSearch.value.trim()
-  if (!keyword) {
-    return companyOrders.value
-  }
-  return companyOrders.value.filter((order) => matchesOrderSearch(order, keyword))
+  const category = appointmentCategoryFilter.value
+  return companyOrders.value.filter((order) => {
+    const matchesCategory = category === 'all' || order.categoryId === category
+    if (!matchesCategory) {
+      return false
+    }
+    if (!keyword) {
+      return true
+    }
+    return matchesOrderSearch(order, keyword)
+  })
 })
 
-const hasAppointmentFilter = computed(() => appointmentSearch.value.trim().length > 0)
+const hasAppointmentFilter = computed(
+  () => appointmentSearch.value.trim().length > 0 || appointmentCategoryFilter.value !== 'all',
+)
 
 const allVisibleOrdersSelected = computed(
   () =>
@@ -1252,6 +1280,13 @@ const handleSelectServiceCategory = (categoryId: number | 'all') => {
     return
   }
   serviceCategoryFilter.value = categoryId
+}
+
+const handleSelectAppointmentCategory = (categoryId: number | 'all') => {
+  if (appointmentCategoryFilter.value === categoryId) {
+    return
+  }
+  appointmentCategoryFilter.value = categoryId
 }
 
 const changeServicePage = (page: number) => {
@@ -1896,12 +1931,22 @@ const loadServiceCategories = async () => {
   ) {
     serviceCategoryFilter.value = 'all'
   }
+  if (
+    appointmentCategoryFilter.value !== 'all' &&
+    !serviceCategories.value.some((item) => item.id === appointmentCategoryFilter.value)
+  ) {
+    appointmentCategoryFilter.value = 'all'
+  }
 }
 
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
-    const result = await fetchCompanyOrders()
+    const params: { categoryId?: number } = {}
+    if (appointmentCategoryFilter.value !== 'all') {
+      params.categoryId = appointmentCategoryFilter.value
+    }
+    const result = await fetchCompanyOrders(Object.keys(params).length ? params : undefined)
     companyOrders.value = result
     result.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
