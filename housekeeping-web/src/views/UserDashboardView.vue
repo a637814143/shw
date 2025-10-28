@@ -213,17 +213,22 @@
         </section>
 
         <section v-else-if="activeSection === 'services'" class="panel">
-          <header class="panel-header">
-            <div>
+          <header class="panel-header service-panel-header">
+            <div class="service-header-top">
               <h2>可选家政服务</h2>
-              <p>
-                当前可预约 {{ services.length }} 项
-                <span v-if="hasServiceFilter">（共 {{ allServices.length }} 项）</span>
-                ，当前分类：<strong class="service-category-highlight">{{ activeServiceCategoryName }}</strong>。
-                点击服务卡片即可填写预约时间与需求。
-              </p>
+              <div class="service-search-group">
+                <label class="visually-hidden" for="user-service-search">搜索服务</label>
+                <input
+                  id="user-service-search"
+                  v-model="serviceSearch"
+                  class="search-input"
+                  type="search"
+                  placeholder="搜索名称、单位、联系方式或描述"
+                />
+                <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
+              </div>
             </div>
-            <div class="service-actions">
+            <div class="service-category-row" aria-live="polite">
               <nav class="service-category-tabs" aria-label="服务分类筛选">
                 <button
                   type="button"
@@ -255,17 +260,6 @@
                 </template>
                 <p v-if="!serviceCategoriesLoading && !serviceCategories.length" class="category-empty">暂无分类</p>
               </nav>
-              <div class="service-search-group">
-                <label class="visually-hidden" for="user-service-search">搜索服务</label>
-                <input
-                  id="user-service-search"
-                  v-model="serviceSearch"
-                  class="search-input"
-                  type="search"
-                  placeholder="搜索名称、单位、联系方式或描述"
-                />
-                <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
-              </div>
             </div>
           </header>
           <div class="service-grid">
@@ -278,10 +272,7 @@
               >
                 {{ favoriteIdSet.has(service.id) ? '♥' : '♡' }}
               </button>
-              <header class="service-card-header">
-                <h3 class="service-title">{{ service.name }}</h3>
-                <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
-              </header>
+              <h3 class="service-title">{{ service.name }}</h3>
               <p class="service-company">提供方：{{ service.companyName }}</p>
               <dl class="service-meta">
                 <div>
@@ -306,7 +297,16 @@
                 </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
-              <button type="button" class="primary-button" @click="handleSelectService(service)">预约服务</button>
+              <footer class="service-card-footer">
+                <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
+                <button
+                  type="button"
+                  class="primary-button service-book-button"
+                  @click="handleSelectService(service)"
+                >
+                  预约服务
+                </button>
+              </footer>
             </article>
             <p v-if="!services.length" class="empty-tip">
               <span v-if="hasServiceFilter && allServices.length">没有找到符合条件的服务，换个关键词试试吧。</span>
@@ -1947,6 +1947,20 @@ onUnmounted(() => {
   color: rgba(226, 232, 240, 0.6);
 }
 
+.service-panel-header {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+.service-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
 .service-actions {
   display: flex;
   gap: 1rem;
@@ -1961,6 +1975,12 @@ onUnmounted(() => {
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.service-category-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .service-category-tabs {
@@ -2002,10 +2022,6 @@ onUnmounted(() => {
   margin: 0;
   color: rgba(148, 163, 184, 0.7);
   font-size: 0.9rem;
-}
-
-.service-category-highlight {
-  color: #38bdf8;
 }
 
 .search-input {
@@ -2160,13 +2176,6 @@ onUnmounted(() => {
   color: #fda4af;
 }
 
-.service-card-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
 .service-title {
   margin: 0;
   font-size: 1.25rem;
@@ -2179,6 +2188,22 @@ onUnmounted(() => {
   color: #38bdf8;
   font-size: 0.8rem;
   white-space: nowrap;
+}
+
+.service-card-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.service-card-footer .service-category-chip {
+  margin: 0;
+}
+
+.service-book-button {
+  margin-left: auto;
 }
 
 .service-company {

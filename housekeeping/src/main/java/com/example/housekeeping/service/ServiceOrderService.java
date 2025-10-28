@@ -128,12 +128,21 @@ public class ServiceOrderService {
     }
 
     @Transactional(readOnly = true)
-    public List<ServiceOrderResponse> listActiveOrdersForCompany(String keyword) {
+    public List<ServiceOrderResponse> listActiveOrdersForCompany(String keyword, Long categoryId) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         List<HousekeepService> services = housekeepServiceRepository.findByCompany(company);
         if (services.isEmpty()) {
             return List.of();
+        }
+        if (categoryId != null) {
+            services = services.stream()
+                .filter(service -> service.getCategory() != null
+                    && service.getCategory().getId().equals(categoryId))
+                .collect(Collectors.toList());
+            if (services.isEmpty()) {
+                return List.of();
+            }
         }
         String normalizedKeyword = normalizeKeyword(keyword);
         return serviceOrderRepository.findByServiceIn(services).stream()

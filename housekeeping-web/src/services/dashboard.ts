@@ -642,12 +642,16 @@ export const exchangeUserPoints = async (
 // 家政公司接口
 export const fetchCompanyServices = async (params?: {
   keyword?: string
+  categoryId?: number
   page?: number
   size?: number
 }): Promise<CompanyServicePage> => {
   const url = new URL(buildUrl('/api/company/services'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
   }
   if (params?.page) {
     url.searchParams.set('page', String(params.page))
@@ -800,10 +804,13 @@ export const deleteAdminServiceCategories = async (ids: number[]): Promise<void>
   await handleResponse<null>(response)
 }
 
-export const fetchCompanyOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
+export const fetchCompanyOrders = async (params?: { keyword?: string; categoryId?: number }): Promise<ServiceOrderItem[]> => {
   const url = new URL(buildUrl('/api/company/services/orders'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)

@@ -45,6 +45,37 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
                                                      @Param("keyword") String keyword,
                                                      Pageable pageable);
 
+    @Query(value = """
+        SELECT s FROM HousekeepService s
+        WHERE s.company = :company
+          AND (:category IS NULL OR s.category = :category)
+          AND (
+            :keyword IS NULL OR
+            LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          )
+        """,
+        countQuery = """
+        SELECT COUNT(s) FROM HousekeepService s
+        WHERE s.company = :company
+          AND (:category IS NULL OR s.category = :category)
+          AND (
+            :keyword IS NULL OR
+            LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          )
+        """)
+    Page<HousekeepService> searchByCompanyWithFilters(@Param("company") UserAll company,
+                                                      @Param("category") ServiceCategory category,
+                                                      @Param("keyword") String keyword,
+                                                      Pageable pageable);
+
     @Query("""
         SELECT s FROM HousekeepService s
         WHERE

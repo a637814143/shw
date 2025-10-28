@@ -91,6 +91,29 @@
             </div>
           </header>
 
+          <div class="category-menu service-category-menu" role="tablist" aria-label="按服务类别筛选服务">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceCategoryFilter === 'all' }"
+              @click="handleSelectServiceCategory('all')"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceCategoryFilter === category.id }"
+              @click="handleSelectServiceCategory(category.id)"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
+
           <div v-if="serviceFormVisible" class="form-card">
             <form class="form-grid" @submit.prevent="submitServiceForm">
               <div class="form-field">
@@ -144,28 +167,6 @@
                 </button>
               </div>
             </form>
-          </div>
-
-          <div class="category-menu" role="tablist" aria-label="按服务类别筛选人员">
-            <button
-              type="button"
-              class="category-chip"
-              :class="{ active: staffCategoryFilter === 'all' }"
-              @click="staffCategoryFilter = 'all'"
-            >
-              全部
-            </button>
-            <button
-              v-for="category in serviceCategories"
-              :key="category.id"
-              type="button"
-              class="category-chip"
-              :class="{ active: staffCategoryFilter === category.id }"
-              @click="staffCategoryFilter = category.id"
-            >
-              {{ category.name }}
-              <span class="chip-count">{{ category.availableStaffCount }}</span>
-            </button>
           </div>
 
           <div class="table-wrapper">
@@ -290,6 +291,29 @@
               <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
             </div>
           </header>
+
+          <div class="category-menu staff-category-menu" role="tablist" aria-label="按服务类别筛选人员">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === 'all' }"
+              @click="staffCategoryFilter = 'all'"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === category.id }"
+              @click="staffCategoryFilter = category.id"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.availableStaffCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
 
           <div v-if="staffFormVisible" class="form-card">
             <form class="form-grid" @submit.prevent="submitStaffForm">
@@ -417,6 +441,28 @@
               </button>
             </div>
           </header>
+          <div class="category-menu appointment-category-menu" role="tablist" aria-label="服务类别筛选预约">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: appointmentCategoryFilter === 'all' }"
+              @click="handleSelectAppointmentCategory('all')"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="`appointment-${category.id}`"
+              type="button"
+              class="category-chip"
+              :class="{ active: appointmentCategoryFilter === category.id }"
+              @click="handleSelectAppointmentCategory(category.id)"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
@@ -458,6 +504,9 @@
                     <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
                     <div class="order-subtext">用户电话：{{ order.customerContactPhone || '未提供' }}</div>
                     <div class="order-subtext">用户地址：{{ order.customerAddress || '—' }}</div>
+                    <div v-if="order.assignedWorker" class="order-subtext">
+                      指派人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
+                    </div>
                     <div v-if="order.specialRequest" class="order-subtext highlight">
                       用户需求：{{ order.specialRequest }}
                     </div>
@@ -482,9 +531,6 @@
                     <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
                       指派人员
                     </button>
-                    <div v-if="order.assignedWorker" class="order-subtext">
-                      当前：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
-                    </div>
                   </td>
                   <td class="table-actions actions-inline">
                     <button
@@ -494,14 +540,6 @@
                       @click="saveOrderProgress(order, 'SCHEDULED')"
                     >
                       重置
-                    </button>
-                    <button
-                      type="button"
-                      class="link-button"
-                      :disabled="progressSaving[order.id] || appointmentsLoading"
-                      @click="saveOrderProgress(order, 'IN_PROGRESS')"
-                    >
-                      服务中
                     </button>
                     <button
                       type="button"
@@ -799,6 +837,7 @@ const activeSection = ref<SectionKey>('services')
 const serviceCategories = ref<ServiceCategoryItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
+const serviceCategoryFilter = ref<number | 'all'>('all')
 const servicePage = ref(1)
 const serviceSize = ref(10)
 const serviceTotal = ref(0)
@@ -809,6 +848,7 @@ let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const companyOrders = ref<ServiceOrderItem[]>([])
 const appointmentsLoading = ref(false)
 const appointmentSearch = ref('')
+const appointmentCategoryFilter = ref<number | 'all'>('all')
 const selectedOrderIds = ref<Set<number>>(new Set())
 const serviceFormVisible = ref(false)
 const serviceSaving = ref(false)
@@ -1061,6 +1101,11 @@ watch(serviceSearch, () => {
   }, 300)
 })
 
+watch(serviceCategoryFilter, async () => {
+  servicePage.value = 1
+  await loadServices()
+})
+
 watch(staffSearch, () => {
   if (staffSearchTimer) {
     clearTimeout(staffSearchTimer)
@@ -1073,6 +1118,10 @@ watch(staffSearch, () => {
 
 watch(staffCategoryFilter, async () => {
   await loadStaff()
+})
+
+watch(appointmentCategoryFilter, async () => {
+  await loadCompanyOrders()
 })
 
 const clearStaffFilter = async () => {
@@ -1148,13 +1197,22 @@ const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
 
 const visibleCompanyOrders = computed(() => {
   const keyword = appointmentSearch.value.trim()
-  if (!keyword) {
-    return companyOrders.value
-  }
-  return companyOrders.value.filter((order) => matchesOrderSearch(order, keyword))
+  const category = appointmentCategoryFilter.value
+  return companyOrders.value.filter((order) => {
+    const matchesCategory = category === 'all' || order.categoryId === category
+    if (!matchesCategory) {
+      return false
+    }
+    if (!keyword) {
+      return true
+    }
+    return matchesOrderSearch(order, keyword)
+  })
 })
 
-const hasAppointmentFilter = computed(() => appointmentSearch.value.trim().length > 0)
+const hasAppointmentFilter = computed(
+  () => appointmentSearch.value.trim().length > 0 || appointmentCategoryFilter.value !== 'all',
+)
 
 const allVisibleOrdersSelected = computed(
   () =>
@@ -1206,7 +1264,9 @@ const hasServiceSelection = computed(() => selectedServiceIds.value.size > 0)
 const allVisibleServicesSelected = computed(
   () => services.value.length > 0 && services.value.every((item) => selectedServiceIds.value.has(item.id)),
 )
-const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
+const hasServiceFilter = computed(
+  () => serviceSearch.value.trim().length > 0 || serviceCategoryFilter.value !== 'all',
+)
 const serviceTotalPages = computed(() => Math.max(1, Math.ceil((serviceTotal.value || 0) / serviceSize.value)))
 const servicePageStart = computed(() =>
   serviceTotal.value === 0 ? 0 : (servicePage.value - 1) * serviceSize.value + 1,
@@ -1214,6 +1274,20 @@ const servicePageStart = computed(() =>
 const servicePageEnd = computed(() =>
   serviceTotal.value === 0 ? 0 : Math.min(serviceTotal.value, servicePage.value * serviceSize.value),
 )
+
+const handleSelectServiceCategory = (categoryId: number | 'all') => {
+  if (serviceCategoryFilter.value === categoryId) {
+    return
+  }
+  serviceCategoryFilter.value = categoryId
+}
+
+const handleSelectAppointmentCategory = (categoryId: number | 'all') => {
+  if (appointmentCategoryFilter.value === categoryId) {
+    return
+  }
+  appointmentCategoryFilter.value = categoryId
+}
 
 const changeServicePage = (page: number) => {
   const totalPages = serviceTotalPages.value
@@ -1784,10 +1858,15 @@ const loadServices = async () => {
   serviceLoading.value = true
   try {
     const keyword = serviceSearch.value.trim()
-    const params = {
-      keyword: keyword ? keyword : undefined,
+    const params: { keyword?: string; categoryId?: number; page: number; size: number } = {
       page: servicePage.value,
       size: serviceSize.value,
+    }
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (serviceCategoryFilter.value !== 'all') {
+      params.categoryId = serviceCategoryFilter.value
     }
     let result = await fetchCompanyServices(params)
     const totalPages = Math.max(1, Math.ceil((result.total || 0) / serviceSize.value))
@@ -1846,12 +1925,28 @@ const loadServiceCategories = async () => {
       staffForm.categoryId = firstCategory.id
     }
   }
+  if (
+    serviceCategoryFilter.value !== 'all' &&
+    !serviceCategories.value.some((item) => item.id === serviceCategoryFilter.value)
+  ) {
+    serviceCategoryFilter.value = 'all'
+  }
+  if (
+    appointmentCategoryFilter.value !== 'all' &&
+    !serviceCategories.value.some((item) => item.id === appointmentCategoryFilter.value)
+  ) {
+    appointmentCategoryFilter.value = 'all'
+  }
 }
 
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
-    const result = await fetchCompanyOrders()
+    const params: { categoryId?: number } = {}
+    if (appointmentCategoryFilter.value !== 'all') {
+      params.categoryId = appointmentCategoryFilter.value
+    }
+    const result = await fetchCompanyOrders(Object.keys(params).length ? params : undefined)
     companyOrders.value = result
     result.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
@@ -2441,6 +2536,10 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
+.service-category-menu {
+  margin-bottom: 20px;
+}
+
 .category-chip {
   border: none;
   background: none;
@@ -2465,6 +2564,12 @@ onUnmounted(() => {
   height: 2px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   border-radius: 999px;
+}
+
+.category-empty {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.85);
+  font-size: 13px;
 }
 
 .chip-count {

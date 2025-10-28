@@ -36,10 +36,18 @@ public class CompanyServiceController {
     @GetMapping
     public Result<CompanyServicePageResponse> listCompanyServices(
         @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "categoryId", required = false) Long categoryId,
         @RequestParam(value = "page", defaultValue = "1") Integer page,
         @RequestParam(value = "size", defaultValue = "10") Integer size
     ) {
-        return Result.success(housekeepServiceManager.listForCurrentCompany(keyword, page == null ? 1 : page, size == null ? 10 : size));
+        return Result.success(
+            housekeepServiceManager.listForCurrentCompany(
+                keyword,
+                categoryId,
+                page == null ? 1 : page,
+                size == null ? 10 : size
+            )
+        );
     }
 
     @PostMapping
@@ -67,9 +75,10 @@ public class CompanyServiceController {
 
     @GetMapping("/orders")
     public Result<List<ServiceOrderResponse>> listActiveOrders(
-        @RequestParam(value = "keyword", required = false) String keyword
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "categoryId", required = false) Long categoryId
     ) {
-        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword));
+        return Result.success(serviceOrderService.listActiveOrdersForCompany(keyword, categoryId));
     }
 
     @DeleteMapping("/orders/{orderId}")
