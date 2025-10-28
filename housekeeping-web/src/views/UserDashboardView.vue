@@ -43,7 +43,7 @@
           <header class="dialog-header">
             <h2>预约 {{ bookingForm.service?.name }}</h2>
             <p>请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。</p>
-            <p class="dialog-subtext">建议服务时间：{{ bookingForm.service?.serviceTime || '按需预约' }}</p>
+            <p class="dialog-subtext">建议服务时长：{{ bookingForm.service?.serviceTime || '按需预约' }}</p>
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
@@ -288,7 +288,7 @@
                   <dd>{{ service.contact }}</dd>
                 </div>
                 <div>
-                  <dt>服务时间</dt>
+                  <dt>服务时长</dt>
                   <dd>{{ service.serviceTime }}</dd>
                 </div>
                 <div>
@@ -827,6 +827,71 @@ const bookingForm = reactive<{
   serviceAddress: '',
 })
 
+const BOOKING_ALLOWED_START_HOUR = 8
+const BOOKING_ALLOWED_END_HOUR = 22
+
+const parseBookingDateTime = (value: string) => {
+  if (!value || !value.includes('T')) {
+    return null
+  }
+
+  const [datePart, timePart] = value.split('T')
+  if (!datePart || !timePart) {
+    return null
+  }
+
+  const [hourPart, minutePart] = timePart.split(':')
+  const hour = Number(hourPart)
+  const minute = Number(minutePart)
+
+  if (Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null
+  }
+
+  return { datePart, hour, minute }
+}
+
+const formatBookingDateTime = (date: string, hour: number, minute: number) =>
+  `${date}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+
+const normalizeBookingTime = (value: string) => {
+  const parsed = parseBookingDateTime(value)
+  if (!parsed) {
+    return value
+  }
+
+  if (parsed.hour < BOOKING_ALLOWED_START_HOUR) {
+    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_START_HOUR, 0)
+  }
+
+  if (parsed.hour > BOOKING_ALLOWED_END_HOUR) {
+    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_END_HOUR, 0)
+  }
+
+  if (parsed.hour === BOOKING_ALLOWED_END_HOUR && parsed.minute > 0) {
+    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_END_HOUR, 0)
+  }
+
+  return value
+}
+
+const isBookingTimeAllowed = (value: string) => {
+  const parsed = parseBookingDateTime(value)
+  if (!parsed) {
+    return false
+  }
+
+  if (parsed.hour < BOOKING_ALLOWED_START_HOUR || parsed.hour > BOOKING_ALLOWED_END_HOUR) {
+    return false
+  }
+
+  if (parsed.hour === BOOKING_ALLOWED_END_HOUR && parsed.minute > 0) {
+    return false
+  }
+
+  return true
+}
+
 const paymentDialogVisible = ref(false)
 const paymentChecking = ref(false)
 const paymentStatus = ref<PaymentStatus>('idle')
@@ -1223,6 +1288,21 @@ const loadFavorites = async () => {
   }
 }
 
+watch(
+  () => bookingForm.scheduledAt,
+  (value) => {
+    if (!value) {
+      return
+    }
+
+    const normalized = normalizeBookingTime(value)
+    if (normalized !== value) {
+      bookingForm.scheduledAt = normalized
+      window.alert('预约时间仅支持 08:00-22:00，请重新选择。')
+    }
+  },
+)
+
 watch(serviceSearch, () => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
@@ -1337,6 +1417,11 @@ const resetPaymentState = () => {
 const submitBooking = async () => {
   if (!bookingForm.service || !bookingForm.scheduledAt || !bookingForm.serviceAddress.trim()) {
     window.alert('请填写完整的预约信息')
+    return
+  }
+
+  if (!isBookingTimeAllowed(bookingForm.scheduledAt)) {
+    window.alert('预约时间仅支持 08:00-22:00，请重新选择。')
     return
   }
 

@@ -133,12 +133,12 @@
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
               <div class="form-field">
-                <label for="service-time">服务时间</label>
+                <label for="service-time">服务时长</label>
                 <input
                   id="service-time"
                   v-model="serviceForm.serviceTime"
                   type="text"
-                  placeholder="如：工作日 9:00-18:00 / 2 小时"
+                  placeholder="如：2 小时 / 工作日 9:00-18:00"
                 />
               </div>
               <div class="form-field">
@@ -186,7 +186,7 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
-                  <th>服务时间</th>
+                  <th>服务时长</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -1344,7 +1344,7 @@ const submitServiceForm = async () => {
     return
   }
   if (!serviceForm.serviceTime.trim()) {
-    window.alert('请填写服务时间')
+    window.alert('请填写服务时长')
     return
   }
   if (serviceForm.price <= 0) {
