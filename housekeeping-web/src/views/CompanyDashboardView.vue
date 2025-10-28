@@ -91,6 +91,29 @@
             </div>
           </header>
 
+          <div class="category-menu service-category-menu" role="tablist" aria-label="按服务类别筛选服务">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceCategoryFilter === 'all' }"
+              @click="handleSelectServiceCategory('all')"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceCategoryFilter === category.id }"
+              @click="handleSelectServiceCategory(category.id)"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
+
           <div v-if="serviceFormVisible" class="form-card">
             <form class="form-grid" @submit.prevent="submitServiceForm">
               <div class="form-field">
@@ -799,6 +822,7 @@ const activeSection = ref<SectionKey>('services')
 const serviceCategories = ref<ServiceCategoryItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
+const serviceCategoryFilter = ref<number | 'all'>('all')
 const servicePage = ref(1)
 const serviceSize = ref(10)
 const serviceTotal = ref(0)
@@ -1061,6 +1085,11 @@ watch(serviceSearch, () => {
   }, 300)
 })
 
+watch(serviceCategoryFilter, async () => {
+  servicePage.value = 1
+  await loadServices()
+})
+
 watch(staffSearch, () => {
   if (staffSearchTimer) {
     clearTimeout(staffSearchTimer)
@@ -1206,7 +1235,9 @@ const hasServiceSelection = computed(() => selectedServiceIds.value.size > 0)
 const allVisibleServicesSelected = computed(
   () => services.value.length > 0 && services.value.every((item) => selectedServiceIds.value.has(item.id)),
 )
-const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
+const hasServiceFilter = computed(
+  () => serviceSearch.value.trim().length > 0 || serviceCategoryFilter.value !== 'all',
+)
 const serviceTotalPages = computed(() => Math.max(1, Math.ceil((serviceTotal.value || 0) / serviceSize.value)))
 const servicePageStart = computed(() =>
   serviceTotal.value === 0 ? 0 : (servicePage.value - 1) * serviceSize.value + 1,
@@ -1214,6 +1245,13 @@ const servicePageStart = computed(() =>
 const servicePageEnd = computed(() =>
   serviceTotal.value === 0 ? 0 : Math.min(serviceTotal.value, servicePage.value * serviceSize.value),
 )
+
+const handleSelectServiceCategory = (categoryId: number | 'all') => {
+  if (serviceCategoryFilter.value === categoryId) {
+    return
+  }
+  serviceCategoryFilter.value = categoryId
+}
 
 const changeServicePage = (page: number) => {
   const totalPages = serviceTotalPages.value
@@ -1784,10 +1822,15 @@ const loadServices = async () => {
   serviceLoading.value = true
   try {
     const keyword = serviceSearch.value.trim()
-    const params = {
-      keyword: keyword ? keyword : undefined,
+    const params: { keyword?: string; categoryId?: number; page: number; size: number } = {
       page: servicePage.value,
       size: serviceSize.value,
+    }
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (serviceCategoryFilter.value !== 'all') {
+      params.categoryId = serviceCategoryFilter.value
     }
     let result = await fetchCompanyServices(params)
     const totalPages = Math.max(1, Math.ceil((result.total || 0) / serviceSize.value))
@@ -1845,6 +1888,12 @@ const loadServiceCategories = async () => {
     if (!staffForm.categoryId) {
       staffForm.categoryId = firstCategory.id
     }
+  }
+  if (
+    serviceCategoryFilter.value !== 'all' &&
+    !serviceCategories.value.some((item) => item.id === serviceCategoryFilter.value)
+  ) {
+    serviceCategoryFilter.value = 'all'
   }
 }
 
@@ -2441,6 +2490,10 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
+.service-category-menu {
+  margin-bottom: 20px;
+}
+
 .category-chip {
   border: none;
   background: none;
@@ -2465,6 +2518,12 @@ onUnmounted(() => {
   height: 2px;
   background: linear-gradient(135deg, #2563eb, #3b82f6);
   border-radius: 999px;
+}
+
+.category-empty {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.85);
+  font-size: 13px;
 }
 
 .chip-count {
