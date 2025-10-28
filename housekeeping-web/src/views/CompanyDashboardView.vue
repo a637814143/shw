@@ -109,6 +109,30 @@
                 <label for="service-contact">联系方式</label>
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
+              <div class="form-field">
+                <label for="service-time">服务时间</label>
+                <input
+                  id="service-time"
+                  v-model="serviceForm.serviceTime"
+                  type="text"
+                  placeholder="如：工作日 9:00-18:00 / 2 小时"
+                />
+              </div>
+              <div class="form-field">
+                <label for="service-category">服务分类</label>
+                <select
+                  id="service-category"
+                  v-model.number="serviceForm.categoryId"
+                  :disabled="!serviceCategories.length"
+                  required
+                >
+                  <option disabled value="0">请选择分类</option>
+                  <option v-for="category in serviceCategories" :key="category.id" :value="category.id">
+                    {{ category.name }}
+                  </option>
+                </select>
+                <p v-if="!serviceCategories.length" class="form-helper">请先在管理员端配置服务分类</p>
+              </div>
               <div class="form-field form-field-full">
                 <label for="service-description">服务简介</label>
                 <textarea id="service-description" v-model="serviceForm.description" rows="3"></textarea>
@@ -120,6 +144,28 @@
                 </button>
               </div>
             </form>
+          </div>
+
+          <div class="category-menu" role="tablist" aria-label="按服务类别筛选人员">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === 'all' }"
+              @click="staffCategoryFilter = 'all'"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === category.id }"
+              @click="staffCategoryFilter = category.id"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.availableStaffCount }}</span>
+            </button>
           </div>
 
           <div class="table-wrapper">
@@ -136,8 +182,10 @@
                     />
                   </th>
                   <th>服务名称</th>
+                  <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
+                  <th>服务时间</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -156,9 +204,12 @@
                   <td>
                     <strong>{{ item.name }}</strong>
                     <div class="order-subtext">单位：{{ item.unit }}</div>
+                    <div class="order-subtext">空闲人员：{{ item.availableStaffCount }}</div>
                   </td>
+                  <td>{{ item.categoryName || '—' }}</td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
                   <td>{{ item.contact }}</td>
+                  <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
@@ -166,10 +217,10 @@
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="6" class="empty-row">服务加载中…</td>
+                  <td colspan="8" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="6" class="empty-row">
+                  <td colspan="8" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -216,7 +267,7 @@
                 v-model="staffSearch"
                 class="search-input"
                 type="search"
-                placeholder="搜索姓名、联系方式、岗位或备注"
+                placeholder="搜索姓名、联系方式、分类或备注"
                 :disabled="staffLoading"
               />
               <button
@@ -251,8 +302,19 @@
                 <input id="staff-contact" v-model="staffForm.contact" type="text" required />
               </div>
               <div class="form-field">
-                <label for="staff-role">岗位/特长</label>
-                <input id="staff-role" v-model="staffForm.role" type="text" />
+                <label for="staff-category">服务类别</label>
+                <select
+                  id="staff-category"
+                  v-model.number="staffForm.categoryId"
+                  :disabled="!serviceCategories.length"
+                  required
+                >
+                  <option disabled value="0">请选择分类</option>
+                  <option v-for="category in serviceCategories" :key="category.id" :value="category.id">
+                    {{ category.name }}
+                  </option>
+                </select>
+                <p v-if="!serviceCategories.length" class="form-helper">请先添加服务分类</p>
               </div>
               <div class="form-field form-field-full">
                 <label for="staff-notes">备注</label>
@@ -282,7 +344,8 @@
                   </th>
                   <th>姓名</th>
                   <th>联系方式</th>
-                  <th>岗位</th>
+                  <th>服务类别</th>
+                  <th>状态</th>
                   <th>备注</th>
                   <th>创建时间</th>
                   <th class="table-actions">操作</th>
@@ -301,7 +364,12 @@
                   </td>
                   <td>{{ item.name }}</td>
                   <td>{{ item.contact }}</td>
-                  <td>{{ item.role || '—' }}</td>
+                  <td>{{ item.categoryName || '—' }}</td>
+                  <td>
+                    <span class="status-badge" :class="item.assigned ? 'status-assigned' : 'status-available'">
+                      {{ item.assigned ? '已分配' : '未分配' }}
+                    </span>
+                  </td>
                   <td>{{ item.notes || '—' }}</td>
                   <td>{{ formatDateTime(item.createdAt) }}</td>
                   <td class="table-actions">
@@ -310,7 +378,7 @@
                   </td>
                 </tr>
                 <tr v-if="!staffList.length">
-                  <td colspan="7" class="empty-row">
+                  <td colspan="8" class="empty-row">
                     <span v-if="hasStaffFilter">未找到匹配的人员，尝试调整搜索条件。</span>
                     <span v-else>还没有添加人员，点击右上角按钮即可新增。</span>
                   </td>
@@ -363,6 +431,7 @@
                     />
                   </th>
                   <th>服务</th>
+                  <th>服务类别</th>
                   <th>预约时间</th>
                   <th>用户</th>
                   <th>状态</th>
@@ -393,6 +462,7 @@
                       用户需求：{{ order.specialRequest }}
                     </div>
                   </td>
+                  <td>{{ order.categoryName || '—' }}</td>
                   <td>{{ formatDateTime(order.scheduledAt) }}</td>
                   <td>{{ order.username }}</td>
                   <td>
@@ -409,19 +479,8 @@
                     />
                   </td>
                   <td>
-                    <select v-model="staffAssignments[order.id]" class="staff-select">
-                      <option value="">选择人员</option>
-                      <option v-for="staff in staffList" :key="staff.id" :value="staff.id">
-                        {{ staff.name }}<span v-if="staff.role">（{{ staff.role }}）</span>
-                      </option>
-                    </select>
-                    <button
-                      type="button"
-                      class="link-button"
-                      :disabled="staffAssignmentSaving[order.id] || !staffAssignments[order.id]"
-                      @click="assignStaffToOrder(order)"
-                    >
-                      {{ staffAssignmentSaving[order.id] ? '指派中…' : '指派' }}
+                    <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
+                      指派人员
                     </button>
                     <div v-if="order.assignedWorker" class="order-subtext">
                       当前：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
@@ -463,10 +522,10 @@
                   </td>
                 </tr>
                 <tr v-if="appointmentsLoading">
-                  <td colspan="8" class="empty-row">预约数据加载中…</td>
+                  <td colspan="9" class="empty-row">预约数据加载中…</td>
                 </tr>
                 <tr v-else-if="!visibleCompanyOrders.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasAppointmentFilter">未找到匹配的预约，请调整搜索条件。</span>
                     <span v-else>暂无预约记录，用户预约后会自动出现在此处。</span>
                   </td>
@@ -601,6 +660,59 @@
 
       </main>
     </div>
+    <div
+      v-if="assignmentModalVisible"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="assignment-modal-title"
+    >
+      <div class="modal-card">
+        <header class="modal-header">
+          <h3 id="assignment-modal-title">指派人员</h3>
+          <button type="button" class="close-button" @click="closeAssignmentModal" aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body">
+          <p v-if="assignmentModalOrder" class="modal-subtitle">
+            服务：{{ assignmentModalOrder.serviceName }} · 分类：{{ assignmentModalOrder.categoryName || '未设置' }}
+          </p>
+          <div v-if="assignmentModalLoading" class="loading-state">加载人员中…</div>
+          <div v-else class="assignment-columns">
+            <section>
+              <h4>未分配</h4>
+              <p v-if="!modalAvailableStaff.length" class="muted-text">暂无未分配人员</p>
+              <ul class="staff-list">
+                <li v-for="staff in modalAvailableStaff" :key="staff.id">
+                  <label class="radio-option">
+                    <input type="radio" :value="staff.id" v-model.number="assignmentModalSelection" />
+                    <span>{{ staff.name }}（{{ staff.contact }}）</span>
+                  </label>
+                </li>
+              </ul>
+            </section>
+            <section>
+              <h4>已分配</h4>
+              <p v-if="!modalAssignedStaff.length" class="muted-text">暂无已分配人员</p>
+              <ul class="staff-list">
+                <li v-for="staff in modalAssignedStaff" :key="staff.id">{{ staff.name }}（{{ staff.contact }}）</li>
+              </ul>
+            </section>
+          </div>
+          <p v-if="assignmentModalError" class="modal-error">{{ assignmentModalError }}</p>
+        </div>
+        <footer class="modal-footer">
+          <button type="button" class="secondary-button" @click="closeAssignmentModal">取消</button>
+          <button
+            type="button"
+            class="primary-button"
+            :disabled="assignmentSubmitting"
+            @click="confirmAssignment"
+          >
+            {{ assignmentSubmitting ? '指派中…' : '确认指派' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -629,6 +741,7 @@ import {
   deleteCompanyStaff,
   deleteCompanyStaffBatch,
   assignCompanyStaff,
+  fetchServiceCategories,
   deleteCompanyOrder,
   deleteCompanyOrders,
   deleteCompanyReview,
@@ -643,6 +756,7 @@ import {
   type UpdateOrderProgressPayload,
   type CompanyStaffItem,
   type CompanyStaffPayload,
+  type ServiceCategoryItem,
 } from '../services/dashboard'
 
 import CompanyMessagingPanel from '../pages/company/CompanyMessagingPanel.vue'
@@ -682,6 +796,7 @@ const sections: SectionMeta[] = [
 ]
 
 const activeSection = ref<SectionKey>('services')
+const serviceCategories = ref<ServiceCategoryItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
 const serviceSearch = ref('')
 const servicePage = ref(1)
@@ -705,7 +820,9 @@ const serviceForm = reactive<CompanyServicePayload>({
   unit: '',
   price: 0,
   contact: '',
+  serviceTime: '按需预约',
   description: '',
+  categoryId: 0,
 })
 
 const staffList = ref<CompanyStaffItem[]>([])
@@ -716,14 +833,22 @@ let staffSearchTimer: ReturnType<typeof setTimeout> | null = null
 const staffFormVisible = ref(false)
 const staffSaving = ref(false)
 const editingStaffId = ref<number | null>(null)
+const staffCategoryFilter = ref<number | 'all'>('all')
 const staffForm = reactive<CompanyStaffPayload>({
   name: '',
   contact: '',
-  role: '',
+  categoryId: 0,
   notes: '',
 })
-const staffAssignments = reactive<Record<number, number | ''>>({})
-const staffAssignmentSaving = reactive<Record<number, boolean>>({})
+const assignmentModalVisible = ref(false)
+const assignmentModalLoading = ref(false)
+const assignmentModalStaff = ref<CompanyStaffItem[]>([])
+const assignmentModalOrder = ref<ServiceOrderItem | null>(null)
+const assignmentModalSelection = ref<number | null>(null)
+const assignmentSubmitting = ref(false)
+const assignmentModalError = ref<string | null>(null)
+const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((item) => !item.assigned))
+const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
 
@@ -946,6 +1071,10 @@ watch(staffSearch, () => {
   }, 300)
 })
 
+watch(staffCategoryFilter, async () => {
+  await loadStaff()
+})
+
 const clearStaffFilter = async () => {
   if (!staffSearch.value) {
     return
@@ -1108,7 +1237,9 @@ const resetServiceForm = () => {
   serviceForm.unit = ''
   serviceForm.price = 0
   serviceForm.contact = ''
+  serviceForm.serviceTime = '按需预约'
   serviceForm.description = ''
+  serviceForm.categoryId = serviceCategories.value[0]?.id ?? 0
   editingServiceId.value = null
 }
 
@@ -1118,7 +1249,9 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
     serviceForm.unit = item.unit
     serviceForm.price = item.price
     serviceForm.contact = item.contact
+    serviceForm.serviceTime = item.serviceTime || '按需预约'
     serviceForm.description = item.description || ''
+    serviceForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
     editingServiceId.value = item.id
   } else {
     resetServiceForm()
@@ -1136,8 +1269,16 @@ const submitServiceForm = async () => {
     window.alert('请完整填写服务信息')
     return
   }
+  if (!serviceForm.serviceTime.trim()) {
+    window.alert('请填写服务时间')
+    return
+  }
   if (serviceForm.price <= 0) {
     window.alert('请填写有效的价格')
+    return
+  }
+  if (!serviceForm.categoryId) {
+    window.alert('请选择服务分类')
     return
   }
   serviceSaving.value = true
@@ -1147,7 +1288,9 @@ const submitServiceForm = async () => {
       unit: serviceForm.unit.trim(),
       price: Number(serviceForm.price),
       contact: serviceForm.contact.trim(),
+      serviceTime: serviceForm.serviceTime.trim(),
       description: serviceForm.description?.trim() || '',
+      categoryId: serviceForm.categoryId,
     }
     if (editingServiceId.value) {
       await updateCompanyService(editingServiceId.value, payload)
@@ -1199,7 +1342,7 @@ const handleBulkDeleteServices = async () => {
 const resetStaffForm = () => {
   staffForm.name = ''
   staffForm.contact = ''
-  staffForm.role = ''
+  staffForm.categoryId = serviceCategories.value[0]?.id ?? 0
   staffForm.notes = ''
   editingStaffId.value = null
 }
@@ -1208,7 +1351,7 @@ const openStaffForm = (item?: CompanyStaffItem) => {
   if (item) {
     staffForm.name = item.name
     staffForm.contact = item.contact
-    staffForm.role = item.role || ''
+    staffForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
     staffForm.notes = item.notes || ''
     editingStaffId.value = item.id
   } else {
@@ -1227,12 +1370,16 @@ const submitStaffForm = async () => {
     window.alert('请填写完整的人员姓名和联系方式')
     return
   }
+  if (!staffForm.categoryId) {
+    window.alert('请选择服务类别')
+    return
+  }
   staffSaving.value = true
   try {
     const payload: CompanyStaffPayload = {
       name: staffForm.name.trim(),
       contact: staffForm.contact.trim(),
-      role: staffForm.role?.trim() || undefined,
+      categoryId: staffForm.categoryId,
       notes: staffForm.notes?.trim() || undefined,
     }
     if (editingStaffId.value) {
@@ -1278,26 +1425,59 @@ const handleBulkDeleteStaff = async () => {
   }
 }
 
-const assignStaffToOrder = async (order: ServiceOrderItem) => {
-  const selected = staffAssignments[order.id]
-  if (!selected) {
+const openAssignmentModal = async (order: ServiceOrderItem) => {
+  if (!order.categoryId) {
+    window.alert('该服务未设置分类，无法指派人员')
+    return
+  }
+  assignmentModalVisible.value = true
+  assignmentModalOrder.value = order
+  assignmentModalSelection.value = order.assignedStaffId ?? null
+  assignmentModalError.value = null
+  assignmentModalLoading.value = true
+  try {
+    assignmentModalStaff.value = await fetchCompanyStaff({ categoryId: order.categoryId })
+  } catch (error) {
+    assignmentModalError.value = error instanceof Error ? error.message : '加载人员列表失败'
+    assignmentModalStaff.value = []
+  } finally {
+    assignmentModalLoading.value = false
+  }
+}
+
+const closeAssignmentModal = () => {
+  assignmentModalVisible.value = false
+  assignmentModalOrder.value = null
+  assignmentModalSelection.value = null
+  assignmentModalStaff.value = []
+  assignmentModalError.value = null
+}
+
+const confirmAssignment = async () => {
+  const order = assignmentModalOrder.value
+  if (!order) {
+    return
+  }
+  if (assignmentModalSelection.value == null) {
     window.alert('请选择要指派的人员')
     return
   }
-  staffAssignmentSaving[order.id] = true
+  assignmentSubmitting.value = true
+  assignmentModalError.value = null
   try {
-    const updated = await assignCompanyStaff(Number(selected), order.id)
+    const updated = await assignCompanyStaff(assignmentModalSelection.value, order.id)
     const index = companyOrders.value.findIndex((item) => item.id === updated.id)
     if (index >= 0) {
       companyOrders.value.splice(index, 1, updated)
     }
-    staffAssignments[order.id] = ''
     progressNoteEdits[updated.id] = updated.progressNote || ''
-    window.alert('已指派人员')
+    await loadStaff()
+    closeAssignmentModal()
+    window.alert('指派成功')
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : '指派失败，请稍后再试')
+    assignmentModalError.value = error instanceof Error ? error.message : '指派失败，请稍后再试'
   } finally {
-    staffAssignmentSaving[order.id] = false
+    assignmentSubmitting.value = false
   }
 }
 
@@ -1631,7 +1811,15 @@ const loadStaff = async () => {
   staffLoading.value = true
   try {
     const keyword = staffSearch.value.trim()
-    staffList.value = await fetchCompanyStaff(keyword ? { keyword } : undefined)
+    const params: { keyword?: string; categoryId?: number } = {}
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (staffCategoryFilter.value !== 'all') {
+      params.categoryId = staffCategoryFilter.value
+    }
+    const query = Object.keys(params).length ? params : undefined
+    staffList.value = await fetchCompanyStaff(query)
     pruneStaffSelection()
   } catch (error) {
     console.error(error)
@@ -1642,6 +1830,24 @@ const loadStaff = async () => {
   }
 }
 
+const loadServiceCategories = async () => {
+  try {
+    serviceCategories.value = await fetchServiceCategories()
+  } catch (error) {
+    console.error(error)
+    serviceCategories.value = []
+  }
+  if (serviceCategories.value.length) {
+    const firstCategory = serviceCategories.value[0]!
+    if (!serviceForm.categoryId) {
+      serviceForm.categoryId = firstCategory.id
+    }
+    if (!staffForm.categoryId) {
+      staffForm.categoryId = firstCategory.id
+    }
+  }
+}
+
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
@@ -1649,8 +1855,6 @@ const loadCompanyOrders = async () => {
     companyOrders.value = result
     result.forEach((item) => {
       progressNoteEdits[item.id] = item.progressNote || ''
-      staffAssignments[item.id] = ''
-      staffAssignmentSaving[item.id] = false
     })
     pruneOrderSelection()
   } catch (error) {
@@ -1695,6 +1899,7 @@ const formatDateTime = (value: string) => {
 }
 
 onMounted(async () => {
+  await loadServiceCategories()
   await Promise.all([loadAccount(), loadServices(), loadStaff()])
   await refreshAppointments()
 })
@@ -2217,6 +2422,150 @@ onUnmounted(() => {
 
 .status-refund_rejected {
   background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.status-assigned {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+.status-available {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.category-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.category-chip {
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(30, 41, 59, 0.7);
+  padding: 4px 0;
+  position: relative;
+  cursor: pointer;
+}
+
+.category-chip.active {
+  color: #2563eb;
+}
+
+.category-chip.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  border-radius: 999px;
+}
+
+.chip-count {
+  margin-left: 6px;
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 2000;
+}
+
+.modal-card {
+  width: min(720px, 100%);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.close-button {
+  border: none;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.assignment-columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.staff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 12px;
+}
+
+.modal-error {
+  color: #dc2626;
+  font-size: 13px;
+}
+
+.modal-subtitle {
+  font-size: 14px;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.muted-text {
+  color: rgba(100, 116, 139, 0.85);
+  font-size: 13px;
 }
 
 .table-wrapper {

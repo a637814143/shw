@@ -488,6 +488,117 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'categories'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务分类管理</h2>
+              <p>统一维护服务分类，供家政公司与用户端选择使用。</p>
+            </div>
+            <div class="user-actions">
+              <button
+                type="button"
+                class="secondary-button danger"
+                :disabled="!hasCategorySelection || categoryLoading"
+                @click="handleBulkDeleteCategories"
+              >
+                删除选中<span v-if="selectedCategoryCount">（{{ selectedCategoryCount }}）</span>
+              </button>
+              <label class="visually-hidden" for="category-search">搜索分类</label>
+              <input
+                id="category-search"
+                v-model="categorySearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索分类名称或描述"
+                :disabled="categoryLoading"
+              />
+              <button type="button" class="primary-button" @click="openCategoryForm" :disabled="categoryLoading">
+                新增分类
+              </button>
+              <button type="button" class="ghost-button" @click="loadAdminCategories" :disabled="categoryLoading">
+                {{ categoryLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+
+          <div v-if="categoryFormVisible" class="category-form-card">
+            <h3>{{ editingCategoryId ? '编辑服务分类' : '新增服务分类' }}</h3>
+            <form class="category-form" @submit.prevent="submitCategoryForm">
+              <div class="category-form-grid">
+                <label>
+                  <span>分类名称</span>
+                  <input v-model="categoryForm.name" type="text" placeholder="例如：育儿保姆" required />
+                </label>
+                <label>
+                  <span>分类描述</span>
+                  <textarea v-model="categoryForm.description" rows="3" placeholder="为分类提供简短描述（可选）"></textarea>
+                </label>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="ghost-button" @click="cancelCategoryForm" :disabled="categorySaving">
+                  取消
+                </button>
+                <button type="submit" class="primary-button" :disabled="categorySaving">
+                  {{ categorySaving ? '保存中…' : '保存分类' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div v-if="categoryLoading" class="loading-state">正在加载服务分类…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="allCategoriesSelected"
+                      :disabled="categoryLoading || !filteredCategories.length"
+                      @change="toggleSelectAllCategories(($event.target as HTMLInputElement).checked)"
+                      aria-label="全选服务分类"
+                    />
+                  </th>
+                  <th>分类名称</th>
+                  <th>描述</th>
+                  <th>关联服务</th>
+                  <th>从业人员</th>
+                  <th>空闲人员</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in filteredCategories" :key="item.id">
+                  <td class="table-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="selectedCategoryIds.has(item.id)"
+                      :disabled="categoryLoading"
+                      @change="toggleCategorySelection(item.id, ($event.target as HTMLInputElement).checked)"
+                      :aria-label="`选择分类 ${item.name}`"
+                    />
+                  </td>
+                  <td>{{ item.name }}</td>
+                  <td>{{ item.description || '—' }}</td>
+                  <td>{{ item.serviceCount }}</td>
+                  <td>{{ item.totalStaffCount }}</td>
+                  <td>{{ item.availableStaffCount }}</td>
+                  <td class="table-actions">
+                    <button type="button" class="link-button" @click="editCategory(item)">编辑</button>
+                    <button type="button" class="link-button danger" @click="handleDeleteCategory(item)">删除</button>
+                  </td>
+                </tr>
+                <tr v-if="!filteredCategories.length">
+                  <td colspan="7" class="empty-row">
+                    <span v-if="hasCategoryFilter">未找到匹配的服务分类。</span>
+                    <span v-else>尚未创建任何服务分类，请先新增。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'content'" class="panel immersive-panel">
           <header class="panel-header">
             <div>
@@ -901,12 +1012,15 @@ import {
   deleteAdminFavorites,
   deleteAdminOrders,
   deleteAdminTransactions,
+  deleteAdminServiceCategory,
+  deleteAdminServiceCategories,
   fetchAdminFavorites,
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
   deleteAdminRefunds,
   fetchAdminTransactions,
+  fetchAdminServiceCategories,
   fetchCurrentAccount,
   fetchAdminUsers,
   fetchDashboardAnnouncements,
@@ -918,6 +1032,8 @@ import {
   updateAdminLoyalty,
   updateAdminPassword,
   updateAdminWallet,
+  createAdminServiceCategory,
+  updateAdminServiceCategory,
   updateDashboardAnnouncement,
   updateDashboardCarousel,
   updateDashboardTip,
@@ -929,6 +1045,8 @@ import {
   type DashboardTipItem,
   type ServiceFavoriteItem,
   type ServiceOrderItem,
+  type ServiceCategoryItem,
+  type ServiceCategoryPayload,
   type UpdateLoyaltyPayload,
   type UpdatePasswordPayload,
   type UpdateWalletPayload,
@@ -936,7 +1054,15 @@ import {
 } from '../services/dashboard'
 
 
-type SectionKey = 'overview' | 'users' | 'ledger' | 'transactions' | 'favorites' | 'content' | 'refunds'
+type SectionKey =
+  | 'overview'
+  | 'users'
+  | 'ledger'
+  | 'transactions'
+  | 'favorites'
+  | 'categories'
+  | 'content'
+  | 'refunds'
 
 interface SectionMeta {
   key: SectionKey
@@ -953,6 +1079,7 @@ const sections: SectionMeta[] = [
   { key: 'ledger', icon: '💼', label: '订单管理' },
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
+  { key: 'categories', icon: '🗂️', label: '服务分类' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
   { key: 'refunds', icon: '💰', label: '退款审批' },
 ]
@@ -989,6 +1116,37 @@ const favoritesLoading = ref(false)
 const favoriteSearch = ref('')
 const selectedFavoriteIds = ref<Set<number>>(new Set())
 let favoriteSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+const serviceCategories = ref<ServiceCategoryItem[]>([])
+const categoryLoading = ref(false)
+const categoryFormVisible = ref(false)
+const categorySaving = ref(false)
+const editingCategoryId = ref<number | null>(null)
+const categoryForm = reactive<ServiceCategoryPayload>({
+  name: '',
+  description: '',
+})
+const selectedCategoryIds = ref<Set<number>>(new Set())
+const categorySearch = ref('')
+
+const filteredCategories = computed(() => {
+  const keyword = categorySearch.value.trim().toLowerCase()
+  if (!keyword) {
+    return serviceCategories.value
+  }
+  return serviceCategories.value.filter((item) => {
+    const name = item.name.toLowerCase()
+    const description = (item.description ?? '').toLowerCase()
+    return name.includes(keyword) || description.includes(keyword)
+  })
+})
+
+const selectedCategoryCount = computed(() => selectedCategoryIds.value.size)
+const hasCategorySelection = computed(() => selectedCategoryIds.value.size > 0)
+const allCategoriesSelected = computed(
+  () => filteredCategories.value.length > 0 && filteredCategories.value.every((item) => selectedCategoryIds.value.has(item.id)),
+)
+const hasCategoryFilter = computed(() => categorySearch.value.trim().length > 0)
 
 const refundOrders = ref<ServiceOrderItem[]>([])
 const refundsLoading = ref(false)
@@ -1151,6 +1309,25 @@ const pruneFavoriteSelection = () => {
   }
 }
 
+const pruneCategorySelection = () => {
+  if (!selectedCategoryIds.value.size) {
+    return
+  }
+  const visibleIds = new Set(filteredCategories.value.map((item) => item.id))
+  let changed = false
+  const next = new Set<number>()
+  selectedCategoryIds.value.forEach((id) => {
+    if (visibleIds.has(id)) {
+      next.add(id)
+    } else {
+      changed = true
+    }
+  })
+  if (changed) {
+    selectedCategoryIds.value = next
+  }
+}
+
 const toggleFavoriteSelection = (id: number, checked: boolean) => {
   const next = new Set(selectedFavoriteIds.value)
   if (checked) {
@@ -1173,6 +1350,30 @@ const toggleSelectAllFavorites = (checked: boolean) => {
 
 const clearFavoriteSelection = () => {
   selectedFavoriteIds.value = new Set()
+}
+
+const toggleCategorySelection = (id: number, checked: boolean) => {
+  const next = new Set(selectedCategoryIds.value)
+  if (checked) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedCategoryIds.value = next
+}
+
+const toggleSelectAllCategories = (checked: boolean) => {
+  if (!checked) {
+    selectedCategoryIds.value = new Set()
+    return
+  }
+  const next = new Set(selectedCategoryIds.value)
+  filteredCategories.value.forEach((item) => next.add(item.id))
+  selectedCategoryIds.value = next
+}
+
+const clearCategorySelection = () => {
+  selectedCategoryIds.value = new Set()
 }
 
 const applyOrderUpdate = (updated: ServiceOrderItem) => {
@@ -1388,6 +1589,8 @@ const switchSection = (key: SectionKey) => {
     loadTransactions()
   } else if (key === 'favorites') {
     loadFavorites()
+  } else if (key === 'categories') {
+    loadAdminCategories()
   } else if (key === 'content') {
     loadContent()
   } else if (key === 'refunds') {
@@ -1476,6 +1679,106 @@ const loadFavorites = async () => {
     console.error(error)
   } finally {
     favoritesLoading.value = false
+  }
+}
+
+const loadAdminCategories = async () => {
+  categoryLoading.value = true
+  try {
+    serviceCategories.value = await fetchAdminServiceCategories()
+    pruneCategorySelection()
+  } catch (error) {
+    console.error(error)
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
+const resetCategoryForm = () => {
+  editingCategoryId.value = null
+  categoryForm.name = ''
+  categoryForm.description = ''
+}
+
+const openCategoryForm = () => {
+  resetCategoryForm()
+  categoryFormVisible.value = true
+}
+
+const editCategory = (item: ServiceCategoryItem) => {
+  editingCategoryId.value = item.id
+  categoryForm.name = item.name
+  categoryForm.description = item.description ?? ''
+  categoryFormVisible.value = true
+}
+
+const cancelCategoryForm = () => {
+  resetCategoryForm()
+  categoryFormVisible.value = false
+}
+
+const submitCategoryForm = async () => {
+  const name = categoryForm.name.trim()
+  if (!name) {
+    window.alert('请填写分类名称')
+    return
+  }
+  const description = categoryForm.description?.trim()
+  const payload: ServiceCategoryPayload = { name }
+  if (description) {
+    payload.description = description
+  }
+  categorySaving.value = true
+  try {
+    if (editingCategoryId.value) {
+      await updateAdminServiceCategory(editingCategoryId.value, payload)
+    } else {
+      await createAdminServiceCategory(payload)
+    }
+    await loadAdminCategories()
+    cancelCategoryForm()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '保存失败，请稍后重试')
+  } finally {
+    categorySaving.value = false
+  }
+}
+
+const removeCategoryFromSelection = (id: number) => {
+  if (!selectedCategoryIds.value.has(id)) {
+    return
+  }
+  const next = new Set(selectedCategoryIds.value)
+  next.delete(id)
+  selectedCategoryIds.value = next
+}
+
+const handleDeleteCategory = async (item: ServiceCategoryItem) => {
+  if (!window.confirm(`确认删除分类“${item.name}”吗？`)) {
+    return
+  }
+  try {
+    await deleteAdminServiceCategory(item.id)
+    removeCategoryFromSelection(item.id)
+    await loadAdminCategories()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败，请稍后重试')
+  }
+}
+
+const handleBulkDeleteCategories = async () => {
+  if (!selectedCategoryIds.value.size) {
+    return
+  }
+  if (!window.confirm(`确认删除选中的 ${selectedCategoryIds.value.size} 个服务分类吗？`)) {
+    return
+  }
+  try {
+    await deleteAdminServiceCategories(Array.from(selectedCategoryIds.value))
+    clearCategorySelection()
+    await loadAdminCategories()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '删除失败，请稍后重试')
   }
 }
 
@@ -1662,6 +1965,10 @@ watch(favoriteSearch, () => {
     favoriteSearchTimer = null
   }, 300)
 })
+
+watch(filteredCategories, () => {
+  pruneCategorySelection()
+}, { deep: true })
 
 const clearUserFilter = async () => {
   if (!userSearch.value) {
@@ -2251,7 +2558,14 @@ const handleBulkDeleteAnnouncements = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadUsers(), loadRefunds(), loadAdminAccount(), loadOrderLedger()])
+  await Promise.all([
+    loadOverview(),
+    loadUsers(),
+    loadRefunds(),
+    loadAdminAccount(),
+    loadOrderLedger(),
+    loadAdminCategories(),
+  ])
 })
 
 onUnmounted(() => {
@@ -3003,6 +3317,80 @@ onUnmounted(() => {
   font-size: 0.85rem;
   margin: 0.15rem 0 0;
   overflow-wrap: anywhere;
+}
+
+.category-form-card {
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.28);
+}
+
+.category-form-card h3 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.category-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.category-form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.category-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-form-grid span {
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.category-form-grid input,
+.category-form-grid textarea {
+  padding: 0.6rem 0.85rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.6);
+  color: #e2e8f0;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.category-form-grid textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.category-form-grid input:focus,
+.category-form-grid textarea:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.65);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+.category-form-grid textarea::placeholder,
+.category-form-grid input::placeholder {
+  color: rgba(148, 163, 184, 0.6);
+}
+
+@media (min-width: 720px) {
+  .category-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .category-form-grid label:last-child {
+    grid-column: span 2;
+  }
 }
 
 .form-actions {

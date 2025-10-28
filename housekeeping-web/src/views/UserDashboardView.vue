@@ -43,6 +43,7 @@
           <header class="dialog-header">
             <h2>预约 {{ bookingForm.service?.name }}</h2>
             <p>请选择上门时间并填写特殊需求，平台会将信息同步给 {{ bookingForm.service?.companyName }}。</p>
+            <p class="dialog-subtext">建议服务时间：{{ bookingForm.service?.serviceTime || '按需预约' }}</p>
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
@@ -218,19 +219,53 @@
               <p>
                 当前可预约 {{ services.length }} 项
                 <span v-if="hasServiceFilter">（共 {{ allServices.length }} 项）</span>
-                ，点击服务卡片即可填写预约时间与需求。
+                ，当前分类：<strong class="service-category-highlight">{{ activeServiceCategoryName }}</strong>。
+                点击服务卡片即可填写预约时间与需求。
               </p>
             </div>
             <div class="service-actions">
-              <label class="visually-hidden" for="user-service-search">搜索服务</label>
-              <input
-                id="user-service-search"
-                v-model="serviceSearch"
-                class="search-input"
-                type="search"
-                placeholder="搜索名称、单位、联系方式或描述"
-              />
-              <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
+              <nav class="service-category-tabs" aria-label="服务分类筛选">
+                <button
+                  type="button"
+                  class="category-tab"
+                  :class="{ active: activeServiceCategoryId === null }"
+                  @click="handleSelectServiceCategory(null)"
+                >
+                  全部
+                </button>
+                <button
+                  v-if="serviceCategoriesLoading"
+                  type="button"
+                  class="category-tab loading"
+                  disabled
+                >
+                  加载中…
+                </button>
+                <template v-else>
+                  <button
+                    v-for="category in serviceCategories"
+                    :key="category.id"
+                    type="button"
+                    class="category-tab"
+                    :class="{ active: activeServiceCategoryId === category.id }"
+                    @click="handleSelectServiceCategory(category.id)"
+                  >
+                    {{ category.name }}
+                  </button>
+                </template>
+                <p v-if="!serviceCategoriesLoading && !serviceCategories.length" class="category-empty">暂无分类</p>
+              </nav>
+              <div class="service-search-group">
+                <label class="visually-hidden" for="user-service-search">搜索服务</label>
+                <input
+                  id="user-service-search"
+                  v-model="serviceSearch"
+                  class="search-input"
+                  type="search"
+                  placeholder="搜索名称、单位、联系方式或描述"
+                />
+                <button type="button" class="ghost-button" @click="loadServices">刷新列表</button>
+              </div>
             </div>
           </header>
           <div class="service-grid">
@@ -243,7 +278,10 @@
               >
                 {{ favoriteIdSet.has(service.id) ? '♥' : '♡' }}
               </button>
-              <h3 class="service-title">{{ service.name }}</h3>
+              <header class="service-card-header">
+                <h3 class="service-title">{{ service.name }}</h3>
+                <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
+              </header>
               <p class="service-company">提供方：{{ service.companyName }}</p>
               <dl class="service-meta">
                 <div>
@@ -257,6 +295,14 @@
                 <div>
                   <dt>联系方式</dt>
                   <dd>{{ service.contact }}</dd>
+                </div>
+                <div>
+                  <dt>服务时间</dt>
+                  <dd>{{ service.serviceTime }}</dd>
+                </div>
+                <div>
+                  <dt>空闲人员</dt>
+                  <dd>{{ service.availableStaffCount }} 人</dd>
                 </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
@@ -677,6 +723,7 @@ import {
   fetchDashboardAnnouncements,
   fetchDashboardCarousels,
   fetchDashboardTips,
+  fetchServiceCategories,
   fetchUserConversations,
   fetchUserFavorites,
   fetchUserMessages,
@@ -704,6 +751,7 @@ import {
   type PaymentSessionInfo,
   type DashboardTipItem,
   type HousekeepServiceItem,
+  type ServiceCategoryItem,
   type ServiceFavoriteItem,
   type ServiceOrderItem,
   type ServiceReviewItem,
@@ -741,6 +789,9 @@ const FALLBACK_AVATAR =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg=='
 const allServices = ref<HousekeepServiceItem[]>([])
 const services = ref<HousekeepServiceItem[]>([])
+const serviceCategories = ref<ServiceCategoryItem[]>([])
+const serviceCategoriesLoading = ref(false)
+const activeServiceCategoryId = ref<number | null>(null)
 const serviceSearch = ref('')
 let serviceSearchTimer: ReturnType<typeof setTimeout> | null = null
 const orders = ref<ServiceOrderItem[]>([])
@@ -827,7 +878,16 @@ const avatarSrc = computed(
 )
 
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
-const hasServiceFilter = computed(() => serviceSearch.value.trim().length > 0)
+const hasServiceFilter = computed(
+  () => serviceSearch.value.trim().length > 0 || activeServiceCategoryId.value !== null,
+)
+const activeServiceCategoryName = computed(() => {
+  if (activeServiceCategoryId.value === null) {
+    return '全部'
+  }
+  const target = serviceCategories.value.find((item) => item.id === activeServiceCategoryId.value)
+  return target ? target.name : '全部'
+})
 const favoritesCount = computed(() => favorites.value.length)
 
 const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
@@ -995,12 +1055,27 @@ const handleProfileUpdated = (payload: AccountProfileItem) => {
 
 const applyServiceFilter = () => {
   const keyword = serviceSearch.value.trim().toLowerCase()
+  const categoryId = activeServiceCategoryId.value
+
+  let next = allServices.value
+  if (categoryId !== null) {
+    next = next.filter((item) => item.categoryId === categoryId)
+  }
+
   if (!keyword) {
-    services.value = allServices.value.slice()
+    services.value = next.slice()
     return
   }
-  services.value = allServices.value.filter((item) => {
-    const fields = [item.name, item.unit, item.contact, item.companyName, item.description || '']
+
+  services.value = next.filter((item) => {
+    const fields = [
+      item.name,
+      item.unit,
+      item.contact,
+      item.serviceTime,
+      item.companyName,
+      item.description || '',
+    ]
     return fields.some((field) => field.toLowerCase().includes(keyword))
   })
 }
@@ -1105,6 +1180,29 @@ const loadServices = async () => {
   }
 }
 
+const loadServiceCategories = async () => {
+  serviceCategoriesLoading.value = true
+  try {
+    serviceCategories.value = await fetchServiceCategories()
+  } catch (error) {
+    console.error(error)
+    serviceCategories.value = []
+  } finally {
+    serviceCategoriesLoading.value = false
+  }
+}
+
+const handleSelectServiceCategory = (categoryId: number | null) => {
+  if (categoryId === null) {
+    activeServiceCategoryId.value = null
+    return
+  }
+  if (activeServiceCategoryId.value === categoryId) {
+    return
+  }
+  activeServiceCategoryId.value = categoryId
+}
+
 const loadOrders = async () => {
   ordersLoading.value = true
   try {
@@ -1133,6 +1231,20 @@ watch(serviceSearch, () => {
     applyServiceFilter()
     serviceSearchTimer = null
   }, 300)
+})
+
+watch(activeServiceCategoryId, () => {
+  applyServiceFilter()
+})
+
+watch(serviceCategories, (next) => {
+  if (activeServiceCategoryId.value === null) {
+    return
+  }
+  const exists = next.some((item) => item.id === activeServiceCategoryId.value)
+  if (!exists) {
+    activeServiceCategoryId.value = null
+  }
 })
 
 watch(orders, pruneOrderSelection)
@@ -1641,6 +1753,7 @@ const statusText = (status: ServiceOrderItem['status']) => {
 onMounted(async () => {
   await Promise.all([
     loadAccount(),
+    loadServiceCategories(),
     loadServices(),
     loadOrders(),
     loadDiscover(),
@@ -1836,10 +1949,63 @@ onUnmounted(() => {
 
 .service-actions {
   display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.service-search-group {
+  display: flex;
   gap: 0.75rem;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.service-category-tabs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.category-tab {
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.35);
+  color: rgba(226, 232, 240, 0.8);
+  font-size: 0.95rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.category-tab:hover:not(:disabled),
+.category-tab:focus-visible:not(:disabled) {
+  border-color: rgba(148, 163, 184, 0.55);
+  background: rgba(30, 41, 59, 0.55);
+  outline: none;
+}
+
+.category-tab.active {
+  border-color: rgba(56, 189, 248, 0.8);
+  background: linear-gradient(120deg, rgba(56, 189, 248, 0.25), rgba(129, 140, 248, 0.25));
+  color: #f8fafc;
+}
+
+.category-tab.loading {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.category-empty {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.9rem;
+}
+
+.service-category-highlight {
+  color: #38bdf8;
 }
 
 .search-input {
@@ -1994,9 +2160,25 @@ onUnmounted(() => {
   color: #fda4af;
 }
 
+.service-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .service-title {
   margin: 0;
   font-size: 1.25rem;
+}
+
+.service-category-chip {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .service-company {
@@ -2438,6 +2620,12 @@ onUnmounted(() => {
 .dialog-header h2 {
   margin: 0;
   font-size: 1.5rem;
+}
+
+.dialog-subtext {
+  margin: 0.25rem 0 0;
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .dialog-field {

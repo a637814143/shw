@@ -1,6 +1,7 @@
 package com.example.housekeeping.repository;
 
 import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,8 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
 
     List<HousekeepService> findByCompany(UserAll company);
 
+    List<HousekeepService> findByCompanyAndCategory(UserAll company, ServiceCategory category);
+
     Page<HousekeepService> findByCompany(UserAll company, Pageable pageable);
 
     @Query(value = """
@@ -24,6 +27,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         """,
@@ -33,6 +37,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         """)
@@ -46,6 +51,7 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         """)
     List<HousekeepService> searchByKeyword(@Param("keyword") String keyword);
@@ -55,4 +61,6 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
         WHERE s.company = :company
         """)
     Double findAveragePriceByCompany(@Param("company") UserAll company);
+
+    long countByCategory(ServiceCategory category);
 }

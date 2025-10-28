@@ -23,6 +23,10 @@ public class HousekeepService {
     @JoinColumn(name = "company_id", nullable = false)
     private UserAll company;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory category;
+
     @Column(name = "name", nullable = false, length = 200)
     private String name;
 
@@ -34,6 +38,9 @@ public class HousekeepService {
 
     @Column(name = "contact", nullable = false, length = 100)
     private String contact;
+
+    @Column(name = "service_time", nullable = false, length = 100)
+    private String serviceTime = "按需预约";
 
     @Column(name = "description", length = 500)
     private String description;

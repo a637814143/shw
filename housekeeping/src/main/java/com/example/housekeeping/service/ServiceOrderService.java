@@ -6,12 +6,15 @@ import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.entity.CompanyStaff;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceOrder;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
 import com.example.housekeeping.repository.CompanyMessageRepository;
+import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -51,6 +54,9 @@ public class ServiceOrderService {
 
     @Autowired
     private CompanyMessageRepository companyMessageRepository;
+
+    @Autowired
+    private CompanyStaffRepository companyStaffRepository;
 
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
@@ -95,6 +101,9 @@ public class ServiceOrderService {
         order.setServiceAddress(serviceAddress);
         order.setProgressNote("待上门服务");
         order.setLoyaltyPoints(earnedPoints);
+        order.setAssignedStaff(null);
+        order.setAssignedWorker(null);
+        order.setWorkerContact(null);
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(order.getCreatedAt());
         order.setSettlementReleased(false);
@@ -192,6 +201,11 @@ public class ServiceOrderService {
         }
         order.setProgressNote(note);
         order.setUpdatedAt(Instant.now());
+        if (desiredStatus == ServiceOrderStatus.COMPLETED
+            || desiredStatus == ServiceOrderStatus.REFUND_APPROVED
+            || desiredStatus == ServiceOrderStatus.REFUND_REJECTED) {
+            releaseAssignedStaff(order);
+        }
         return mapToResponse(serviceOrderRepository.save(order));
     }
 
@@ -264,6 +278,7 @@ public class ServiceOrderService {
         order.setRefundResponse(normalizeMessage(request.getMessage()));
         order.setHandledBy(actor);
         order.setUpdatedAt(now);
+        releaseAssignedStaff(order);
 
         ServiceOrder saved = serviceOrderRepository.save(order);
         if (approve) {
@@ -328,6 +343,7 @@ public class ServiceOrderService {
             throw new RuntimeException("家政人员与联系方式不能为空");
         }
 
+        releaseAssignedStaff(order);
         order.setAssignedWorker(workerName);
         order.setWorkerContact(workerContact);
         if (order.getStatus() == ServiceOrderStatus.SCHEDULED || order.getStatus() == ServiceOrderStatus.PENDING) {
@@ -458,6 +474,8 @@ public class ServiceOrderService {
 
     ServiceOrderResponse mapToResponse(ServiceOrder order) {
         HousekeepService service = order.getService();
+        ServiceCategory category = service.getCategory();
+        Long assignedStaffId = order.getAssignedStaff() == null ? null : order.getAssignedStaff().getId();
         return new ServiceOrderResponse(
             order.getId(),
             service.getId(),
@@ -483,7 +501,10 @@ public class ServiceOrderService {
             order.getCreatedAt(),
             order.getUpdatedAt(),
             order.isSettlementReleased(),
-            order.getSettlementReleasedAt()
+            order.getSettlementReleasedAt(),
+            category == null ? null : category.getId(),
+            category == null ? null : category.getName(),
+            assignedStaffId
         );
     }
 
@@ -580,6 +601,16 @@ public class ServiceOrderService {
         );
     }
 
+    private void releaseAssignedStaff(ServiceOrder order) {
+        CompanyStaff assignedStaff = order.getAssignedStaff();
+        if (assignedStaff != null) {
+            assignedStaff.setAssigned(false);
+            assignedStaff.setUpdatedAt(Instant.now());
+            companyStaffRepository.save(assignedStaff);
+            order.setAssignedStaff(null);
+        }
+    }
+
     private boolean matchesRefundKeyword(ServiceOrder order, String keyword) {
         if (keyword == null) {
             return true;
@@ -607,6 +638,7 @@ public class ServiceOrderService {
         if (permitted.isEmpty()) {
             return;
         }
+        permitted.forEach(this::releaseAssignedStaff);
         permitted.forEach(companyMessageRepository::deleteByOrder);
         serviceOrderRepository.deleteAll(permitted);
     }

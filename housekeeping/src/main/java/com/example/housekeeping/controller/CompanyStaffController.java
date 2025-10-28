@@ -24,8 +24,9 @@ public class CompanyStaffController {
     private CompanyStaffService companyStaffService;
 
     @GetMapping
-    public Result<List<CompanyStaffResponse>> listStaff(@RequestParam(value = "keyword", required = false) String keyword) {
-        return Result.success(companyStaffService.listStaff(keyword));
+    public Result<List<CompanyStaffResponse>> listStaff(@RequestParam(value = "keyword", required = false) String keyword,
+                                                        @RequestParam(value = "categoryId", required = false) Long categoryId) {
+        return Result.success(companyStaffService.listStaff(keyword, categoryId));
     }
 
     @PostMapping

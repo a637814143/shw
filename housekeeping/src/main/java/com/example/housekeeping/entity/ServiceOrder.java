@@ -61,6 +61,10 @@ public class ServiceOrder {
     @JoinColumn(name = "handled_by")
     private UserAll handledBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
+    private CompanyStaff assignedStaff;
+
     @Column(name = "assigned_worker", length = 100)
     private String assignedWorker;
 

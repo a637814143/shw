@@ -4,9 +4,12 @@ import com.example.housekeeping.dto.CompanyServicePageResponse;
 import com.example.housekeeping.dto.HousekeepServiceRequest;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
 import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
+import com.example.housekeeping.repository.CompanyStaffRepository;
+import com.example.housekeeping.repository.ServiceCategoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.math.RoundingMode;
 
@@ -32,12 +36,25 @@ public class HousekeepServiceManager {
     @Autowired
     private AccountLookupService accountLookupService;
 
+    @Autowired
+    private ServiceCategoryRepository serviceCategoryRepository;
+
+    @Autowired
+    private CompanyStaffRepository companyStaffRepository;
+
     @Transactional(readOnly = true)
-    public List<HousekeepServiceResponse> listAllServices(String keyword) {
+    public List<HousekeepServiceResponse> listAllServices(String keyword, Long categoryId) {
         String normalizedKeyword = normalizeKeyword(keyword);
+        ServiceCategory category = categoryId == null ? null : resolveCategory(categoryId);
         List<HousekeepService> services = normalizedKeyword == null
             ? housekeepServiceRepository.findAll()
             : housekeepServiceRepository.searchByKeyword(normalizedKeyword);
+        if (category != null) {
+            services = services.stream()
+                .filter(service -> service.getCategory() != null
+                    && Objects.equals(service.getCategory().getId(), category.getId()))
+                .collect(Collectors.toList());
+        }
         return services.stream()
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -81,10 +98,12 @@ public class HousekeepServiceManager {
 
         HousekeepService service = new HousekeepService();
         service.setCompany(company);
+        service.setCategory(resolveCategory(request.getCategoryId()));
         service.setName(request.getName().trim());
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -100,10 +119,13 @@ public class HousekeepServiceManager {
         if (!service.getCompany().getId().equals(company.getId())) {
             throw new RuntimeException("无权操作其他公司服务");
         }
+        ServiceCategory category = resolveCategory(request.getCategoryId());
+        service.setCategory(category);
         service.setName(request.getName().trim());
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
+        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -158,16 +180,37 @@ public class HousekeepServiceManager {
     }
 
     private HousekeepServiceResponse mapToResponse(HousekeepService service) {
+        ServiceCategory category = service.getCategory();
         return new HousekeepServiceResponse(
             service.getId(),
             service.getName(),
             service.getUnit(),
             service.getPrice(),
             service.getContact(),
+            formatServiceTime(service),
             service.getDescription(),
             service.getCompany().getId(),
-            service.getCompany().getUsername()
+            service.getCompany().getUsername(),
+            category == null ? null : category.getId(),
+            category == null ? null : category.getName(),
+            availableStaffForService(service)
         );
+    }
+
+    private long availableStaffForService(HousekeepService service) {
+        ServiceCategory category = service.getCategory();
+        if (category == null) {
+            return 0L;
+        }
+        return companyStaffRepository.countByCompanyAndCategoryAndAssignedFalse(service.getCompany(), category);
+    }
+
+    private ServiceCategory resolveCategory(Long categoryId) {
+        if (categoryId == null) {
+            throw new RuntimeException("请选择服务分类");
+        }
+        return serviceCategoryRepository.findById(categoryId)
+            .orElseThrow(() -> new RuntimeException("服务分类不存在"));
     }
 
     private String normalizeDescription(String description) {
@@ -176,6 +219,18 @@ public class HousekeepServiceManager {
         }
         String trimmed = description.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeServiceTime(String serviceTime) {
+        if (serviceTime == null) {
+            return "按需预约";
+        }
+        String trimmed = serviceTime.trim();
+        return trimmed.isEmpty() ? "按需预约" : trimmed;
+    }
+
+    private String formatServiceTime(HousekeepService service) {
+        return normalizeServiceTime(service.getServiceTime());
     }
 
     private String normalizeKeyword(String keyword) {

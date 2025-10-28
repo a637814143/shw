@@ -23,6 +23,10 @@ public class CompanyStaff {
     @JoinColumn(name = "company_id", nullable = false)
     private UserAll company;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ServiceCategory category;
+
     @Column(name = "staff_name", nullable = false, length = 100)
     private String name;
 
@@ -34,6 +38,9 @@ public class CompanyStaff {
 
     @Column(name = "notes", length = 500)
     private String notes;
+
+    @Column(name = "assigned", nullable = false)
+    private boolean assigned;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

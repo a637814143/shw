@@ -1,6 +1,7 @@
 package com.example.housekeeping.repository;
 
 import com.example.housekeeping.entity.CompanyStaff;
+import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -11,6 +12,14 @@ import java.util.List;
 public interface CompanyStaffRepository extends JpaRepository<CompanyStaff, Long> {
 
     List<CompanyStaff> findByCompany(UserAll company);
+
+    List<CompanyStaff> findByCompanyAndCategory(UserAll company, ServiceCategory category);
+
+    long countByCategory(ServiceCategory category);
+
+    long countByCategoryAndAssignedFalse(ServiceCategory category);
+
+    long countByCompanyAndCategoryAndAssignedFalse(UserAll company, ServiceCategory category);
 
     @Query("""
         SELECT s FROM CompanyStaff s
