@@ -3,21 +3,36 @@
     <div class="messaging-shell">
       <aside class="thread-rail">
         <header class="thread-header">
-          <div>
+          <div class="thread-title-block">
             <h2>客户沟通中心</h2>
-            <p>实时追踪用户问询并快速回复，维系高端服务体验</p>
+            <label class="thread-search">
+              <span aria-hidden="true" class="thread-search-icon">🔍</span>
+              <span class="sr-only">搜索会话</span>
+              <input
+                v-model="searchTerm"
+                type="search"
+                name="conversation-search"
+                autocomplete="off"
+                placeholder="搜索客户、服务或消息"
+              />
+            </label>
           </div>
-          <button type="button" class="icon-button" @click="emit('refreshConversations')" :disabled="loadingConversations">
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="刷新会话列表"
+            @click="emit('refreshConversations')"
+            :disabled="loadingConversations"
+          >
             <span aria-hidden="true">⟳</span>
-            <span class="sr-only">刷新会话列表</span>
           </button>
         </header>
 
         <div v-if="loadingConversations" class="thread-empty" role="status">正在获取最新会话…</div>
 
-        <ul v-else-if="conversations.length" class="thread-list">
+        <ul v-else-if="filteredConversations.length" class="thread-list">
           <li
-            v-for="item in conversations"
+            v-for="item in filteredConversations"
             :key="item.orderId"
             class="thread-item"
             :class="{ active: item.orderId === activeConversationId }"
@@ -37,8 +52,14 @@
         </ul>
 
         <div v-else class="thread-empty">
-          <h3>暂无沟通消息</h3>
-          <p>当用户通过订单发起咨询时，会在此处显示。</p>
+          <template v-if="hasSearchTerm">
+            <h3>未找到匹配的会话</h3>
+            <p>尝试搜索客户姓名、服务名称或消息关键词。</p>
+          </template>
+          <template v-else>
+            <h3>暂无沟通消息</h3>
+            <p>当用户通过订单发起咨询时，会在此处显示。</p>
+          </template>
         </div>
       </aside>
 
@@ -130,10 +151,27 @@ const emit = defineEmits<{
 
 const messageDraft = ref('')
 const messageContainer = ref<HTMLDivElement | null>(null)
+const searchTerm = ref('')
 
 const activeConversation = computed(() =>
   props.conversations.find((item) => item.orderId === props.activeConversationId) ?? null,
 )
+
+const hasSearchTerm = computed(() => searchTerm.value.trim().length > 0)
+
+const filteredConversations = computed(() => {
+  const keyword = searchTerm.value.trim().toLowerCase()
+  if (!keyword) {
+    return props.conversations
+  }
+  return props.conversations.filter((item) => {
+    const candidates = [item.serviceName, item.customerName, item.lastMessage]
+    return candidates.some((text) => {
+      if (!text) return false
+      return text.toLowerCase().includes(keyword)
+    })
+  })
+})
 
 const statusText = (status: ServiceOrderStatus) => {
   switch (status) {
@@ -224,16 +262,53 @@ watch(
   gap: 16px;
 }
 
+.thread-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
 .thread-header h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
 }
 
-.thread-header p {
-  margin: 6px 0 0;
+
+.thread-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(248, 250, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.thread-search:focus-within {
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.thread-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
   font-size: 13px;
+  color: var(--brand-text);
+  outline: none;
+}
+
+.thread-search input::placeholder {
   color: var(--brand-text-muted);
+}
+
+.thread-search-icon {
+  font-size: 16px;
 }
 
 .icon-button {
