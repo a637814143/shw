@@ -169,28 +169,6 @@
             </form>
           </div>
 
-          <div class="category-menu" role="tablist" aria-label="按服务类别筛选人员">
-            <button
-              type="button"
-              class="category-chip"
-              :class="{ active: staffCategoryFilter === 'all' }"
-              @click="staffCategoryFilter = 'all'"
-            >
-              全部
-            </button>
-            <button
-              v-for="category in serviceCategories"
-              :key="category.id"
-              type="button"
-              class="category-chip"
-              :class="{ active: staffCategoryFilter === category.id }"
-              @click="staffCategoryFilter = category.id"
-            >
-              {{ category.name }}
-              <span class="chip-count">{{ category.availableStaffCount }}</span>
-            </button>
-          </div>
-
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
@@ -313,6 +291,29 @@
               <button type="button" class="primary-button" @click="openStaffForm()">新增人员</button>
             </div>
           </header>
+
+          <div class="category-menu staff-category-menu" role="tablist" aria-label="按服务类别筛选人员">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === 'all' }"
+              @click="staffCategoryFilter = 'all'"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: staffCategoryFilter === category.id }"
+              @click="staffCategoryFilter = category.id"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.availableStaffCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
 
           <div v-if="staffFormVisible" class="form-card">
             <form class="form-grid" @submit.prevent="submitStaffForm">

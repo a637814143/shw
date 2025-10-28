@@ -61,17 +61,21 @@ public class HousekeepServiceManager {
     }
 
     @Transactional(readOnly = true)
-    public CompanyServicePageResponse listForCurrentCompany(String keyword, int page, int size) {
+    public CompanyServicePageResponse listForCurrentCompany(String keyword, Long categoryId, int page, int size) {
         UserAll company = accountLookupService.getCurrentAccount();
         ensureRole(company, AccountRole.COMPANY);
         String normalizedKeyword = normalizeKeyword(keyword);
+        ServiceCategory categoryFilter = findCategoryForFilter(categoryId);
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(1, size);
         Pageable pageable = PageRequest.of(safePage - 1, safeSize, Sort.by(Sort.Direction.DESC, "id"));
 
-        Page<HousekeepService> pageResult = normalizedKeyword == null
-            ? housekeepServiceRepository.findByCompany(company, pageable)
-            : housekeepServiceRepository.searchByCompanyAndKeyword(company, normalizedKeyword, pageable);
+        Page<HousekeepService> pageResult = housekeepServiceRepository.searchByCompanyWithFilters(
+            company,
+            categoryFilter,
+            normalizedKeyword,
+            pageable
+        );
 
         List<HousekeepServiceResponse> items = pageResult.getContent().stream()
             .map(this::mapToResponse)
@@ -203,6 +207,14 @@ public class HousekeepServiceManager {
             return 0L;
         }
         return companyStaffRepository.countByCompanyAndCategoryAndAssignedFalse(service.getCompany(), category);
+    }
+
+    private ServiceCategory findCategoryForFilter(Long categoryId) {
+        if (categoryId == null) {
+            return null;
+        }
+        return serviceCategoryRepository.findById(categoryId)
+            .orElseThrow(() -> new RuntimeException("服务分类不存在"));
     }
 
     private ServiceCategory resolveCategory(Long categoryId) {
