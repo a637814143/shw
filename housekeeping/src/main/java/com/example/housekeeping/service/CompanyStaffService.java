@@ -111,12 +111,15 @@ public class CompanyStaffService {
             previous.setUpdatedAt(Instant.now());
             companyStaffRepository.save(previous);
         }
-        order.setAssignedWorker(staff.getName());
-        order.setWorkerContact(staff.getContact());
+        String workerName = staff.getName() == null ? "" : staff.getName().trim();
+        String workerContact = staff.getContact() == null ? "" : staff.getContact().trim();
+        order.setAssignedWorker(workerName.isEmpty() ? null : workerName);
+        order.setWorkerContact(workerContact.isEmpty() ? null : workerContact);
         order.setAssignedStaff(staff);
         ServiceOrderStatus status = order.getStatus();
         if (status == null || status == ServiceOrderStatus.SCHEDULED || status == ServiceOrderStatus.PENDING) {
-            order.setProgressNote("已安排 " + staff.getName() + " 上门服务");
+            String phonePart = workerContact.isEmpty() ? "" : "（" + workerContact + "）";
+            order.setProgressNote("已安排" + workerName + phonePart + "上门服务");
             order.setStatus(ServiceOrderStatus.IN_PROGRESS);
         }
         order.setUpdatedAt(Instant.now());

@@ -520,13 +520,13 @@
                     </span>
                   </td>
                   <td>
-                    <textarea
-                      v-model="progressNoteEdits[order.id]"
-                      class="progress-input progress-textarea"
-                      placeholder="填写最新进度"
-                      rows="2"
-                      :title="progressNoteEdits[order.id] || ''"
-                    ></textarea>
+                    <div
+                      class="progress-note"
+                      :class="{ muted: !order.assignedWorker && !(order.progressNote && order.progressNote.trim()) }"
+                      :title="formatProgressText(order)"
+                    >
+                      {{ formatProgressText(order) }}
+                    </div>
                   </td>
                   <td>
                     <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
@@ -854,7 +854,6 @@ const selectedOrderIds = ref<Set<number>>(new Set())
 const serviceFormVisible = ref(false)
 const serviceSaving = ref(false)
 const editingServiceId = ref<number | null>(null)
-const progressNoteEdits = reactive<Record<number, string>>({})
 const progressSaving = reactive<Record<number, boolean>>({})
 const serviceForm = reactive<CompanyServicePayload>({
   name: '',
@@ -1545,7 +1544,6 @@ const confirmAssignment = async () => {
     if (index >= 0) {
       companyOrders.value.splice(index, 1, updated)
     }
-    progressNoteEdits[updated.id] = updated.progressNote || ''
     await loadStaff()
     closeAssignmentModal()
     window.alert('指派成功')
@@ -1594,16 +1592,16 @@ const refreshAppointments = async () => {
 const saveOrderProgress = async (order: ServiceOrderItem, status: ServiceOrderItem['status']) => {
   progressSaving[order.id] = true
   try {
+    const note = order.progressNote?.trim()
     const payload: UpdateOrderProgressPayload = {
       status,
-      progressNote: progressNoteEdits[order.id]?.trim() || undefined,
+      progressNote: note && note.length ? note : undefined,
     }
     const updated = await updateCompanyOrderProgress(order.id, payload)
     const index = companyOrders.value.findIndex((item) => item.id === updated.id)
     if (index >= 0) {
       companyOrders.value.splice(index, 1, updated)
     }
-    progressNoteEdits[updated.id] = updated.progressNote || ''
     window.alert('预约进度已更新')
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '更新失败，请稍后再试')
@@ -1949,9 +1947,6 @@ const loadCompanyOrders = async () => {
     }
     const result = await fetchCompanyOrders(Object.keys(params).length ? params : undefined)
     companyOrders.value = result
-    result.forEach((item) => {
-      progressNoteEdits[item.id] = item.progressNote || ''
-    })
     pruneOrderSelection()
   } catch (error) {
     console.error(error)
@@ -1992,6 +1987,17 @@ const statusText = (status: ServiceOrderItem['status']) => {
 const formatDateTime = (value: string) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+const formatProgressText = (order: ServiceOrderItem): string => {
+  const workerName = order.assignedWorker?.trim()
+  if (workerName) {
+    const phone = order.workerContact?.trim()
+    const phonePart = phone ? `（${phone}）` : ''
+    return `已安排${workerName}${phonePart}上门服务`
+  }
+  const note = order.progressNote?.trim()
+  return note && note.length ? note : '暂无进度'
 }
 
 onMounted(async () => {
@@ -2463,21 +2469,17 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.progress-input {
-  width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: var(--brand-radius);
-  padding: 8px 10px;
+.progress-note {
   font-size: 13px;
-  background: rgba(248, 250, 255, 0.92);
+  line-height: 1.6;
+  color: #0f172a;
+  min-height: 44px;
+  display: block;
+  padding: 6px 0;
 }
 
-.progress-textarea {
-  min-height: 54px;
-  resize: vertical;
-  line-height: 1.5;
-  color: #0f172a;
-  display: block;
+.progress-note.muted {
+  color: var(--brand-text-muted);
 }
 
 .staff-select {
