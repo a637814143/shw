@@ -459,7 +459,7 @@
               @click="handleSelectAppointmentCategory(category.id)"
             >
               {{ category.name }}
-              <span class="chip-count">{{ category.serviceCount }}</span>
+              <span class="chip-count">{{ appointmentCount(category.id) }}</span>
             </button>
             <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
           </div>
@@ -1202,6 +1202,19 @@ const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
   const fields = [review.serviceName, review.username, review.content, review.companyReply]
   return fields.some((field) => normalizeSearchValue(field).includes(target))
 }
+
+const appointmentCategoryCounts = computed(() => {
+  const counts = new Map<number, number>()
+  companyOrders.value.forEach((order) => {
+    if (typeof order.categoryId === 'number') {
+      const value = counts.get(order.categoryId) ?? 0
+      counts.set(order.categoryId, value + 1)
+    }
+  })
+  return counts
+})
+
+const appointmentCount = (categoryId: number) => appointmentCategoryCounts.value.get(categoryId) ?? 0
 
 const visibleCompanyOrders = computed(() => {
   const keyword = appointmentSearch.value.trim()
@@ -1967,11 +1980,7 @@ const loadServiceCategories = async () => {
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
-    const params: { categoryId?: number } = {}
-    if (appointmentCategoryFilter.value !== 'all') {
-      params.categoryId = appointmentCategoryFilter.value
-    }
-    const result = await fetchCompanyOrders(Object.keys(params).length ? params : undefined)
+    const result = await fetchCompanyOrders()
     companyOrders.value = result
     pruneOrderSelection()
   } catch (error) {

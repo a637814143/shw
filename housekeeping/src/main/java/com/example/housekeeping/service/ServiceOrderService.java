@@ -6,15 +6,18 @@ import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.entity.AccountTransaction;
 import com.example.housekeeping.entity.CompanyStaff;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.AccountTransactionType;
 import com.example.housekeeping.enums.ServiceOrderStatus;
 import com.example.housekeeping.repository.CompanyMessageRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
+import com.example.housekeeping.repository.AccountTransactionRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceOrderRepository;
 import com.example.housekeeping.repository.UserAllRepository;
@@ -57,6 +60,9 @@ public class ServiceOrderService {
 
     @Autowired
     private CompanyStaffRepository companyStaffRepository;
+
+    @Autowired
+    private AccountTransactionRepository accountTransactionRepository;
 
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
@@ -279,6 +285,18 @@ public class ServiceOrderService {
             order.setProgressNote("订单已退款");
             order.setSettlementReleased(true);
             order.setSettlementReleasedAt(now);
+
+            String serviceName = order.getService().getName();
+            recordTransaction(user, AccountTransactionType.ADJUST, amount,
+                "订单退款：" + serviceName);
+            BigDecimal negativeAmount = amount.negate();
+            if (wasSettled) {
+                recordTransaction(company, AccountTransactionType.ADJUST, negativeAmount,
+                    "订单退款扣回：" + serviceName);
+            } else {
+                recordTransaction(treasury, AccountTransactionType.ADJUST, negativeAmount,
+                    "订单退款：" + serviceName);
+            }
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");
@@ -538,6 +556,19 @@ public class ServiceOrderService {
     private UserAll getTreasuryAccount() {
         return userAllRepository.findFirstByUserTypeOrderByIdAsc(AccountRole.ADMIN.getLabel())
             .orElseThrow(() -> new RuntimeException("平台管理员账户未配置"));
+    }
+
+    private void recordTransaction(UserAll account, AccountTransactionType type, BigDecimal amount, String note) {
+        if (account == null || type == null || amount == null) {
+            return;
+        }
+        AccountTransaction txn = new AccountTransaction();
+        txn.setUser(account);
+        txn.setType(type);
+        txn.setAmount(amount);
+        txn.setNote(note);
+        txn.setCreatedAt(Instant.now());
+        accountTransactionRepository.save(txn);
     }
 
     private int calculateLoyaltyPoints(BigDecimal amount) {
