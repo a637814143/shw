@@ -2335,6 +2335,7 @@ const handleRefund = async (order: ServiceOrderItem, approve: boolean) => {
     }
     await loadRefunds()
     await loadOrderLedger()
+    await loadAdminAccount()
     await loadOverview()
   } catch (error) {
     console.error(error)
