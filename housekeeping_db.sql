@@ -74,6 +74,7 @@ CREATE TABLE `service_order` (
   `handled_by` bigint DEFAULT NULL COMMENT '处理人',
   `assigned_worker` varchar(100) DEFAULT NULL COMMENT '分配的家政人员',
   `worker_contact` varchar(100) DEFAULT NULL COMMENT '家政人员联系方式',
+  `user_confirmed` tinyint(1) NOT NULL DEFAULT 0 COMMENT '用户是否确认订单',
   `created_at` datetime NOT NULL COMMENT '创建时间',
   `updated_at` datetime NOT NULL COMMENT '更新时间',
   `settlement_released` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已结算至商家',

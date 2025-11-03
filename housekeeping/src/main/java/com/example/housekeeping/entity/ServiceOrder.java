@@ -82,4 +82,7 @@ public class ServiceOrder {
 
     @Column(name = "settlement_released_at")
     private Instant settlementReleasedAt;
+
+    @Column(name = "user_confirmed", nullable = false)
+    private boolean userConfirmed = false;
 }

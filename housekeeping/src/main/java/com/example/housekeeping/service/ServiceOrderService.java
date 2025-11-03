@@ -108,6 +108,7 @@ public class ServiceOrderService {
         order.setUpdatedAt(order.getCreatedAt());
         order.setSettlementReleased(false);
         order.setSettlementReleasedAt(null);
+        order.setUserConfirmed(false);
 
         ServiceOrder saved = serviceOrderRepository.save(order);
         userAllRepository.save(user);
@@ -302,6 +303,33 @@ public class ServiceOrderService {
     }
 
     @Transactional
+    public ServiceOrderResponse confirmOrderForCurrentUser(Long orderId) {
+        UserAll user = accountLookupService.getCurrentAccount();
+        ensureRole(user, AccountRole.USER);
+
+        ServiceOrder order = serviceOrderRepository.findById(orderId)
+            .orElseThrow(() -> new RuntimeException("订单不存在"));
+
+        if (!order.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("无权操作该订单");
+        }
+
+        ServiceOrderStatus status = order.getStatus();
+        if (status != ServiceOrderStatus.COMPLETED && status != ServiceOrderStatus.REFUND_REQUESTED) {
+            throw new RuntimeException("仅已完成或退款审核中的订单可以确认");
+        }
+
+        if (order.isUserConfirmed()) {
+            return mapToResponse(order);
+        }
+
+        order.setUserConfirmed(true);
+        order.setUpdatedAt(Instant.now());
+        ServiceOrder saved = serviceOrderRepository.save(order);
+        return mapToResponse(saved);
+    }
+
+    @Transactional
     public ServiceOrderResponse settleCompletedOrder(Long orderId) {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
@@ -313,6 +341,9 @@ public class ServiceOrderService {
         }
         if (order.getStatus() != ServiceOrderStatus.COMPLETED) {
             throw new RuntimeException("仅已完成的订单可以结算");
+        }
+        if (!order.isUserConfirmed()) {
+            throw new RuntimeException("用户尚未确认订单，暂不可结算");
         }
 
         BigDecimal amount = order.getAmount();
@@ -513,6 +544,7 @@ public class ServiceOrderService {
             order.getUpdatedAt(),
             order.isSettlementReleased(),
             order.getSettlementReleasedAt(),
+            order.isUserConfirmed(),
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
             assignedStaffId

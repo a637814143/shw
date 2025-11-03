@@ -36,6 +36,7 @@ public class ServiceOrderResponse {
     private Instant updatedAt;
     private boolean settlementReleased;
     private Instant settlementReleasedAt;
+    private boolean userConfirmed;
     private Long categoryId;
     private String categoryName;
     private Long assignedStaffId;
@@ -47,7 +48,7 @@ public class ServiceOrderResponse {
                                 String assignedWorker, String workerContact,
                                 String customerContactPhone, String customerAddress,
                                 Instant createdAt, Instant updatedAt, boolean settlementReleased, Instant settlementReleasedAt,
-                                Long categoryId, String categoryName, Long assignedStaffId) {
+                                boolean userConfirmed, Long categoryId, String categoryName, Long assignedStaffId) {
         this.id = id;
         this.serviceId = serviceId;
         this.serviceName = serviceName;
@@ -74,6 +75,7 @@ public class ServiceOrderResponse {
         this.updatedAt = updatedAt;
         this.settlementReleased = settlementReleased;
         this.settlementReleasedAt = settlementReleasedAt;
+        this.userConfirmed = userConfirmed;
         this.categoryId = categoryId;
         this.categoryName = categoryName;
         this.assignedStaffId = assignedStaffId;
@@ -181,6 +183,10 @@ public class ServiceOrderResponse {
 
     public Instant getSettlementReleasedAt() {
         return settlementReleasedAt;
+    }
+
+    public boolean isUserConfirmed() {
+        return userConfirmed;
     }
 
     public Long getCategoryId() {

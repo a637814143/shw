@@ -319,6 +319,77 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'favorites'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>我的收藏服务</h2>
+              <p>集中管理心仪的服务，快速预约或取消收藏。</p>
+            </div>
+            <div class="service-actions">
+              <label class="visually-hidden" for="user-favorite-search">搜索收藏</label>
+              <input
+                id="user-favorite-search"
+                v-model="favoriteSearch"
+                class="search-input"
+                type="search"
+                :disabled="favoritesLoading"
+                placeholder="搜索服务或家政公司"
+              />
+              <button type="button" class="secondary-button" :disabled="favoritesLoading" @click="loadFavorites">
+                {{ favoritesLoading ? '刷新中…' : '刷新收藏' }}
+              </button>
+            </div>
+          </header>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>收藏时间</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in visibleFavorites" :key="item.id">
+                  <td>
+                    <strong>{{ item.serviceName }}</strong>
+                    <div class="order-subtext">家政公司：{{ item.companyName }}</div>
+                  </td>
+                  <td>{{ formatDateTime(item.createdAt) }}</td>
+                  <td class="table-actions">
+                    <button type="button" class="link-button" @click="viewFavoriteService(item)">查看服务</button>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="favoritesLoading"
+                      @click="bookFavoriteService(item)"
+                    >
+                      预约服务
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="favoritesLoading"
+                      @click="handleRemoveFavorite(item)"
+                    >
+                      取消收藏
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="favoritesLoading">
+                  <td colspan="3" class="empty-row">收藏加载中…</td>
+                </tr>
+                <tr v-else-if="!visibleFavorites.length">
+                  <td colspan="3" class="empty-row">
+                    <span v-if="hasFavoriteFilter">没有找到匹配的收藏，换个关键词试试。</span>
+                    <span v-else>还没有收藏服务，去选择服务页面看看吧。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'orders'" class="panel">
           <header class="panel-header">
             <div>
@@ -420,6 +491,14 @@
                       @click="jumpToMessages(order.id)"
                     >
                       去沟通
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="ordersLoading || confirmingOrderFlags[order.id] || !canConfirmOrder(order)"
+                      @click="handleConfirmOrder(order)"
+                    >
+                      {{ order.userConfirmed ? '已确认' : confirmingOrderFlags[order.id] ? '确认中…' : '确认订单' }}
                     </button>
                     <button
                       v-if="canRequestRefund(order)"
@@ -729,6 +808,7 @@ import {
   fetchDashboardTips,
   fetchServiceCategories,
   fetchUserConversations,
+  confirmUserOrder,
   fetchUserFavorites,
   fetchUserMessages,
   fetchUserOrders,
@@ -778,7 +858,15 @@ interface ReviewableServiceSummary {
   lastScheduledAt: string | null
 }
 
-type SectionKey = 'profile' | 'discover' | 'services' | 'orders' | 'wallet' | 'messages' | 'reviews'
+type SectionKey =
+  | 'profile'
+  | 'discover'
+  | 'services'
+  | 'favorites'
+  | 'orders'
+  | 'wallet'
+  | 'messages'
+  | 'reviews'
 
 type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
 
@@ -810,6 +898,9 @@ const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
 const announcements = ref<DashboardAnnouncementItem[]>([])
 const favorites = ref<ServiceFavoriteItem[]>([])
+const favoritesLoading = ref(false)
+const favoriteSearch = ref('')
+const confirmingOrderFlags = reactive<Record<number, boolean>>({})
 const conversations = ref<UserConversationItem[]>([])
 const messages = ref<CompanyMessageItem[]>([])
 const conversationsLoading = ref(false)
@@ -941,6 +1032,7 @@ const sections: SectionMeta[] = [
   { key: 'profile', icon: '👤', label: '个人资料' },
   { key: 'discover', icon: '🌟', label: '精选推荐' },
   { key: 'services', icon: '🧹', label: '选择服务' },
+  { key: 'favorites', icon: '❤️', label: '我的收藏' },
   { key: 'orders', icon: '📋', label: '我的订单' },
   { key: 'wallet', icon: '💳', label: '充值/兑换' },
   { key: 'messages', icon: '💬', label: '在线沟通' },
@@ -975,6 +1067,16 @@ const activeServiceCategoryName = computed(() => {
   return target ? target.name : '全部'
 })
 const favoritesCount = computed(() => favorites.value.length)
+
+const visibleFavorites = computed(() => {
+  const keyword = favoriteSearch.value.trim()
+  if (!keyword) {
+    return favorites.value
+  }
+  return favorites.value.filter((favorite) => matchesFavoriteSearch(favorite, keyword))
+})
+
+const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
 
 const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
 
@@ -1011,6 +1113,15 @@ const matchesUserOrderSearch = (order: ServiceOrderItem, keyword: string) => {
     order.workerContact,
     order.refundReason,
   ]
+  return fields.some((field) => normalizeUserSearchValue(field).includes(target))
+}
+
+const matchesFavoriteSearch = (favorite: ServiceFavoriteItem, keyword: string) => {
+  if (!keyword) {
+    return true
+  }
+  const target = keyword.toLowerCase()
+  const fields = [favorite.serviceName, favorite.companyName, favorite.username]
   return fields.some((field) => normalizeUserSearchValue(field).includes(target))
 }
 
@@ -1302,10 +1413,19 @@ const loadOrders = async () => {
 }
 
 const loadFavorites = async () => {
+  favoritesLoading.value = true
   try {
     favorites.value = await fetchUserFavorites()
   } catch (error) {
     console.error(error)
+  } finally {
+    favoritesLoading.value = false
+  }
+}
+
+const ensureServicesLoaded = async () => {
+  if (!allServices.value.length) {
+    await loadServices()
   }
 }
 
@@ -1396,6 +1516,8 @@ const switchSection = (key: SectionKey) => {
     loadAccount()
   } else if (key === 'messages') {
     loadConversations()
+  } else if (key === 'favorites') {
+    loadFavorites()
   } else if (key === 'wallet') {
     loadAccount()
   } else if (key === 'reviews') {
@@ -1610,6 +1732,9 @@ const handleBulkDeleteOrders = async () => {
   }
 }
 
+const canConfirmOrder = (order: ServiceOrderItem) =>
+  !order.userConfirmed && (order.status === 'COMPLETED' || order.status === 'REFUND_REQUESTED')
+
 const canRequestRefund = (order: ServiceOrderItem) => {
   return (
     order.status === 'IN_PROGRESS' ||
@@ -1630,6 +1755,29 @@ const handleRequestRefund = async (order: ServiceOrderItem) => {
   }
 }
 
+const handleConfirmOrder = async (order: ServiceOrderItem) => {
+  if (order.userConfirmed) {
+    return
+  }
+  if (!canConfirmOrder(order)) {
+    window.alert('订单状态未满足确认条件，请等待服务完成或退款处理。')
+    return
+  }
+  if (!window.confirm(`确认“${order.serviceName}”服务已完成并满意吗？确认后平台会通知管理员结算。`)) {
+    return
+  }
+  confirmingOrderFlags[order.id] = true
+  try {
+    await confirmUserOrder(order.id)
+    await loadOrders()
+    window.alert('感谢确认，平台将尽快安排结算。')
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '确认失败，请稍后再试。')
+  } finally {
+    delete confirmingOrderFlags[order.id]
+  }
+}
+
 const toggleFavorite = async (service: HousekeepServiceItem) => {
   try {
     if (favoriteIdSet.value.has(service.id)) {
@@ -1644,6 +1792,38 @@ const toggleFavorite = async (service: HousekeepServiceItem) => {
   } catch (error) {
     console.error(error)
   }
+}
+
+const handleRemoveFavorite = async (favorite: ServiceFavoriteItem) => {
+  if (!window.confirm(`确认取消收藏“${favorite.serviceName}”吗？`)) {
+    return
+  }
+  try {
+    await removeUserFavorite(favorite.serviceId)
+    await loadFavorites()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '取消收藏失败，请稍后再试。')
+  }
+}
+
+const viewFavoriteService = async (favorite: ServiceFavoriteItem) => {
+  await ensureServicesLoaded()
+  serviceSearch.value = favorite.serviceName
+  activeSection.value = 'services'
+}
+
+const bookFavoriteService = async (favorite: ServiceFavoriteItem) => {
+  await ensureServicesLoaded()
+  let target = allServices.value.find((item) => item.id === favorite.serviceId)
+  if (!target) {
+    await loadServices()
+    target = allServices.value.find((item) => item.id === favorite.serviceId)
+  }
+  if (!target) {
+    window.alert('未找到该服务，可能已下架。')
+    return
+  }
+  handleSelectService(target)
 }
 
 const setReviewTab = (tab: 'reviewed' | 'unreviewed') => {

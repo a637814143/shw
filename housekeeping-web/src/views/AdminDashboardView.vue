@@ -274,6 +274,7 @@
                   <th>用户 / 公司</th>
                   <th>预约时间</th>
                   <th>状态</th>
+                  <th>是否确认</th>
                   <th>金额</th>
                   <th class="table-actions">结算</th>
                 </tr>
@@ -305,6 +306,11 @@
                     </span>
                     <div class="order-subtext">{{ order.progressNote || '待更新' }}</div>
                   </td>
+                  <td>
+                    <span class="confirm-badge" :class="order.userConfirmed ? 'confirmed' : 'pending'">
+                      {{ order.userConfirmed ? '已确认' : '未确认' }}
+                    </span>
+                  </td>
                   <td>¥{{ order.price.toFixed(2) }}</td>
                   <td class="table-actions actions-inline">
                     <div class="settlement-cell">
@@ -315,7 +321,7 @@
                         v-if="!order.settlementReleased"
                         type="button"
                         class="primary-button"
-                        :disabled="order.status !== 'COMPLETED' || settlementSaving[order.id]"
+                        :disabled="order.status !== 'COMPLETED' || !order.userConfirmed || settlementSaving[order.id]"
                         @click="completeSettlement(order)"
                       >
                         {{ settlementSaving[order.id] ? '结算中…' : '完成交易' }}
@@ -324,7 +330,7 @@
                   </td>
                 </tr>
                 <tr v-if="!orderLedger.length">
-                  <td colspan="7" class="empty-row">
+                  <td colspan="8" class="empty-row">
                     <span v-if="hasOrderFilter">未找到匹配的订单，请调整搜索条件。</span>
                     <span v-else>暂无订单记录。</span>
                   </td>
@@ -2300,6 +2306,10 @@ const completeSettlement = async (order: ServiceOrderItem) => {
   if (order.settlementReleased || order.status !== 'COMPLETED') {
     return
   }
+  if (!order.userConfirmed) {
+    window.alert('用户尚未确认订单，暂不能结算。')
+    return
+  }
   settlementSaving[order.id] = true
   try {
     const updated = await settleAdminOrder(order.id)
@@ -2980,6 +2990,28 @@ onUnmounted(() => {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+.confirm-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5f5;
+}
+
+.confirm-badge.confirmed {
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ade80;
+}
+
+.confirm-badge.pending {
+  background: rgba(248, 113, 113, 0.18);
+  color: #fca5a5;
 }
 
 .status-scheduled {

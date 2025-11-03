@@ -69,6 +69,11 @@ public class UserServiceController {
         return Result.success("退款申请已提交", serviceOrderService.requestRefund(orderId, request));
     }
 
+    @PostMapping("/orders/{orderId}/confirm")
+    public Result<ServiceOrderResponse> confirmOrder(@PathVariable Long orderId) {
+        return Result.success("已确认订单", serviceOrderService.confirmOrderForCurrentUser(orderId));
+    }
+
     @DeleteMapping("/orders/{orderId}")
     public Result<Void> deleteOrder(@PathVariable Long orderId) {
         serviceOrderService.deleteOrdersForCurrentUser(List.of(orderId));
