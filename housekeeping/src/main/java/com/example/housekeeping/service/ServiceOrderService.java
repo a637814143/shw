@@ -280,6 +280,7 @@ public class ServiceOrderService {
             order.setProgressNote("订单已退款");
             order.setSettlementReleased(true);
             order.setSettlementReleasedAt(now);
+            order.setUserConfirmed(true);
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");

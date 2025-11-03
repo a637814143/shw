@@ -459,7 +459,7 @@
               @click="handleSelectAppointmentCategory(category.id)"
             >
               {{ category.name }}
-              <span class="chip-count">{{ category.serviceCount }}</span>
+              <span class="chip-count">{{ appointmentCountForCategory(category.id) }}</span>
             </button>
             <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
           </div>
@@ -1217,6 +1217,20 @@ const visibleCompanyOrders = computed(() => {
     return matchesOrderSearch(order, keyword)
   })
 })
+
+const appointmentCategoryCounts = computed(() => {
+  const counts = new Map<number, number>()
+  for (const order of companyOrders.value) {
+    const categoryId = order.categoryId
+    if (typeof categoryId === 'number' && Number.isFinite(categoryId)) {
+      counts.set(categoryId, (counts.get(categoryId) ?? 0) + 1)
+    }
+  }
+  return counts
+})
+
+const appointmentCountForCategory = (categoryId: number) =>
+  appointmentCategoryCounts.value.get(categoryId) ?? 0
 
 const deletableCompanyOrders = computed(() => companyOrders.value.filter((order) => canDeleteCompanyOrder(order)))
 const deletableOrderIds = computed(() => new Set(deletableCompanyOrders.value.map((item) => item.id)))
