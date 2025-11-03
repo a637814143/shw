@@ -111,6 +111,7 @@ export interface ServiceOrderItem {
   updatedAt: string
   settlementReleased: boolean
   settlementReleasedAt?: string | null
+  userConfirmed: boolean
   categoryId?: number | null
   categoryName?: string | null
   assignedStaffId?: number | null
@@ -583,6 +584,13 @@ export const removeUserFavorite = async (serviceId: number): Promise<void> => {
     ...withAuthHeaders({ method: 'DELETE' }),
   })
   await handleResponse<null>(response)
+}
+
+export const confirmUserOrder = async (orderId: number): Promise<ServiceOrderItem> => {
+  const response = await fetch(buildUrl(`/api/user/services/orders/${orderId}/confirm`), {
+    ...withAuthHeaders({ method: 'POST' }),
+  })
+  return handleResponse<ServiceOrderItem>(response)
 }
 
 export const fetchUserConversations = async (): Promise<UserConversationItem[]> => {
