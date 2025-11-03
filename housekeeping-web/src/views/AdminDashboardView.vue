@@ -312,7 +312,7 @@
                         {{ order.settlementReleased ? settlementSummary(order) : '待结算' }}
                       </span>
                       <button
-                        v-if="!order.settlementReleased"
+                        v-if="!order.settlementReleased && order.status === 'COMPLETED'"
                         type="button"
                         class="primary-button"
                         :disabled="order.status !== 'COMPLETED' || settlementSaving[order.id]"
@@ -1485,6 +1485,12 @@ const formatDateTime = (value: string) => {
 }
 
 const settlementSummary = (order: ServiceOrderItem) => {
+  if (order.status === 'REFUND_APPROVED') {
+    if (order.settlementReleasedAt) {
+      return `退款已完成 · ${formatDateTime(order.settlementReleasedAt)}`
+    }
+    return '退款已完成'
+  }
   if (order.settlementReleasedAt) {
     return `已结算 · ${formatDateTime(order.settlementReleasedAt)}`
   }

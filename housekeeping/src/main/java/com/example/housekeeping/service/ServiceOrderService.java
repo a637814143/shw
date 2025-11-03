@@ -6,13 +6,16 @@ import com.example.housekeeping.dto.RefundDecisionRequest;
 import com.example.housekeeping.dto.RefundRequest;
 import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
+import com.example.housekeeping.entity.AccountTransaction;
 import com.example.housekeeping.entity.CompanyStaff;
 import com.example.housekeeping.entity.HousekeepService;
-import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.ServiceCategory;
+import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.AccountTransactionType;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.repository.AccountTransactionRepository;
 import com.example.housekeeping.repository.CompanyMessageRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
@@ -57,6 +60,9 @@ public class ServiceOrderService {
 
     @Autowired
     private CompanyStaffRepository companyStaffRepository;
+
+    @Autowired
+    private AccountTransactionRepository accountTransactionRepository;
 
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
@@ -279,6 +285,7 @@ public class ServiceOrderService {
             order.setProgressNote("订单已退款");
             order.setSettlementReleased(true);
             order.setSettlementReleasedAt(now);
+            recordRefundTransaction(user, amount, now, order.getId());
         } else {
             order.setStatus(ServiceOrderStatus.REFUND_REJECTED);
             order.setProgressNote("退款申请被拒绝");
@@ -652,5 +659,22 @@ public class ServiceOrderService {
         permitted.forEach(this::releaseAssignedStaff);
         permitted.forEach(companyMessageRepository::deleteByOrder);
         serviceOrderRepository.deleteAll(permitted);
+    }
+
+    private void recordRefundTransaction(UserAll user, BigDecimal amount, Instant occurredAt, Long orderId) {
+        if (user == null || amount == null) {
+            return;
+        }
+        AccountTransaction txn = new AccountTransaction();
+        txn.setUser(user);
+        txn.setType(AccountTransactionType.ADJUST);
+        txn.setAmount(amount);
+        StringBuilder note = new StringBuilder("订单退款退回余额");
+        if (orderId != null) {
+            note.append(" (#").append(orderId).append(")");
+        }
+        txn.setNote(note.toString());
+        txn.setCreatedAt(occurredAt == null ? Instant.now() : occurredAt);
+        accountTransactionRepository.save(txn);
     }
 }

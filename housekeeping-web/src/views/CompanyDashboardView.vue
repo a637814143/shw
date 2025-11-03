@@ -449,6 +449,7 @@
               @click="handleSelectAppointmentCategory('all')"
             >
               全部
+              <span class="chip-count">{{ totalAppointmentCount }}</span>
             </button>
             <button
               v-for="category in serviceCategories"
@@ -459,7 +460,7 @@
               @click="handleSelectAppointmentCategory(category.id)"
             >
               {{ category.name }}
-              <span class="chip-count">{{ category.serviceCount }}</span>
+              <span class="chip-count">{{ appointmentCountForCategory(category.id) }}</span>
             </button>
             <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
           </div>
@@ -1126,8 +1127,8 @@ watch(staffCategoryFilter, async () => {
   await loadStaff()
 })
 
-watch(appointmentCategoryFilter, async () => {
-  await loadCompanyOrders()
+watch(appointmentCategoryFilter, () => {
+  pruneOrderSelection()
 })
 
 const clearStaffFilter = async () => {
@@ -1162,6 +1163,22 @@ const companyStats = computed(() => {
     staffCount,
   }
 })
+
+const totalAppointmentCount = computed(() => companyOrders.value.length)
+
+const appointmentCountsByCategory = computed(() => {
+  const counts: Record<number, number> = {}
+  companyOrders.value.forEach((order) => {
+    if (typeof order.categoryId === 'number') {
+      const id = order.categoryId
+      counts[id] = (counts[id] ?? 0) + 1
+    }
+  })
+  return counts
+})
+
+const appointmentCountForCategory = (categoryId: number) =>
+  appointmentCountsByCategory.value[categoryId] ?? 0
 
 const normalizeSearchValue = (value: unknown) => {
   if (value == null) {
@@ -1967,12 +1984,7 @@ const loadServiceCategories = async () => {
 const loadCompanyOrders = async () => {
   appointmentsLoading.value = true
   try {
-    const params: { categoryId?: number } = {}
-    if (appointmentCategoryFilter.value !== 'all') {
-      params.categoryId = appointmentCategoryFilter.value
-    }
-    const result = await fetchCompanyOrders(Object.keys(params).length ? params : undefined)
-    companyOrders.value = result
+    companyOrders.value = await fetchCompanyOrders()
     pruneOrderSelection()
   } catch (error) {
     console.error(error)
