@@ -174,15 +174,43 @@
               <header class="section-title">
                 <h3>主题轮播</h3>
               </header>
-              <div class="carousel-track" role="region" aria-label="精选轮播">
-                <article v-for="item in carousels" :key="item.id" class="carousel-card">
-                  <div class="carousel-media" :style="{ backgroundImage: `url(${item.imageUrl})` }"></div>
-                  <div class="carousel-body">
-                    <h4>{{ item.title }}</h4>
-                    <p>{{ item.serviceLink ? item.serviceLink : '精选家政专题' }}</p>
-                  </div>
-                </article>
-                <p v-if="!carousels.length" class="empty-tip">暂无轮播内容，稍后再来看看。</p>
+              <div
+                v-if="currentCarousel"
+                :class="['carousel-frame', { 'has-controls': carousels.length > 1 }]"
+                role="region"
+                aria-label="精选轮播"
+              >
+                <button
+                  v-if="carousels.length > 1"
+                  type="button"
+                  class="carousel-button prev"
+                  @click="showPreviousCarousel"
+                  aria-label="上一张"
+                >
+                  ‹
+                </button>
+                <div class="carousel-window">
+                  <article :key="currentCarousel.id" class="carousel-card">
+                    <div class="carousel-media" :style="{ backgroundImage: `url(${currentCarousel.imageUrl})` }"></div>
+                    <div class="carousel-body">
+                      <h4>{{ currentCarousel.title }}</h4>
+                      <p>{{ currentCarousel.serviceLink ? currentCarousel.serviceLink : '精选家政专题' }}</p>
+                    </div>
+                  </article>
+                </div>
+                <button
+                  v-if="carousels.length > 1"
+                  type="button"
+                  class="carousel-button next"
+                  @click="showNextCarousel"
+                  aria-label="下一张"
+                >
+                  ›
+                </button>
+              </div>
+              <p v-else class="empty-tip">暂无轮播内容，稍后再来看看。</p>
+              <div v-if="carousels.length > 1" class="carousel-indicator">
+                {{ carouselIndex + 1 }} / {{ carousels.length }}
               </div>
             </section>
 
@@ -895,6 +923,7 @@ const userReviewsLoading = ref(false)
 const reviewSearch = ref('')
 const selectedUserReviewIds = ref<Set<number>>(new Set())
 const carousels = ref<DashboardCarouselItem[]>([])
+const carouselIndex = ref(0)
 const tips = ref<DashboardTipItem[]>([])
 const announcements = ref<DashboardAnnouncementItem[]>([])
 const favorites = ref<ServiceFavoriteItem[]>([])
@@ -1027,6 +1056,15 @@ const exchangeForm = reactive<{ points: number | null }>({ points: null })
 const exchangeSaving = ref(false)
 
 const discoverLoading = ref(false)
+
+const currentCarousel = computed(() => {
+  if (!carousels.value.length) {
+    return null
+  }
+  const length = carousels.value.length
+  const index = ((carouselIndex.value % length) + length) % length
+  return carousels.value[index]
+})
 
 const sections: SectionMeta[] = [
   { key: 'profile', icon: '👤', label: '个人资料' },
@@ -1429,6 +1467,28 @@ const ensureServicesLoaded = async () => {
   }
 }
 
+const showPreviousCarousel = () => {
+  if (carousels.value.length <= 1) {
+    return
+  }
+  carouselIndex.value = (carouselIndex.value - 1 + carousels.value.length) % carousels.value.length
+}
+
+const showNextCarousel = () => {
+  if (carousels.value.length <= 1) {
+    return
+  }
+  carouselIndex.value = (carouselIndex.value + 1) % carousels.value.length
+}
+
+watch(carousels, (items) => {
+  if (!items.length) {
+    carouselIndex.value = 0
+    return
+  }
+  carouselIndex.value = carouselIndex.value % items.length
+})
+
 watch(
   () => bookingForm.scheduledAt,
   (value) => {
@@ -1482,6 +1542,7 @@ const loadDiscover = async () => {
       fetchDashboardAnnouncements(),
     ])
     carousels.value = carouselData
+    carouselIndex.value = 0
     tips.value = tipData
     announcements.value = announcementData
   } catch (error) {
@@ -2414,13 +2475,66 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
-.carousel-track {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(220px, 1fr);
-  gap: 1rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
+.carousel-frame {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.carousel-frame.has-controls {
+  padding: 0 2.75rem;
+}
+
+.carousel-window {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  margin: 0 auto;
+}
+
+.carousel-button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  width: 2.5rem;
+  height: 2.5rem;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+  color: var(--brand-primary);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.carousel-button.prev {
+  left: 0.75rem;
+}
+
+.carousel-button.next {
+  right: 0.75rem;
+}
+
+.carousel-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+.carousel-button:not(:disabled):hover {
+  transform: translateY(-50%) scale(1.05);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.carousel-indicator {
+  text-align: center;
+  color: var(--brand-text-muted);
+  font-size: 0.85rem;
 }
 
 .carousel-card {
@@ -2431,6 +2545,8 @@ onUnmounted(() => {
   min-height: 220px;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
 }
 
 .carousel-media {
@@ -2446,8 +2562,9 @@ onUnmounted(() => {
 
 .section-title {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
 }
 
 .section-title h3 {
