@@ -69,14 +69,61 @@
                 <span class="insight-helper">金额单位：元</span>
               </header>
               <div class="sparkline" role="img" aria-label="七日充值趋势柱状图">
-                <div
-                  v-for="point in weeklySeries"
-                  :key="point.label"
-                  class="spark-bar"
-                  :style="sparkStyle(point.amount)"
-                >
-                  <span class="spark-amount">¥{{ point.amount.toFixed(2) }}</span>
-                  <span class="spark-label">{{ shortLabel(point.label) }}</span>
+                <div class="spark-stats">
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">7 日总计</span>
+                    <strong class="spark-stat-value">{{ formatCurrency(weeklyTotal) }}</strong>
+                  </div>
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">日均充值</span>
+                    <strong class="spark-stat-value">{{ formatCurrency(weeklyAverage) }}</strong>
+                  </div>
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">最高单日</span>
+                    <strong class="spark-stat-value">
+                      {{ formatCurrency(weeklyPeak.amount) }}
+                    </strong>
+                    <span v-if="weeklyPeak.label" class="spark-stat-sub">
+                      {{ formatXAxisDate(weeklyPeak.label) }}
+                      <template v-if="formatXAxisWeek(weeklyPeak.label)">
+                        · {{ formatXAxisWeek(weeklyPeak.label) }}
+                      </template>
+                    </span>
+                  </div>
+                  <div class="spark-stat trend" :class="trendDirection">
+                    <span class="spark-stat-label">较昨日</span>
+                    <strong class="spark-stat-value">{{ weeklyTrendText }}</strong>
+                    <span class="spark-stat-sub">{{ trendComparison }}</span>
+                  </div>
+                </div>
+                <div class="spark-chart">
+                  <div class="spark-rail">
+                    <span v-for="tick in sparkTicks" :key="tick.label" class="spark-rail-tick">
+                      <span class="spark-rail-value">{{ tick.label }}</span>
+                    </span>
+                  </div>
+                  <div class="spark-bars">
+                    <div
+                      v-for="point in weeklySeries"
+                      :key="point.label"
+                      class="spark-bar"
+                      :class="{ peak: point.label === weeklyPeak.label }"
+                      :style="sparkStyle(point.amount)"
+                    >
+                      <span class="spark-amount">{{ formatAxisAmount(point.amount) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="spark-x-axis">
+                  <span
+                    v-for="point in weeklySeries"
+                    :key="`label-${point.label}`"
+                    class="spark-x-label"
+                    :class="{ peak: point.label === weeklyPeak.label }"
+                  >
+                    <span class="spark-x-date">{{ formatXAxisDate(point.label) }}</span>
+                    <span class="spark-x-week">{{ formatXAxisWeek(point.label) }}</span>
+                  </span>
                 </div>
               </div>
             </article>
@@ -1452,6 +1499,89 @@ const maxWeeklyAmount = computed(() => {
   return max <= 0 ? 1 : max
 })
 
+const formatCurrency = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return '¥0'
+  }
+  const formatter = new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency: 'CNY',
+    minimumFractionDigits: value >= 1000 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return formatter.format(value)
+}
+
+const weeklyTotal = computed(() =>
+  weeklySeries.value.reduce((sum, point) => sum + (Number.isFinite(point.amount) ? point.amount : 0), 0),
+)
+
+const weeklyAverage = computed(() =>
+  weeklySeries.value.length > 0 ? weeklyTotal.value / weeklySeries.value.length : 0,
+)
+
+const weeklyPeak = computed(() => {
+  const [first, ...rest] = weeklySeries.value
+  if (!first) {
+    return { amount: 0, label: '' }
+  }
+  return rest.reduce(
+    (acc, point) => (point.amount > acc.amount ? { amount: point.amount, label: point.label } : acc),
+    { amount: first.amount, label: first.label },
+  )
+})
+
+const previousDayAmount = computed(() => {
+  const series = weeklySeries.value
+  if (series.length < 2) {
+    return 0
+  }
+  return series[series.length - 2]?.amount ?? 0
+})
+
+const latestDayAmount = computed(() => {
+  const series = weeklySeries.value
+  if (!series.length) {
+    return 0
+  }
+  return series[series.length - 1]?.amount ?? 0
+})
+
+const weeklyTrend = computed(() => {
+  if (weeklySeries.value.length < 2) {
+    return 0
+  }
+  const prev = previousDayAmount.value
+  const latest = latestDayAmount.value
+  if (prev === 0) {
+    return latest === 0 ? 0 : 1
+  }
+  return (latest - prev) / prev
+})
+
+const weeklyTrendText = computed(() => {
+  const value = weeklyTrend.value
+  if (!Number.isFinite(value) || value === 0) {
+    return '持平'
+  }
+  const formatted = Math.abs(value) >= 0.995 ? `${value > 0 ? '+' : '-'}100%+` : `${value > 0 ? '+' : '-'}${Math.abs(value * 100).toFixed(1)}%`
+  return formatted
+})
+
+const trendComparison = computed(() => {
+  if (weeklySeries.value.length < 2) {
+    return '暂无对比数据'
+  }
+  return `${formatCurrency(previousDayAmount.value)} → ${formatCurrency(latestDayAmount.value)}`
+})
+
+const trendDirection = computed(() => {
+  const value = weeklyTrend.value
+  if (value > 0) return 'up'
+  if (value < 0) return 'down'
+  return 'flat'
+})
+
 const appointmentMetrics = computed(() => overview.value?.appointmentMetrics ?? [])
 const maxAppointment = computed(() => {
   const max = appointmentMetrics.value.reduce((acc, item) => Math.max(acc, item.count), 0)
@@ -1477,10 +1607,49 @@ const metricStyle = (count: number) => ({
   width: `${Math.max(6, Math.round((count / maxAppointment.value) * 100))}%`,
 })
 
-const shortLabel = (label: string) => {
+const axisCurrencyFormatter = new Intl.NumberFormat('zh-CN', {
+  style: 'currency',
+  currency: 'CNY',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+})
+
+const formatAxisAmount = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return axisCurrencyFormatter.format(0)
+  }
+  return axisCurrencyFormatter.format(Math.round(value))
+}
+
+const sparkTicks = computed(() => {
+  const steps = 4
+  const max = maxWeeklyAmount.value
+  const interval = max / steps
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const value = interval * (steps - index)
+    return { value, label: formatAxisAmount(value) }
+  })
+})
+
+const formatXAxisDate = (label: string) => {
+  if (!label) return '—'
+  const date = new Date(label)
+  if (Number.isNaN(date.getTime())) {
+    return label
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}`
+}
+
+const formatXAxisWeek = (label: string) => {
   if (!label) return ''
-  const parts = label.split('-')
-  return parts.length >= 2 ? `${parts[1]}/${parts[2] ?? ''}` : label
+  const date = new Date(label)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  return weekMap[date.getDay()] ?? ''
 }
 
 const formatDateTime = (value: string) => {
@@ -3098,38 +3267,268 @@ onUnmounted(() => {
 }
 
 .sparkline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.spark-stats {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.spark-stat {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 88px;
+}
+
+.spark-stat-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.spark-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.spark-stat-sub {
+  font-size: 0.7rem;
+  color: rgba(226, 232, 240, 0.55);
+  letter-spacing: 0.03em;
+}
+
+.spark-stat.trend {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(14, 116, 144, 0.18));
+  border-color: rgba(125, 211, 252, 0.35);
+}
+
+.spark-stat.trend.up .spark-stat-value {
+  color: #34d399;
+}
+
+.spark-stat.trend.up .spark-stat-value::before {
+  content: '↑';
+  font-size: 0.85rem;
+}
+
+.spark-stat.trend.down .spark-stat-value {
+  color: #f87171;
+}
+
+.spark-stat.trend.down .spark-stat-value::before {
+  content: '↓';
+  font-size: 0.85rem;
+}
+
+.spark-stat.trend.flat .spark-stat-value {
+  color: #facc15;
+}
+
+.spark-stat.trend.flat .spark-stat-value::before {
+  content: '→';
+  font-size: 0.85rem;
+}
+
+.spark-chart {
+  display: flex;
+  gap: 1.4rem;
+  align-items: stretch;
+  height: 210px;
+  padding: 1rem 1.2rem 1.4rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.18));
+  position: relative;
+  overflow: visible;
+}
+
+.spark-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2.4rem 0.75rem 0.6rem 0;
+  min-width: 82px;
+}
+
+.spark-rail::after {
+  content: '';
+  position: absolute;
+  top: 2.4rem;
+  bottom: 0.6rem;
+  right: 0.3rem;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(148, 163, 184, 0),
+    rgba(148, 163, 184, 0.45) 20%,
+    rgba(148, 163, 184, 0.45) 80%,
+    rgba(148, 163, 184, 0)
+  );
+  opacity: 0.85;
+}
+
+.spark-rail-tick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.spark-rail-value {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: rgba(226, 232, 240, 0.85);
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.35);
+}
+
+.spark-bars {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1rem;
   align-items: end;
-  height: 160px;
+  padding: 2.4rem 0 0.6rem;
+  overflow: visible;
+}
+
+.spark-bars::before {
+  content: '';
+  position: absolute;
+  inset: 2.4rem 0 0.6rem;
+  background: repeating-linear-gradient(
+    to top,
+    rgba(148, 163, 184, 0.22),
+    rgba(148, 163, 184, 0.22) 1px,
+    transparent 1px,
+    transparent calc(25% - 1px)
+  );
+  pointer-events: none;
+  border-radius: 0.85rem;
+  z-index: 0;
+}
+
+.spark-bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.6rem;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    rgba(148, 163, 184, 0),
+    rgba(148, 163, 184, 0.55) 20%,
+    rgba(148, 163, 184, 0.55) 80%,
+    rgba(148, 163, 184, 0)
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 .spark-bar {
   position: relative;
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.85), rgba(99, 102, 241, 0.65));
-  border-radius: 0.75rem 0.75rem 0.35rem 0.35rem;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(37, 99, 235, 0.78));
+  border-radius: 0.9rem 0.9rem 0.45rem 0.45rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 0.75rem 0.35rem 0.6rem;
-  transition: transform 0.2s ease;
+  align-items: center;
+  padding: 0.95rem 0.45rem 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.25);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 1;
+}
+
+.spark-bar.peak {
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.98), rgba(56, 189, 248, 0.82));
+  box-shadow: 0 20px 36px rgba(56, 189, 248, 0.35);
+  border-color: rgba(224, 242, 254, 0.55);
+}
+
+.spark-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  pointer-events: none;
 }
 
 .spark-bar:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
+  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.32);
 }
 
 .spark-amount {
-  font-size: 0.8rem;
+  position: absolute;
+  top: -2.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.82rem;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.9);
-  margin-bottom: 0.35rem;
+  color: rgba(15, 23, 42, 0.85);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  padding: 0.22rem 0.65rem;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+  z-index: 2;
 }
 
-.spark-label {
-  font-size: 0.75rem;
-  color: rgba(15, 23, 42, 0.65);
+.spark-x-axis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.spark-x-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: rgba(226, 232, 240, 0.78);
+  letter-spacing: 0.02em;
+}
+
+.spark-x-label.peak .spark-x-date {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.spark-x-label.peak .spark-x-week {
+  color: rgba(125, 211, 252, 0.85);
+}
+
+.spark-x-date {
+  font-size: 0.82rem;
+}
+
+.spark-x-week {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.85);
 }
 
 .metric-list {
