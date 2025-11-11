@@ -3100,36 +3100,98 @@ onUnmounted(() => {
 .sparkline {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: end;
-  height: 160px;
+  height: 180px;
+  padding: 1.1rem 1rem 1.6rem;
+  border-radius: 1.1rem;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.18));
+  position: relative;
+  overflow: hidden;
+}
+
+.sparkline::before {
+  content: '';
+  position: absolute;
+  inset: 1.1rem 1rem 1.6rem;
+  background: repeating-linear-gradient(
+    to top,
+    rgba(148, 163, 184, 0.24),
+    rgba(148, 163, 184, 0.24) 1px,
+    transparent 1px,
+    transparent calc(25% - 1px)
+  );
+  opacity: 0.6;
+  pointer-events: none;
+  border-radius: 0.85rem;
+  z-index: 0;
+}
+
+.sparkline::after {
+  content: '';
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1.6rem;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    rgba(148, 163, 184, 0),
+    rgba(148, 163, 184, 0.55) 20%,
+    rgba(148, 163, 184, 0.55) 80%,
+    rgba(148, 163, 184, 0)
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 .spark-bar {
   position: relative;
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.85), rgba(99, 102, 241, 0.65));
-  border-radius: 0.75rem 0.75rem 0.35rem 0.35rem;
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(37, 99, 235, 0.78));
+  border-radius: 0.9rem 0.9rem 0.45rem 0.45rem;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 0.75rem 0.35rem 0.6rem;
-  transition: transform 0.2s ease;
+  padding: 0.85rem 0.45rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.25);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 1;
+}
+
+.spark-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
+  pointer-events: none;
 }
 
 .spark-bar:hover {
-  transform: translateY(-4px);
+  transform: translateY(-6px);
+  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.32);
 }
 
 .spark-amount {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: rgba(15, 23, 42, 0.9);
-  margin-bottom: 0.35rem;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  align-self: center;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
 }
 
 .spark-label {
-  font-size: 0.75rem;
-  color: rgba(15, 23, 42, 0.65);
+  font-size: 0.72rem;
+  color: rgba(226, 232, 240, 0.85);
+  text-align: center;
+  letter-spacing: 0.02em;
+  margin-top: 0.45rem;
 }
 
 .metric-list {

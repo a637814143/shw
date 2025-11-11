@@ -25,15 +25,15 @@
         <p class="stat-value">{{ orderStats.awaiting }}</p>
         <p class="stat-helper">等待家政人员上门</p>
       </article>
-      <article class="stat-card glass">
-        <p class="stat-label">收藏服务</p>
-        <p class="stat-value">{{ favoritesCount }}</p>
-        <p class="stat-helper">点击服务卡片右上角可收藏</p>
-      </article>
       <article class="stat-card warning">
         <p class="stat-label">系统公告</p>
         <p class="stat-value">{{ announcements.length }}</p>
         <p class="stat-helper">关注最新服务与活动</p>
+      </article>
+      <article class="stat-card success">
+        <p class="stat-label">收藏服务</p>
+        <p class="stat-value">{{ favoritesCount }}</p>
+        <p class="stat-helper">点击服务卡片右上角可收藏</p>
       </article>
     </section>
 
@@ -1810,7 +1810,7 @@ const handleRequestRefund = async (order: ServiceOrderItem) => {
   try {
     await requestUserRefund(order.id, { reason })
     await loadOrders()
-    window.alert('退款申请已提交，等待家政公司或管理员处理。')
+    window.alert('退款申请已提交，等待管理员处理')
   } catch (error) {
     console.error(error)
   }
@@ -2239,9 +2239,24 @@ onUnmounted(() => {
   position: relative;
 }
 
-.stat-card.glass {
-  background: linear-gradient(145deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.08));
-  border-color: rgba(16, 185, 129, 0.22);
+.stat-card.accent {
+  background: linear-gradient(150deg, rgba(37, 99, 235, 0.14), rgba(37, 99, 235, 0.04));
+  border-color: rgba(37, 99, 235, 0.22);
+}
+
+.stat-card.primary {
+  background: linear-gradient(150deg, rgba(16, 185, 129, 0.16), rgba(16, 185, 129, 0.05));
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.stat-card.warning {
+  background: linear-gradient(150deg, rgba(245, 158, 11, 0.16), rgba(251, 191, 36, 0.06));
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.stat-card.success {
+  background: linear-gradient(150deg, rgba(37, 99, 235, 0.12), rgba(16, 185, 129, 0.06));
+  border-color: rgba(37, 99, 235, 0.24);
 }
 
 .stat-label {
