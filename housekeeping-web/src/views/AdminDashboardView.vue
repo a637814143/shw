@@ -68,62 +68,87 @@
                 <h3>近 7 日充值趋势</h3>
                 <span class="insight-helper">金额单位：元</span>
               </header>
-              <div class="sparkline" role="img" aria-label="七日充值趋势柱状图">
-                <div class="spark-stats">
-                  <div class="spark-stat">
-                    <span class="spark-stat-label">7 日总计</span>
-                    <strong class="spark-stat-value">{{ formatCurrency(weeklyTotal) }}</strong>
+              <div class="trend-card" role="img" aria-label="近 7 日充值趋势折线面积图">
+                <header class="trend-card-header">
+                  <div>
+                    <h4>近 7 天充值趋势图</h4>
+                    <p>展示每日充值金额走势</p>
                   </div>
-                  <div class="spark-stat">
-                    <span class="spark-stat-label">日均充值</span>
-                    <strong class="spark-stat-value">{{ formatCurrency(weeklyAverage) }}</strong>
+                  <div class="trend-summary">
+                    <span>7 日总计 {{ formatCurrency(weeklyTotal) }}</span>
+                    <span>日均充值 {{ formatCurrency(weeklyAverage) }}</span>
                   </div>
-                  <div class="spark-stat">
-                    <span class="spark-stat-label">最高单日</span>
-                    <strong class="spark-stat-value">
-                      {{ formatCurrency(weeklyPeak.amount) }}
-                    </strong>
-                    <span v-if="weeklyPeak.label" class="spark-stat-sub">
-                      {{ formatXAxisDate(weeklyPeak.label) }}
-                      <template v-if="formatXAxisWeek(weeklyPeak.label)">
-                        · {{ formatXAxisWeek(weeklyPeak.label) }}
-                      </template>
-                    </span>
+                </header>
+
+                <div v-if="!weeklySeries.length" class="trend-empty">暂无充值数据</div>
+
+                <div v-else class="trend-visual">
+                  <div class="trend-y-axis">
+                    <span v-for="tick in chartTicks" :key="tick" class="trend-y-tick">{{ tick }}</span>
+                    <span class="trend-y-label">充值金额</span>
                   </div>
-                  <div class="spark-stat trend" :class="trendDirection">
-                    <span class="spark-stat-label">较昨日</span>
-                    <strong class="spark-stat-value">{{ weeklyTrendText }}</strong>
-                    <span class="spark-stat-sub">{{ trendComparison }}</span>
-                  </div>
-                </div>
-                <div class="spark-chart">
-                  <div class="spark-rail">
-                    <span v-for="tick in sparkTicks" :key="tick.label" class="spark-rail-tick">
-                      <span class="spark-rail-value">{{ tick.label }}</span>
-                    </span>
-                  </div>
-                  <div class="spark-bars">
-                    <div
-                      v-for="point in weeklySeries"
-                      :key="point.label"
-                      class="spark-bar"
-                      :class="{ peak: point.label === weeklyPeak.label }"
-                      :style="sparkStyle(point.amount)"
+
+                  <div class="trend-plot" :style="plotStyle">
+                    <svg
+                      :viewBox="`0 0 ${chartDimensions.width} ${chartDimensions.height}`"
+                      :width="chartDimensions.width"
+                      :height="chartDimensions.height"
+                      preserveAspectRatio="none"
                     >
-                      <span class="spark-amount">{{ formatAxisAmount(point.amount) }}</span>
+                      <defs>
+                        <linearGradient :id="areaGradientId" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stop-color="#5b7bfa" stop-opacity="0.42" />
+                          <stop offset="100%" stop-color="#5b7bfa" stop-opacity="0.05" />
+                        </linearGradient>
+                      </defs>
+
+                      <path :d="areaPath" fill="url(#areaGradientId)" class="trend-area" />
+                      <path :d="linePath" class="trend-line" />
+
+                      <g v-for="point in chartPoints" :key="point.label" class="trend-point-group">
+                        <circle
+                          class="trend-point"
+                          :class="pointPointClass(point.label)"
+                          :cx="point.x"
+                          :cy="point.y"
+                          r="5"
+                        />
+                      </g>
+                    </svg>
+
+                    <div
+                      v-if="peakPoint"
+                      class="trend-bubble peak"
+                      :style="bubbleStyle(peakPoint)"
+                    >
+                      <span>{{ formatAxisAmount(peakPoint.amount) }}</span>
+                    </div>
+
+                    <div
+                      v-if="lowPoint"
+                      class="trend-bubble trough"
+                      :style="bubbleStyle(lowPoint)"
+                    >
+                      <span>{{ formatAxisAmount(lowPoint.amount) }}</span>
+                    </div>
+
+                    <div
+                      v-if="latestPoint"
+                      class="trend-indicator"
+                      :style="indicatorStyle(latestPoint)"
+                    >
+                      <span>{{ formatAxisAmount(latestPoint.amount) }}</span>
+                      <i aria-hidden="true" />
                     </div>
                   </div>
                 </div>
-                <div class="spark-x-axis">
-                  <span
-                    v-for="point in weeklySeries"
-                    :key="`label-${point.label}`"
-                    class="spark-x-label"
-                    :class="{ peak: point.label === weeklyPeak.label }"
-                  >
-                    <span class="spark-x-date">{{ formatXAxisDate(point.label) }}</span>
-                    <span class="spark-x-week">{{ formatXAxisWeek(point.label) }}</span>
+
+                <div class="trend-x-axis">
+                  <span v-for="point in weeklySeries" :key="`x-${point.label}`" class="trend-x-label">
+                    <strong>{{ formatXAxisDate(point.label) }}</strong>
+                    <small>{{ formatXAxisWeek(point.label) }}</small>
                   </span>
+                  <span class="trend-x-caption">日期</span>
                 </div>
               </div>
             </article>
@@ -1499,6 +1524,10 @@ const maxWeeklyAmount = computed(() => {
   return max <= 0 ? 1 : max
 })
 
+const chartDimensions = { width: 640, height: 280 }
+const chartPadding = { top: 24, right: 32, bottom: 40, left: 72 }
+const areaGradientId = `trend-area-${Math.random().toString(36).slice(2)}`
+
 const formatCurrency = (value: number) => {
   if (!Number.isFinite(value)) {
     return '¥0'
@@ -1520,68 +1549,6 @@ const weeklyAverage = computed(() =>
   weeklySeries.value.length > 0 ? weeklyTotal.value / weeklySeries.value.length : 0,
 )
 
-const weeklyPeak = computed(() => {
-  const [first, ...rest] = weeklySeries.value
-  if (!first) {
-    return { amount: 0, label: '' }
-  }
-  return rest.reduce(
-    (acc, point) => (point.amount > acc.amount ? { amount: point.amount, label: point.label } : acc),
-    { amount: first.amount, label: first.label },
-  )
-})
-
-const previousDayAmount = computed(() => {
-  const series = weeklySeries.value
-  if (series.length < 2) {
-    return 0
-  }
-  return series[series.length - 2]?.amount ?? 0
-})
-
-const latestDayAmount = computed(() => {
-  const series = weeklySeries.value
-  if (!series.length) {
-    return 0
-  }
-  return series[series.length - 1]?.amount ?? 0
-})
-
-const weeklyTrend = computed(() => {
-  if (weeklySeries.value.length < 2) {
-    return 0
-  }
-  const prev = previousDayAmount.value
-  const latest = latestDayAmount.value
-  if (prev === 0) {
-    return latest === 0 ? 0 : 1
-  }
-  return (latest - prev) / prev
-})
-
-const weeklyTrendText = computed(() => {
-  const value = weeklyTrend.value
-  if (!Number.isFinite(value) || value === 0) {
-    return '持平'
-  }
-  const formatted = Math.abs(value) >= 0.995 ? `${value > 0 ? '+' : '-'}100%+` : `${value > 0 ? '+' : '-'}${Math.abs(value * 100).toFixed(1)}%`
-  return formatted
-})
-
-const trendComparison = computed(() => {
-  if (weeklySeries.value.length < 2) {
-    return '暂无对比数据'
-  }
-  return `${formatCurrency(previousDayAmount.value)} → ${formatCurrency(latestDayAmount.value)}`
-})
-
-const trendDirection = computed(() => {
-  const value = weeklyTrend.value
-  if (value > 0) return 'up'
-  if (value < 0) return 'down'
-  return 'flat'
-})
-
 const appointmentMetrics = computed(() => overview.value?.appointmentMetrics ?? [])
 const maxAppointment = computed(() => {
   const max = appointmentMetrics.value.reduce((acc, item) => Math.max(acc, item.count), 0)
@@ -1598,10 +1565,6 @@ const allRefundsSelected = computed(
     selectableRefunds.value.length > 0 &&
     selectableRefunds.value.every((order) => selectedRefundIds.value.has(order.id)),
 )
-
-const sparkStyle = (amount: number) => ({
-  height: `${Math.max(12, Math.round((amount / maxWeeklyAmount.value) * 100))}%`,
-})
 
 const metricStyle = (count: number) => ({
   width: `${Math.max(6, Math.round((count / maxAppointment.value) * 100))}%`,
@@ -1621,15 +1584,190 @@ const formatAxisAmount = (value: number) => {
   return axisCurrencyFormatter.format(Math.round(value))
 }
 
-const sparkTicks = computed(() => {
-  const steps = 4
+const tickNumberFormatter = new Intl.NumberFormat('zh-CN', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+})
+
+const calculateNiceStep = (max: number, segments = 5) => {
+  if (max <= 0) {
+    return 1
+  }
+  const rawStep = max / segments
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep))
+  const residual = rawStep / magnitude
+  if (residual <= 1) return 1 * magnitude
+  if (residual <= 2) return 2 * magnitude
+  if (residual <= 5) return 5 * magnitude
+  return 10 * magnitude
+}
+
+const chartSegments = 5
+
+const chartStep = computed(() => calculateNiceStep(maxWeeklyAmount.value, chartSegments))
+const chartMaxValue = computed(() => {
+  const step = chartStep.value
   const max = maxWeeklyAmount.value
-  const interval = max / steps
-  return Array.from({ length: steps + 1 }, (_, index) => {
-    const value = interval * (steps - index)
-    return { value, label: formatAxisAmount(value) }
+  if (step <= 0) {
+    return chartSegments
+  }
+  const steppedMax = Math.ceil(max / step) * step
+  const baseMax = step * chartSegments
+  return Math.max(step, steppedMax, baseMax)
+})
+
+const chartTickValues = computed(() => {
+  const step = chartStep.value
+  const max = chartMaxValue.value
+  if (step <= 0) {
+    return [0]
+  }
+  const ticks: number[] = []
+  for (let value = max; value >= 0; value -= step) {
+    const rounded = Math.max(0, Number(value.toFixed(0)))
+    ticks.push(rounded)
+  }
+  if (ticks[ticks.length - 1] !== 0) {
+    ticks.push(0)
+  }
+  return ticks
+})
+
+const chartTicks = computed(() => chartTickValues.value.map((value) => tickNumberFormatter.format(value)))
+
+type ChartPoint = {
+  label: string
+  amount: number
+  x: number
+  y: number
+}
+
+const plotStyle = computed(() => ({
+  width: `${chartDimensions.width}px`,
+  height: `${chartDimensions.height}px`,
+}))
+
+const chartInnerWidth = computed(
+  () => chartDimensions.width - chartPadding.left - chartPadding.right,
+)
+const chartInnerHeight = computed(
+  () => chartDimensions.height - chartPadding.top - chartPadding.bottom,
+)
+const chartBaseline = computed(() => chartPadding.top + chartInnerHeight.value)
+
+const chartPoints = computed<ChartPoint[]>(() => {
+  const series = weeklySeries.value
+  if (!series.length) return []
+  const innerWidth = chartInnerWidth.value
+  const step = series.length > 1 ? innerWidth / (series.length - 1) : 0
+  const maxValue = chartMaxValue.value || 1
+  return series.map((point, index) => {
+    const amount = Number(point.amount) || 0
+    const ratio = Math.min(amount / maxValue, 1)
+    const x = chartPadding.left + step * index
+    const y = chartPadding.top + (1 - ratio) * chartInnerHeight.value
+    return { label: point.label, amount, x, y }
   })
 })
+
+const catmullRomToBezier = (points: ChartPoint[]) => {
+  if (points.length === 0) {
+    return ''
+  }
+  if (points.length === 1) {
+    const single = points[0]
+    return single ? `M ${single.x} ${single.y}` : ''
+  }
+  const firstPoint = points[0]
+  if (!firstPoint) {
+    return ''
+  }
+  let path = `M ${firstPoint.x} ${firstPoint.y}`
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] ?? points[i]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[i + 2] ?? p2
+    if (!p0 || !p1 || !p2 || !p3) {
+      continue
+    }
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`
+  }
+  return path
+}
+
+const linePath = computed(() => catmullRomToBezier(chartPoints.value))
+
+const areaPath = computed(() => {
+  const points = chartPoints.value
+  if (!points.length) {
+    return ''
+  }
+  const baselineY = chartBaseline.value
+  if (points.length === 1) {
+    const point = points[0]
+    if (!point) {
+      return ''
+    }
+    return `M ${point.x} ${point.y} L ${point.x} ${baselineY} L ${point.x} ${baselineY} Z`
+  }
+  const line = catmullRomToBezier(points)
+  const lastPoint = points[points.length - 1]
+  const firstPoint = points[0]
+  if (!lastPoint || !firstPoint) {
+    return line
+  }
+  return `${line} L ${lastPoint.x} ${baselineY} L ${firstPoint.x} ${baselineY} Z`
+})
+
+const peakPoint = computed<ChartPoint | null>(() => {
+  const [first, ...rest] = chartPoints.value
+  if (!first) return null
+  return rest.reduce<ChartPoint>(
+    (acc, point) => (point.amount > acc.amount ? point : acc),
+    first,
+  )
+})
+
+const lowPoint = computed<ChartPoint | null>(() => {
+  const [first, ...rest] = chartPoints.value
+  if (!first) return null
+  return rest.reduce<ChartPoint>(
+    (acc, point) => (point.amount < acc.amount ? point : acc),
+    first,
+  )
+})
+
+const latestPoint = computed<ChartPoint | null>(() => {
+  const points = chartPoints.value
+  if (!points.length) return null
+  const lastIndex = points.length - 1
+  return points[lastIndex] ?? null
+})
+
+const bubbleStyle = (point: ChartPoint) => ({
+  left: `${point.x}px`,
+  top: `${point.y}px`,
+})
+
+const indicatorStyle = (point: ChartPoint) => ({
+  left: `${point.x}px`,
+  top: `${point.y}px`,
+})
+
+const pointPointClass = (label: string) => {
+  if (peakPoint.value && label === peakPoint.value.label) {
+    return 'is-peak'
+  }
+  if (lowPoint.value && label === lowPoint.value.label) {
+    return 'is-trough'
+  }
+  return ''
+}
 
 const formatXAxisDate = (label: string) => {
   if (!label) return '—'
@@ -3266,269 +3404,248 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 
-.sparkline {
+.trend-card {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1.5rem;
+  padding: 1.5rem 1.75rem 1.75rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: radial-gradient(circle at top, rgba(99, 102, 241, 0.18), rgba(15, 23, 42, 0.65));
+  position: relative;
+  overflow: hidden;
 }
 
-.spark-stats {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.trend-card::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 1.15rem;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  pointer-events: none;
 }
 
-.spark-stat {
-  padding: 0.75rem 0.9rem;
-  border-radius: 0.9rem;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.25);
+.trend-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.trend-card-header h4 {
+  font-size: 1.2rem;
+  margin: 0;
+  color: #e0e7ff;
+  letter-spacing: 0.02em;
+}
+
+.trend-card-header p {
+  margin: 0.35rem 0 0;
+  color: rgba(148, 163, 184, 0.8);
+  font-size: 0.9rem;
+}
+
+.trend-summary {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  min-height: 88px;
+  align-items: flex-end;
+  font-size: 0.9rem;
+  color: rgba(191, 219, 254, 0.9);
 }
 
-.spark-stat-label {
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: rgba(226, 232, 240, 0.65);
-}
-
-.spark-stat-value {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: #f8fafc;
+.trend-summary span {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-.spark-stat-sub {
-  font-size: 0.7rem;
-  color: rgba(226, 232, 240, 0.55);
-  letter-spacing: 0.03em;
+.trend-empty {
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.95rem;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 1rem;
 }
 
-.spark-stat.trend {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(14, 116, 144, 0.18));
-  border-color: rgba(125, 211, 252, 0.35);
-}
-
-.spark-stat.trend.up .spark-stat-value {
-  color: #34d399;
-}
-
-.spark-stat.trend.up .spark-stat-value::before {
-  content: '↑';
-  font-size: 0.85rem;
-}
-
-.spark-stat.trend.down .spark-stat-value {
-  color: #f87171;
-}
-
-.spark-stat.trend.down .spark-stat-value::before {
-  content: '↓';
-  font-size: 0.85rem;
-}
-
-.spark-stat.trend.flat .spark-stat-value {
-  color: #facc15;
-}
-
-.spark-stat.trend.flat .spark-stat-value::before {
-  content: '→';
-  font-size: 0.85rem;
-}
-
-.spark-chart {
-  display: flex;
-  gap: 1.4rem;
+.trend-visual {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.25rem;
   align-items: stretch;
-  height: 210px;
-  padding: 1rem 1.2rem 1.4rem;
-  border-radius: 1.1rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.18));
   position: relative;
-  overflow: visible;
 }
 
-.spark-rail {
+.trend-y-axis {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 2.4rem 0.75rem 0.6rem 0;
-  min-width: 82px;
+  padding: 0.5rem 1rem 2.25rem 0;
+  min-width: 72px;
 }
 
-.spark-rail::after {
+.trend-y-axis::after {
   content: '';
   position: absolute;
-  top: 2.4rem;
-  bottom: 0.6rem;
-  right: 0.3rem;
+  top: 0.5rem;
+  bottom: 2.25rem;
+  right: 0.4rem;
   width: 1px;
   background: linear-gradient(
     to bottom,
-    rgba(148, 163, 184, 0),
-    rgba(148, 163, 184, 0.45) 20%,
-    rgba(148, 163, 184, 0.45) 80%,
-    rgba(148, 163, 184, 0)
-  );
-  opacity: 0.85;
-}
-
-.spark-rail-tick {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  align-items: flex-start;
-}
-
-.spark-rail-value {
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: rgba(226, 232, 240, 0.85);
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 999px;
-  padding: 0.18rem 0.55rem;
-  box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.35);
-}
-
-.spark-bars {
-  position: relative;
-  flex: 1;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 1rem;
-  align-items: end;
-  padding: 2.4rem 0 0.6rem;
-  overflow: visible;
-}
-
-.spark-bars::before {
-  content: '';
-  position: absolute;
-  inset: 2.4rem 0 0.6rem;
-  background: repeating-linear-gradient(
-    to top,
-    rgba(148, 163, 184, 0.22),
-    rgba(148, 163, 184, 0.22) 1px,
-    transparent 1px,
-    transparent calc(25% - 1px)
-  );
-  pointer-events: none;
-  border-radius: 0.85rem;
-  z-index: 0;
-}
-
-.spark-bars::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0.6rem;
-  height: 2px;
-  background: linear-gradient(
-    to right,
     rgba(148, 163, 184, 0),
     rgba(148, 163, 184, 0.55) 20%,
     rgba(148, 163, 184, 0.55) 80%,
     rgba(148, 163, 184, 0)
   );
-  pointer-events: none;
-  z-index: 0;
 }
 
-.spark-bar {
-  position: relative;
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(37, 99, 235, 0.78));
-  border-radius: 0.9rem 0.9rem 0.45rem 0.45rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 0.95rem 0.45rem 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.25);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  z-index: 1;
-}
-
-.spark-bar.peak {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.98), rgba(56, 189, 248, 0.82));
-  box-shadow: 0 20px 36px rgba(56, 189, 248, 0.35);
-  border-color: rgba(224, 242, 254, 0.55);
-}
-
-.spark-bar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
-  pointer-events: none;
-}
-
-.spark-bar:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.32);
-}
-
-.spark-amount {
-  position: absolute;
-  top: -2.2rem;
-  left: 50%;
-  transform: translateX(-50%);
+.trend-y-tick {
   font-size: 0.82rem;
-  font-weight: 600;
-  color: rgba(15, 23, 42, 0.85);
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 999px;
-  padding: 0.22rem 0.65rem;
-  white-space: nowrap;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
-  z-index: 2;
-}
-
-.spark-x-axis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 0.9rem;
-}
-
-.spark-x-label {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  font-size: 0.78rem;
-  color: rgba(226, 232, 240, 0.78);
+  color: rgba(226, 232, 240, 0.9);
   letter-spacing: 0.02em;
 }
 
-.spark-x-label.peak .spark-x-date {
-  color: #38bdf8;
-  font-weight: 600;
-}
-
-.spark-x-label.peak .spark-x-week {
-  color: rgba(125, 211, 252, 0.85);
-}
-
-.spark-x-date {
+.trend-y-label {
+  position: absolute;
+  bottom: -1.75rem;
+  left: 0;
   font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.75);
+  letter-spacing: 0.08em;
 }
 
-.spark-x-week {
-  font-size: 0.72rem;
-  color: rgba(148, 163, 184, 0.85);
+.trend-plot {
+  position: relative;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.55), rgba(15, 23, 42, 0.25));
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: inset 0 0 32px rgba(15, 23, 42, 0.5);
+  overflow: visible;
+}
+
+.trend-plot svg {
+  display: block;
+}
+
+.trend-line {
+  fill: none;
+  stroke: rgba(99, 102, 241, 0.85);
+  stroke-width: 2.5;
+}
+
+.trend-point-group {
+  pointer-events: none;
+}
+
+.trend-point {
+  fill: #4f46e5;
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 2;
+  filter: drop-shadow(0 4px 8px rgba(79, 70, 229, 0.35));
+}
+
+.trend-point.is-peak {
+  fill: #0ea5e9;
+  filter: drop-shadow(0 6px 12px rgba(14, 165, 233, 0.45));
+}
+
+.trend-point.is-trough {
+  fill: #94a3b8;
+  filter: drop-shadow(0 4px 10px rgba(148, 163, 184, 0.35));
+}
+
+.trend-bubble {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  transform: translate(-50%, -110%);
+  white-space: nowrap;
+}
+
+.trend-bubble.trough {
+  transform: translate(-50%, 35%);
+  background: rgba(15, 23, 42, 0.75);
+}
+
+.trend-indicator {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  font-size: 0.82rem;
+  transform: translate(0.75rem, -50%);
+  white-space: nowrap;
+}
+
+.trend-indicator i {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid rgba(56, 189, 248, 0.8);
+}
+
+.trend-x-axis {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 1.25rem 0;
+  position: relative;
+}
+
+.trend-x-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.trend-x-label strong {
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.92);
+  letter-spacing: 0.02em;
+}
+
+.trend-x-label small {
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.7);
+}
+
+.trend-x-caption {
+  position: absolute;
+  right: -0.25rem;
+  bottom: -1.65rem;
+  font-size: 0.82rem;
+  color: rgba(148, 163, 184, 0.75);
+  letter-spacing: 0.08em;
 }
 
 .metric-list {
