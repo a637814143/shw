@@ -83,7 +83,12 @@
                     <strong class="spark-stat-value">
                       {{ formatCurrency(weeklyPeak.amount) }}
                     </strong>
-                    <span v-if="weeklyPeak.label" class="spark-stat-sub">{{ shortLabel(weeklyPeak.label) }}</span>
+                    <span v-if="weeklyPeak.label" class="spark-stat-sub">
+                      {{ formatXAxisDate(weeklyPeak.label) }}
+                      <template v-if="formatXAxisWeek(weeklyPeak.label)">
+                        · {{ formatXAxisWeek(weeklyPeak.label) }}
+                      </template>
+                    </span>
                   </div>
                   <div class="spark-stat trend" :class="trendDirection">
                     <span class="spark-stat-label">较昨日</span>
@@ -92,16 +97,33 @@
                   </div>
                 </div>
                 <div class="spark-chart">
-                  <div
-                    v-for="point in weeklySeries"
-                    :key="point.label"
-                    class="spark-bar"
-                    :class="{ peak: point.label === weeklyPeak.label }"
-                    :style="sparkStyle(point.amount)"
-                  >
-                    <span class="spark-amount">{{ formatCompactAmount(point.amount) }}</span>
-                    <span class="spark-label">{{ shortLabel(point.label) }}</span>
+                  <div class="spark-rail">
+                    <span v-for="tick in sparkTicks" :key="tick.label" class="spark-rail-tick">
+                      <span class="spark-rail-value">{{ tick.label }}</span>
+                    </span>
                   </div>
+                  <div class="spark-bars">
+                    <div
+                      v-for="point in weeklySeries"
+                      :key="point.label"
+                      class="spark-bar"
+                      :class="{ peak: point.label === weeklyPeak.label }"
+                      :style="sparkStyle(point.amount)"
+                    >
+                      <span class="spark-amount">{{ formatAxisAmount(point.amount) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="spark-x-axis">
+                  <span
+                    v-for="point in weeklySeries"
+                    :key="`label-${point.label}`"
+                    class="spark-x-label"
+                    :class="{ peak: point.label === weeklyPeak.label }"
+                  >
+                    <span class="spark-x-date">{{ formatXAxisDate(point.label) }}</span>
+                    <span class="spark-x-week">{{ formatXAxisWeek(point.label) }}</span>
+                  </span>
                 </div>
               </div>
             </article>
@@ -1490,22 +1512,6 @@ const formatCurrency = (value: number) => {
   return formatter.format(value)
 }
 
-const formatCompactAmount = (value: number) => {
-  if (!Number.isFinite(value) || value <= 0) {
-    return '0'
-  }
-  if (value >= 1000000) {
-    return `${(value / 1000000).toFixed(1)}m`
-  }
-  if (value >= 10000) {
-    return `${(value / 10000).toFixed(1)}万`
-  }
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}k`
-  }
-  return value.toFixed(value >= 100 ? 0 : 1)
-}
-
 const weeklyTotal = computed(() =>
   weeklySeries.value.reduce((sum, point) => sum + (Number.isFinite(point.amount) ? point.amount : 0), 0),
 )
@@ -1601,10 +1607,49 @@ const metricStyle = (count: number) => ({
   width: `${Math.max(6, Math.round((count / maxAppointment.value) * 100))}%`,
 })
 
-const shortLabel = (label: string) => {
+const axisCurrencyFormatter = new Intl.NumberFormat('zh-CN', {
+  style: 'currency',
+  currency: 'CNY',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+})
+
+const formatAxisAmount = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return axisCurrencyFormatter.format(0)
+  }
+  return axisCurrencyFormatter.format(Math.round(value))
+}
+
+const sparkTicks = computed(() => {
+  const steps = 4
+  const max = maxWeeklyAmount.value
+  const interval = max / steps
+  return Array.from({ length: steps + 1 }, (_, index) => {
+    const value = interval * (steps - index)
+    return { value, label: formatAxisAmount(value) }
+  })
+})
+
+const formatXAxisDate = (label: string) => {
+  if (!label) return '—'
+  const date = new Date(label)
+  if (Number.isNaN(date.getTime())) {
+    return label
+  }
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${month}/${day}`
+}
+
+const formatXAxisWeek = (label: string) => {
   if (!label) return ''
-  const parts = label.split('-')
-  return parts.length >= 2 ? `${parts[1]}/${parts[2] ?? ''}` : label
+  const date = new Date(label)
+  if (Number.isNaN(date.getTime())) {
+    return ''
+  }
+  const weekMap = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  return weekMap[date.getDay()] ?? ''
 }
 
 const formatDateTime = (value: string) => {
@@ -3298,42 +3343,96 @@ onUnmounted(() => {
 }
 
 .spark-chart {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 1rem;
-  align-items: end;
-  height: 190px;
-  padding: 1.1rem 1rem 1.6rem;
+  display: flex;
+  gap: 1.4rem;
+  align-items: stretch;
+  height: 210px;
+  padding: 1rem 1.2rem 1.4rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.45), rgba(15, 23, 42, 0.18));
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
-.spark-chart::before {
+.spark-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 2.4rem 0.75rem 0.6rem 0;
+  min-width: 82px;
+}
+
+.spark-rail::after {
   content: '';
   position: absolute;
-  inset: 1.1rem 1rem 1.6rem;
+  top: 2.4rem;
+  bottom: 0.6rem;
+  right: 0.3rem;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(148, 163, 184, 0),
+    rgba(148, 163, 184, 0.45) 20%,
+    rgba(148, 163, 184, 0.45) 80%,
+    rgba(148, 163, 184, 0)
+  );
+  opacity: 0.85;
+}
+
+.spark-rail-tick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
+}
+
+.spark-rail-value {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: rgba(226, 232, 240, 0.85);
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.35);
+}
+
+.spark-bars {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: end;
+  padding: 2.4rem 0 0.6rem;
+  overflow: visible;
+}
+
+.spark-bars::before {
+  content: '';
+  position: absolute;
+  inset: 2.4rem 0 0.6rem;
   background: repeating-linear-gradient(
     to top,
-    rgba(148, 163, 184, 0.24),
-    rgba(148, 163, 184, 0.24) 1px,
+    rgba(148, 163, 184, 0.22),
+    rgba(148, 163, 184, 0.22) 1px,
     transparent 1px,
     transparent calc(25% - 1px)
   );
-  opacity: 0.6;
   pointer-events: none;
   border-radius: 0.85rem;
   z-index: 0;
 }
 
-.spark-chart::after {
+.spark-bars::after {
   content: '';
   position: absolute;
-  left: 1rem;
-  right: 1rem;
-  bottom: 1.6rem;
+  left: 0;
+  right: 0;
+  bottom: 0.6rem;
   height: 2px;
   background: linear-gradient(
     to right,
@@ -3353,7 +3452,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: 0.85rem 0.45rem 0.75rem;
+  align-items: center;
+  padding: 0.95rem 0.45rem 0.8rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 16px 32px rgba(37, 99, 235, 0.25);
   overflow: hidden;
@@ -3381,23 +3481,54 @@ onUnmounted(() => {
 }
 
 .spark-amount {
+  position: absolute;
+  top: -2.2rem;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.82rem;
   font-weight: 600;
   color: rgba(15, 23, 42, 0.85);
   background: rgba(255, 255, 255, 0.95);
   border-radius: 999px;
-  padding: 0.22rem 0.55rem;
-  align-self: center;
-  margin-bottom: 0.5rem;
+  padding: 0.22rem 0.65rem;
+  white-space: nowrap;
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+  z-index: 2;
 }
 
-.spark-label {
-  font-size: 0.72rem;
-  color: rgba(226, 232, 240, 0.85);
-  text-align: center;
+.spark-x-axis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.spark-x-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: rgba(226, 232, 240, 0.78);
   letter-spacing: 0.02em;
-  margin-top: 0.45rem;
+}
+
+.spark-x-label.peak .spark-x-date {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.spark-x-label.peak .spark-x-week {
+  color: rgba(125, 211, 252, 0.85);
+}
+
+.spark-x-date {
+  font-size: 0.82rem;
+}
+
+.spark-x-week {
+  font-size: 0.72rem;
+  color: rgba(148, 163, 184, 0.85);
 }
 
 .metric-list {
