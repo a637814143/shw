@@ -69,14 +69,39 @@
                 <span class="insight-helper">金额单位：元</span>
               </header>
               <div class="sparkline" role="img" aria-label="七日充值趋势柱状图">
-                <div
-                  v-for="point in weeklySeries"
-                  :key="point.label"
-                  class="spark-bar"
-                  :style="sparkStyle(point.amount)"
-                >
-                  <span class="spark-amount">¥{{ point.amount.toFixed(2) }}</span>
-                  <span class="spark-label">{{ shortLabel(point.label) }}</span>
+                <div class="spark-stats">
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">7 日总计</span>
+                    <strong class="spark-stat-value">{{ formatCurrency(weeklyTotal) }}</strong>
+                  </div>
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">日均充值</span>
+                    <strong class="spark-stat-value">{{ formatCurrency(weeklyAverage) }}</strong>
+                  </div>
+                  <div class="spark-stat">
+                    <span class="spark-stat-label">最高单日</span>
+                    <strong class="spark-stat-value">
+                      {{ formatCurrency(weeklyPeak.amount) }}
+                    </strong>
+                    <span v-if="weeklyPeak.label" class="spark-stat-sub">{{ shortLabel(weeklyPeak.label) }}</span>
+                  </div>
+                  <div class="spark-stat trend" :class="trendDirection">
+                    <span class="spark-stat-label">较昨日</span>
+                    <strong class="spark-stat-value">{{ weeklyTrendText }}</strong>
+                    <span class="spark-stat-sub">{{ trendComparison }}</span>
+                  </div>
+                </div>
+                <div class="spark-chart">
+                  <div
+                    v-for="point in weeklySeries"
+                    :key="point.label"
+                    class="spark-bar"
+                    :class="{ peak: point.label === weeklyPeak.label }"
+                    :style="sparkStyle(point.amount)"
+                  >
+                    <span class="spark-amount">{{ formatCompactAmount(point.amount) }}</span>
+                    <span class="spark-label">{{ shortLabel(point.label) }}</span>
+                  </div>
                 </div>
               </div>
             </article>
@@ -1450,6 +1475,105 @@ const weeklySeries = computed(() => overview.value?.weeklyRecharge ?? [])
 const maxWeeklyAmount = computed(() => {
   const max = weeklySeries.value.reduce((acc, item) => Math.max(acc, item.amount), 0)
   return max <= 0 ? 1 : max
+})
+
+const formatCurrency = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return '¥0'
+  }
+  const formatter = new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency: 'CNY',
+    minimumFractionDigits: value >= 1000 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return formatter.format(value)
+}
+
+const formatCompactAmount = (value: number) => {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0'
+  }
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}m`
+  }
+  if (value >= 10000) {
+    return `${(value / 10000).toFixed(1)}万`
+  }
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1)}k`
+  }
+  return value.toFixed(value >= 100 ? 0 : 1)
+}
+
+const weeklyTotal = computed(() =>
+  weeklySeries.value.reduce((sum, point) => sum + (Number.isFinite(point.amount) ? point.amount : 0), 0),
+)
+
+const weeklyAverage = computed(() =>
+  weeklySeries.value.length > 0 ? weeklyTotal.value / weeklySeries.value.length : 0,
+)
+
+const weeklyPeak = computed(() => {
+  const [first, ...rest] = weeklySeries.value
+  if (!first) {
+    return { amount: 0, label: '' }
+  }
+  return rest.reduce(
+    (acc, point) => (point.amount > acc.amount ? { amount: point.amount, label: point.label } : acc),
+    { amount: first.amount, label: first.label },
+  )
+})
+
+const previousDayAmount = computed(() => {
+  const series = weeklySeries.value
+  if (series.length < 2) {
+    return 0
+  }
+  return series[series.length - 2]?.amount ?? 0
+})
+
+const latestDayAmount = computed(() => {
+  const series = weeklySeries.value
+  if (!series.length) {
+    return 0
+  }
+  return series[series.length - 1]?.amount ?? 0
+})
+
+const weeklyTrend = computed(() => {
+  if (weeklySeries.value.length < 2) {
+    return 0
+  }
+  const prev = previousDayAmount.value
+  const latest = latestDayAmount.value
+  if (prev === 0) {
+    return latest === 0 ? 0 : 1
+  }
+  return (latest - prev) / prev
+})
+
+const weeklyTrendText = computed(() => {
+  const value = weeklyTrend.value
+  if (!Number.isFinite(value) || value === 0) {
+    return '持平'
+  }
+  const formatted = Math.abs(value) >= 0.995 ? `${value > 0 ? '+' : '-'}100%+` : `${value > 0 ? '+' : '-'}${Math.abs(value * 100).toFixed(1)}%`
+  return formatted
+})
+
+const trendComparison = computed(() => {
+  if (weeklySeries.value.length < 2) {
+    return '暂无对比数据'
+  }
+  return `${formatCurrency(previousDayAmount.value)} → ${formatCurrency(latestDayAmount.value)}`
+})
+
+const trendDirection = computed(() => {
+  const value = weeklyTrend.value
+  if (value > 0) return 'up'
+  if (value < 0) return 'down'
+  return 'flat'
 })
 
 const appointmentMetrics = computed(() => overview.value?.appointmentMetrics ?? [])
@@ -3098,11 +3222,87 @@ onUnmounted(() => {
 }
 
 .sparkline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.spark-stats {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.spark-stat {
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 88px;
+}
+
+.spark-stat-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.spark-stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.spark-stat-sub {
+  font-size: 0.7rem;
+  color: rgba(226, 232, 240, 0.55);
+  letter-spacing: 0.03em;
+}
+
+.spark-stat.trend {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(14, 116, 144, 0.18));
+  border-color: rgba(125, 211, 252, 0.35);
+}
+
+.spark-stat.trend.up .spark-stat-value {
+  color: #34d399;
+}
+
+.spark-stat.trend.up .spark-stat-value::before {
+  content: '↑';
+  font-size: 0.85rem;
+}
+
+.spark-stat.trend.down .spark-stat-value {
+  color: #f87171;
+}
+
+.spark-stat.trend.down .spark-stat-value::before {
+  content: '↓';
+  font-size: 0.85rem;
+}
+
+.spark-stat.trend.flat .spark-stat-value {
+  color: #facc15;
+}
+
+.spark-stat.trend.flat .spark-stat-value::before {
+  content: '→';
+  font-size: 0.85rem;
+}
+
+.spark-chart {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1rem;
   align-items: end;
-  height: 180px;
+  height: 190px;
   padding: 1.1rem 1rem 1.6rem;
   border-radius: 1.1rem;
   border: 1px solid rgba(148, 163, 184, 0.35);
@@ -3111,7 +3311,7 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.sparkline::before {
+.spark-chart::before {
   content: '';
   position: absolute;
   inset: 1.1rem 1rem 1.6rem;
@@ -3128,7 +3328,7 @@ onUnmounted(() => {
   z-index: 0;
 }
 
-.sparkline::after {
+.spark-chart::after {
   content: '';
   position: absolute;
   left: 1rem;
@@ -3161,6 +3361,12 @@ onUnmounted(() => {
   z-index: 1;
 }
 
+.spark-bar.peak {
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.98), rgba(56, 189, 248, 0.82));
+  box-shadow: 0 20px 36px rgba(56, 189, 248, 0.35);
+  border-color: rgba(224, 242, 254, 0.55);
+}
+
 .spark-bar::before {
   content: '';
   position: absolute;
@@ -3175,12 +3381,12 @@ onUnmounted(() => {
 }
 
 .spark-amount {
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.9);
-  background: rgba(255, 255, 255, 0.92);
+  color: rgba(15, 23, 42, 0.85);
+  background: rgba(255, 255, 255, 0.95);
   border-radius: 999px;
-  padding: 0.2rem 0.45rem;
+  padding: 0.22rem 0.55rem;
   align-self: center;
   margin-bottom: 0.5rem;
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
