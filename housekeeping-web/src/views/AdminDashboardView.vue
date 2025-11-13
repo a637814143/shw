@@ -68,7 +68,7 @@
                 <h3>近 7 日充值趋势</h3>
                 <span class="insight-helper">金额单位：元</span>
               </header>
-              <div class="sparkline" role="img" aria-label="七日充值趋势柱状图">
+              <div class="sparkline" role="img" aria-label="七日充值趋势折线图">
                 <div class="spark-stats">
                   <div class="spark-stat">
                     <span class="spark-stat-label">7 日总计</span>
@@ -102,16 +102,63 @@
                       <span class="spark-rail-value">{{ tick.label }}</span>
                     </span>
                   </div>
-                  <div class="spark-bars">
-                    <div
-                      v-for="point in weeklySeries"
-                      :key="point.label"
-                      class="spark-bar"
-                      :class="{ peak: point.label === weeklyPeak.label }"
-                      :style="sparkStyle(point.amount)"
+                  <div class="spark-graph">
+                    <svg
+                      class="spark-svg"
+                      :viewBox="`0 0 ${sparkSvgWidth} ${sparkSvgHeight}`"
+                      preserveAspectRatio="none"
+                      role="presentation"
+                      aria-hidden="true"
                     >
-                      <span class="spark-amount">{{ formatAxisAmount(point.amount) }}</span>
-                    </div>
+                      <defs>
+                        <linearGradient :id="sparkAreaGradientId" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stop-color="rgba(56, 189, 248, 0.4)" />
+                          <stop offset="65%" stop-color="rgba(14, 116, 144, 0.15)" />
+                          <stop offset="100%" stop-color="rgba(8, 47, 73, 0)" />
+                        </linearGradient>
+                        <linearGradient :id="sparkLineGradientId" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stop-color="#38bdf8" />
+                          <stop offset="50%" stop-color="#60a5fa" />
+                          <stop offset="100%" stop-color="#6366f1" />
+                        </linearGradient>
+                      </defs>
+                      <path
+                        v-if="sparkAreaPath"
+                        class="spark-area"
+                        :d="sparkAreaPath"
+                        :fill="`url(#${sparkAreaGradientId})`"
+                      />
+                      <path
+                        v-if="sparkLinePath"
+                        class="spark-line"
+                        :d="sparkLinePath"
+                        :stroke="`url(#${sparkLineGradientId})`"
+                      />
+                      <g v-if="sparkLinePoints.length" class="spark-circles">
+                        <circle
+                          v-for="point in sparkLinePoints"
+                          :key="`dot-${point.label}`"
+                          class="spark-dot"
+                          :class="{ peak: point.isPeak }"
+                          :cx="point.svgX"
+                          :cy="point.svgY"
+                          :r="point.isPeak ? 2.4 : 1.8"
+                        />
+                      </g>
+                      <g v-if="sparkLinePoints.length" class="spark-labels">
+                        <text
+                          v-for="point in sparkLinePoints"
+                          :key="`label-${point.label}`"
+                          class="spark-label"
+                          text-anchor="middle"
+                          dominant-baseline="central"
+                          :x="point.svgX"
+                          :y="point.textY"
+                        >
+                          {{ formatAxisAmount(point.amount) }}
+                        </text>
+                      </g>
+                    </svg>
                   </div>
                 </div>
                 <div class="spark-x-axis">
@@ -1493,24 +1540,38 @@ const normalUserCount = computed(
   () => Math.max(0, adminStats.value.totalUsers - adminStats.value.totalCompanies - adminStats.value.totalAdmins),
 )
 
+interface SparkLinePoint {
+  label: string
+  amount: number
+  svgX: number
+  svgY: number
+  textY: number
+  isPeak: boolean
+}
+
+const sparkSvgWidth = 100
+const sparkSvgHeight = 60
+const sparkSvgPadding = 6
+const sparkChartWidth = sparkSvgWidth - sparkSvgPadding * 2
+const sparkChartHeight = sparkSvgHeight - sparkSvgPadding * 2
+const sparkAreaGradientId = `spark-area-${Math.random().toString(36).slice(2, 9)}`
+const sparkLineGradientId = `spark-stroke-${Math.random().toString(36).slice(2, 9)}`
+
 const weeklySeries = computed(() => overview.value?.weeklyRecharge ?? [])
 const maxWeeklyAmount = computed(() => {
   const max = weeklySeries.value.reduce((acc, item) => Math.max(acc, item.amount), 0)
   return max <= 0 ? 1 : max
 })
 
-const formatCurrency = (value: number) => {
-  if (!Number.isFinite(value)) {
-    return '¥0'
+const minWeeklyAmount = computed(() => {
+  if (!weeklySeries.value.length) {
+    return 0
   }
-  const formatter = new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency: 'CNY',
-    minimumFractionDigits: value >= 1000 ? 0 : 2,
-    maximumFractionDigits: 2,
-  })
-  return formatter.format(value)
-}
+  return weeklySeries.value.reduce(
+    (acc, item) => (Number.isFinite(item.amount) ? Math.min(acc, item.amount) : acc),
+    Number.POSITIVE_INFINITY,
+  )
+})
 
 const weeklyTotal = computed(() =>
   weeklySeries.value.reduce((sum, point) => sum + (Number.isFinite(point.amount) ? point.amount : 0), 0),
@@ -1530,6 +1591,70 @@ const weeklyPeak = computed(() => {
     { amount: first.amount, label: first.label },
   )
 })
+
+const sparkLinePoints = computed<SparkLinePoint[]>(() => {
+  const series = weeklySeries.value
+  if (!series.length) {
+    return []
+  }
+  const baseline = sparkSvgHeight - sparkSvgPadding
+  const topLimit = sparkSvgPadding
+  const minAmount = Number.isFinite(minWeeklyAmount.value) ? minWeeklyAmount.value : 0
+  const rangeBase = Math.max(maxWeeklyAmount.value - minAmount, 0)
+  const spacing = series.length > 1 ? sparkChartWidth / (series.length - 1) : 0
+
+  return series.map((item, index) => {
+    const amount = Number.isFinite(item.amount) ? item.amount : 0
+    const ratio = rangeBase <= 0 ? 0.5 : (amount - minAmount) / rangeBase
+    const normalized = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0.5
+    const svgX = sparkSvgPadding + (series.length > 1 ? index * spacing : sparkChartWidth / 2)
+    const svgY = baseline - normalized * sparkChartHeight
+    const labelY = Math.max(svgY - 5, topLimit)
+    return {
+      label: item.label,
+      amount,
+      svgX: Number(svgX.toFixed(2)),
+      svgY: Number(svgY.toFixed(2)),
+      textY: Number(labelY.toFixed(2)),
+      isPeak: item.label === weeklyPeak.value.label,
+    }
+  })
+})
+
+const sparkLinePath = computed(() => {
+  const points = sparkLinePoints.value
+  if (!points.length) {
+    return ''
+  }
+  return points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.svgX} ${point.svgY}`)
+    .join(' ')
+})
+
+const sparkAreaPath = computed(() => {
+  const points = sparkLinePoints.value
+  if (!points.length) {
+    return ''
+  }
+  const baseline = sparkSvgHeight - sparkSvgPadding
+  const start = `M ${points[0].svgX} ${baseline}`
+  const end = `L ${points[points.length - 1].svgX} ${baseline} Z`
+  const body = points.map((point) => `L ${point.svgX} ${point.svgY}`)
+  return [start, ...body, end].join(' ')
+})
+
+const formatCurrency = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return '¥0'
+  }
+  const formatter = new Intl.NumberFormat('zh-CN', {
+    style: 'currency',
+    currency: 'CNY',
+    minimumFractionDigits: value >= 1000 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return formatter.format(value)
+}
 
 const previousDayAmount = computed(() => {
   const series = weeklySeries.value
@@ -1598,10 +1723,6 @@ const allRefundsSelected = computed(
     selectableRefunds.value.length > 0 &&
     selectableRefunds.value.every((order) => selectedRefundIds.value.has(order.id)),
 )
-
-const sparkStyle = (amount: number) => ({
-  height: `${Math.max(12, Math.round((amount / maxWeeklyAmount.value) * 100))}%`,
-})
 
 const metricStyle = (count: number) => ({
   width: `${Math.max(6, Math.round((count / maxAppointment.value) * 100))}%`,
@@ -3399,101 +3520,89 @@ onUnmounted(() => {
   box-shadow: inset 0 0 8px rgba(15, 23, 42, 0.35);
 }
 
-.spark-bars {
+.spark-graph {
   position: relative;
   flex: 1;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 1rem;
-  align-items: end;
-  padding: 2.4rem 0 0.6rem;
-  overflow: visible;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 1.2rem 1rem 0.75rem;
+  border-radius: 0.95rem;
+  background: linear-gradient(180deg, rgba(30, 64, 175, 0.16), rgba(30, 64, 175, 0.05));
+  overflow: hidden;
 }
 
-.spark-bars::before {
+.spark-graph::before {
   content: '';
   position: absolute;
-  inset: 2.4rem 0 0.6rem;
+  inset: 0.6rem 0.4rem;
   background: repeating-linear-gradient(
     to top,
-    rgba(148, 163, 184, 0.22),
-    rgba(148, 163, 184, 0.22) 1px,
+    rgba(148, 163, 184, 0.18),
+    rgba(148, 163, 184, 0.18) 1px,
     transparent 1px,
     transparent calc(25% - 1px)
   );
+  border-radius: inherit;
   pointer-events: none;
-  border-radius: 0.85rem;
-  z-index: 0;
+  opacity: 0.75;
 }
 
-.spark-bars::after {
+.spark-graph::after {
   content: '';
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0.6rem;
-  height: 2px;
+  left: 1.1rem;
+  right: 1.1rem;
+  bottom: 0.45rem;
+  height: 1.5px;
   background: linear-gradient(
     to right,
     rgba(148, 163, 184, 0),
-    rgba(148, 163, 184, 0.55) 20%,
-    rgba(148, 163, 184, 0.55) 80%,
+    rgba(148, 163, 184, 0.6) 25%,
+    rgba(148, 163, 184, 0.6) 75%,
     rgba(148, 163, 184, 0)
   );
   pointer-events: none;
-  z-index: 0;
 }
 
-.spark-bar {
-  position: relative;
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.95), rgba(37, 99, 235, 0.78));
-  border-radius: 0.9rem 0.9rem 0.45rem 0.45rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 0.95rem 0.45rem 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow: 0 16px 32px rgba(37, 99, 235, 0.25);
-  overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  z-index: 1;
+.spark-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.spark-bar.peak {
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.98), rgba(56, 189, 248, 0.82));
-  box-shadow: 0 20px 36px rgba(56, 189, 248, 0.35);
-  border-color: rgba(224, 242, 254, 0.55);
+.spark-area {
+  fill-opacity: 1;
 }
 
-.spark-bar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0));
-  pointer-events: none;
+.spark-line {
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 8px 16px rgba(37, 99, 235, 0.35));
 }
 
-.spark-bar:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.32);
+.spark-circles circle {
+  fill: #38bdf8;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.85;
+  transition: transform 0.2s ease, fill 0.2s ease;
 }
 
-.spark-amount {
-  position: absolute;
-  top: -2.2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.82rem;
+.spark-circles circle.peak {
+  fill: #facc15;
+  stroke: rgba(34, 211, 238, 0.85);
+}
+
+.spark-labels text {
+  fill: rgba(226, 232, 240, 0.9);
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.85);
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 999px;
-  padding: 0.22rem 0.65rem;
-  white-space: nowrap;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
-  z-index: 2;
+  font-size: 3.4px;
+  letter-spacing: 0.35px;
+  paint-order: stroke;
+  stroke: rgba(15, 23, 42, 0.35);
+  stroke-width: 0.6px;
 }
 
 .spark-x-axis {
