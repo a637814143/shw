@@ -3228,9 +3228,9 @@ onUnmounted(() => {
 }
 
 .overview-grid {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .insight-card {
