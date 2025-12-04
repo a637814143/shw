@@ -266,7 +266,7 @@
                   type="button"
                   class="category-tab"
                   :class="{ active: activeServiceCategoryId === null }"
-                  @click="handleSelectServiceCategory(null)"
+                  @click="resetServiceFilters"
                 >
                   全部
                 </button>
@@ -1425,6 +1425,12 @@ const loadServiceCategories = async () => {
   } finally {
     serviceCategoriesLoading.value = false
   }
+}
+
+const resetServiceFilters = () => {
+  serviceSearch.value = ''
+  activeServiceCategoryId.value = null
+  applyServiceFilter()
 }
 
 const handleSelectServiceCategory = (categoryId: number | null) => {
