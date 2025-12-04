@@ -39,6 +39,9 @@ public class ServiceOrder {
     @Column(name = "scheduled_at", nullable = false)
     private Instant scheduledAt;
 
+    @Column(name = "scheduled_end_at", nullable = false)
+    private Instant scheduledEndAt;
+
     @Column(name = "special_request", length = 500)
     private String specialRequest;
 

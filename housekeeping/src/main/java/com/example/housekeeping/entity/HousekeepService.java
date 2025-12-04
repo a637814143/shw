@@ -44,4 +44,7 @@ public class HousekeepService {
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
 }

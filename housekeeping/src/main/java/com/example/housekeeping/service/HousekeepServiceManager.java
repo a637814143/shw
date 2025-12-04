@@ -108,6 +108,7 @@ public class HousekeepServiceManager {
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
         service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setDurationMinutes(normalizeDuration(request.getDurationMinutes()));
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -130,6 +131,7 @@ public class HousekeepServiceManager {
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
         service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setDurationMinutes(normalizeDuration(request.getDurationMinutes()));
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -192,6 +194,7 @@ public class HousekeepServiceManager {
             service.getPrice(),
             service.getContact(),
             formatServiceTime(service),
+            service.getDurationMinutes(),
             service.getDescription(),
             service.getCompany().getId(),
             service.getCompany().getUsername(),
@@ -239,6 +242,13 @@ public class HousekeepServiceManager {
         }
         String trimmed = serviceTime.trim();
         return trimmed.isEmpty() ? "按需预约" : trimmed;
+    }
+
+    private Integer normalizeDuration(Integer durationMinutes) {
+        if (durationMinutes == null) {
+            return null;
+        }
+        return Math.max(1, durationMinutes);
     }
 
     private String formatServiceTime(HousekeepService service) {
