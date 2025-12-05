@@ -238,7 +238,9 @@ public class HousekeepServiceManager {
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
             availableStaffForService(service),
-            service.getStatus() == null ? null : service.getStatus().name(),
+            service.getStatus() == null
+                ? HousekeepServiceStatus.PENDING.name()
+                : service.getStatus().name(),
             service.getRejectionReason()
         );
     }

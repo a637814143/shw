@@ -99,7 +99,11 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
     @Query("""
         SELECT s FROM HousekeepService s
         WHERE (:category IS NULL OR s.category = :category)
-          AND (:status IS NULL OR s.status = :status)
+          AND (
+            :status IS NULL
+            OR s.status = :status
+            OR (s.status IS NULL AND :status = com.example.housekeeping.enums.HousekeepServiceStatus.PENDING)
+          )
           AND (
             :keyword IS NULL OR
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
