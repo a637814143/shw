@@ -30,7 +30,7 @@ public class AdminServiceApprovalController {
         @RequestParam(value = "categoryId", required = false) Long categoryId,
         @RequestParam(value = "status", required = false) String status
     ) {
-        HousekeepServiceStatus statusEnum = parseStatusOrDefault(status);
+        HousekeepServiceStatus statusEnum = parseStatusOrNull(status);
         return Result.success(housekeepServiceManager.listForAdmin(keyword, categoryId, statusEnum));
     }
 
@@ -45,14 +45,14 @@ public class AdminServiceApprovalController {
         );
     }
 
-    private HousekeepServiceStatus parseStatusOrDefault(String raw) {
+    private HousekeepServiceStatus parseStatusOrNull(String raw) {
         if (raw == null || raw.isBlank()) {
-            return HousekeepServiceStatus.PENDING;
+            return null;
         }
         try {
             return HousekeepServiceStatus.valueOf(raw.trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
-            return HousekeepServiceStatus.PENDING;
+            return null;
         }
     }
 }
