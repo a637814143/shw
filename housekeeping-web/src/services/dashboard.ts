@@ -61,6 +61,8 @@ export type ServiceOrderStatus =
   | 'REFUND_APPROVED'
   | 'REFUND_REJECTED'
 
+export type HousekeepServiceStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
 export interface HousekeepServiceItem {
   id: number
   name: string
@@ -74,6 +76,8 @@ export interface HousekeepServiceItem {
   categoryId?: number | null
   categoryName?: string | null
   availableStaffCount: number
+  status?: HousekeepServiceStatus | null
+  rejectionReason?: string | null
 }
 
 export interface CompanyServicePage {
@@ -185,6 +189,11 @@ export interface CompanyServicePayload {
   serviceTime: string
   description?: string
   categoryId: number
+}
+
+export interface ServiceApprovalPayload {
+  approve: boolean
+  reason?: string
 }
 
 export interface RefundDecisionPayload {
@@ -894,6 +903,36 @@ export const fetchAdminUsers = async (params?: { keyword?: string }): Promise<Us
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<UserAccountItem[]>(response)
+}
+
+export const fetchAdminServices = async (params?: {
+  keyword?: string
+  categoryId?: number
+  status?: HousekeepServiceStatus
+}): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/admin/services'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
+  }
+  if (params?.status) {
+    url.searchParams.set('status', params.status)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<HousekeepServiceItem[]>(response)
+}
+
+export const reviewAdminService = async (
+  serviceId: number,
+  payload: ServiceApprovalPayload,
+): Promise<HousekeepServiceItem> => {
+  const response = await fetch(buildUrl(`/api/admin/services/${serviceId}/review`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<HousekeepServiceItem>(response)
 }
 
 export const updateAdminWallet = async (

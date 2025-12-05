@@ -28,14 +28,20 @@ DROP TABLE IF EXISTS `housekeep_service`;
 CREATE TABLE `housekeep_service` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
   `company_id` bigint NOT NULL COMMENT '所属家政公司',
+  `category_id` bigint DEFAULT NULL COMMENT '服务分类',
   `name` varchar(200) NOT NULL COMMENT '服务名称',
   `unit` varchar(50) NOT NULL COMMENT '计价单位',
   `price` decimal(12,2) NOT NULL COMMENT '服务价格',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
+  `service_time` varchar(100) NOT NULL DEFAULT '按需预约' COMMENT '服务时段或耗时',
   `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
+  `status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '审核状态',
+  `rejection_reason` varchar(500) DEFAULT NULL COMMENT '驳回原因',
   PRIMARY KEY (`id`),
   KEY `idx_company` (`company_id`),
-  CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`)
+  KEY `idx_service_category` (`category_id`),
+  CONSTRAINT `fk_service_company` FOREIGN KEY (`company_id`) REFERENCES `user_all` (`id`),
+  CONSTRAINT `fk_service_category` FOREIGN KEY (`category_id`) REFERENCES `service_category` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家政公司发布的服务';
 
 DROP TABLE IF EXISTS `service_order`;

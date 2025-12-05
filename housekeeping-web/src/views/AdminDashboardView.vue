@@ -541,6 +541,97 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'serviceAudit'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务审核</h2>
+              <p>审核家政公司新增的服务，只有通过的服务才会向用户展示。</p>
+            </div>
+            <div class="user-actions audit-actions">
+              <label class="visually-hidden" for="audit-search">搜索服务</label>
+              <input
+                id="audit-search"
+                v-model="auditSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务名称、公司或联系方式"
+                :disabled="auditLoading"
+              />
+              <select v-model="auditStatus" :disabled="auditLoading" aria-label="按审核状态筛选">
+                <option v-for="option in auditStatusOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </select>
+              <select v-model="auditCategoryFilter" :disabled="auditLoading" aria-label="按分类筛选">
+                <option value="all">全部分类</option>
+                <option v-for="category in serviceCategories" :key="category.id" :value="category.id">
+                  {{ category.name }}
+                </option>
+              </select>
+              <button type="button" class="ghost-button" @click="loadAuditServices" :disabled="auditLoading">
+                {{ auditLoading ? '同步中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+
+          <div v-if="auditLoading" class="loading-state">正在加载待审核的服务…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务名称</th>
+                  <th>所属公司</th>
+                  <th>分类</th>
+                  <th>价格</th>
+                  <th>联系方式</th>
+                  <th>状态</th>
+                  <th>描述</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in auditServices" :key="item.id">
+                  <td>
+                    <strong>{{ item.name }}</strong>
+                  </td>
+                  <td>{{ item.companyName }}</td>
+                  <td>{{ item.categoryName || '—' }}</td>
+                  <td>¥{{ item.price.toFixed(2) }}</td>
+                  <td>{{ item.contact }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${(item.status || 'APPROVED').toLowerCase()}`">
+                      {{ serviceStatusLabel(item.status) }}
+                    </span>
+                    <div v-if="item.status === 'REJECTED' && item.rejectionReason" class="order-subtext">
+                      （{{ item.rejectionReason }}）
+                    </div>
+                  </td>
+                  <td>{{ item.description || '—' }}</td>
+                  <td class="table-actions">
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="auditLoading || item.status === 'APPROVED'"
+                      @click="handleApproveService(item)"
+                    >
+                      通过
+                    </button>
+                    <button type="button" class="link-button danger" :disabled="auditLoading" @click="handleRejectService(item)">
+                      驳回
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!auditServices.length">
+                  <td colspan="8" class="empty-row">
+                    <span v-if="hasAuditFilter">未找到匹配的服务，请调整筛选条件。</span>
+                    <span v-else>暂无待审核的服务。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'categories'" class="panel">
           <header class="panel-header">
             <div>
@@ -1068,10 +1159,12 @@ import {
   deleteAdminServiceCategory,
   deleteAdminServiceCategories,
   fetchAdminFavorites,
+  fetchAdminServices,
   fetchAdminOrders,
   fetchAdminOverview,
   fetchAdminRefunds,
   deleteAdminRefunds,
+  reviewAdminService,
   fetchAdminTransactions,
   fetchAdminServiceCategories,
   fetchCurrentAccount,
@@ -1096,7 +1189,10 @@ import {
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
   type DashboardTipItem,
+  type HousekeepServiceItem,
+  type HousekeepServiceStatus,
   type ServiceFavoriteItem,
+  type ServiceApprovalPayload,
   type ServiceOrderItem,
   type ServiceCategoryItem,
   type ServiceCategoryPayload,
@@ -1113,6 +1209,7 @@ type SectionKey =
   | 'ledger'
   | 'transactions'
   | 'favorites'
+  | 'serviceAudit'
   | 'categories'
   | 'content'
   | 'refunds'
@@ -1132,6 +1229,7 @@ const sections: SectionMeta[] = [
   { key: 'ledger', icon: '💼', label: '订单管理' },
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
+  { key: 'serviceAudit', icon: '✅', label: '服务审核' },
   { key: 'categories', icon: '🗂️', label: '服务分类' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
   { key: 'refunds', icon: '💰', label: '退款审批' },
@@ -1169,6 +1267,13 @@ const favoritesLoading = ref(false)
 const favoriteSearch = ref('')
 const selectedFavoriteIds = ref<Set<number>>(new Set())
 let favoriteSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+const auditServices = ref<HousekeepServiceItem[]>([])
+const auditLoading = ref(false)
+const auditSearch = ref('')
+const auditStatus = ref<HousekeepServiceStatus | 'ALL'>('PENDING')
+const auditCategoryFilter = ref<number | 'all'>('all')
+let auditSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const serviceCategories = ref<ServiceCategoryItem[]>([])
 const categoryLoading = ref(false)
@@ -1236,6 +1341,26 @@ const allFavoritesSelected = computed(
 )
 const selectedFavoriteCount = computed(() => selectedFavoriteIds.value.size)
 const hasFavoriteSelection = computed(() => selectedFavoriteIds.value.size > 0)
+const hasAuditFilter = computed(
+  () => auditSearch.value.trim().length > 0 || auditCategoryFilter.value !== 'all' || auditStatus.value !== 'PENDING',
+)
+
+const auditStatusOptions: { value: HousekeepServiceStatus | 'ALL'; label: string }[] = [
+  { value: 'PENDING', label: '待审核' },
+  { value: 'APPROVED', label: '审核通过' },
+  { value: 'REJECTED', label: '已驳回' },
+  { value: 'ALL', label: '全部' },
+]
+
+const serviceStatusLabel = (status?: HousekeepServiceStatus | null) => {
+  if (!status || status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return '已驳回'
+  }
+  return '待审核'
+}
 
 const carousels = ref<DashboardCarouselItem[]>([])
 const tips = ref<DashboardTipItem[]>([])
@@ -1764,6 +1889,8 @@ const switchSection = (key: SectionKey) => {
     loadTransactions()
   } else if (key === 'favorites') {
     loadFavorites()
+  } else if (key === 'serviceAudit') {
+    loadAuditServices()
   } else if (key === 'categories') {
     loadAdminCategories()
   } else if (key === 'content') {
@@ -1854,6 +1981,56 @@ const loadFavorites = async () => {
     console.error(error)
   } finally {
     favoritesLoading.value = false
+  }
+}
+
+const loadAuditServices = async () => {
+  auditLoading.value = true
+  try {
+    const keyword = auditSearch.value.trim()
+    const params: { keyword?: string; categoryId?: number; status?: HousekeepServiceStatus } = {}
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (auditCategoryFilter.value !== 'all') {
+      params.categoryId = auditCategoryFilter.value
+    }
+    if (auditStatus.value !== 'ALL') {
+      params.status = auditStatus.value
+    }
+    auditServices.value = await fetchAdminServices(params)
+  } catch (error) {
+    console.error(error)
+    auditServices.value = []
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+const handleApproveService = async (item: HousekeepServiceItem) => {
+  try {
+    await reviewAdminService(item.id, { approve: true })
+    await loadAuditServices()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleRejectService = async (item: HousekeepServiceItem) => {
+  const reason = window.prompt('请输入驳回理由', item.rejectionReason ?? '')
+  if (reason === null) {
+    return
+  }
+  const trimmed = reason.trim()
+  if (!trimmed) {
+    window.alert('驳回理由不能为空')
+    return
+  }
+  try {
+    await reviewAdminService(item.id, { approve: false, reason: trimmed })
+    await loadAuditServices()
+  } catch (error) {
+    console.error(error)
   }
 }
 
@@ -2139,6 +2316,24 @@ watch(favoriteSearch, () => {
     await loadFavorites()
     favoriteSearchTimer = null
   }, 300)
+})
+
+watch(auditSearch, () => {
+  if (auditSearchTimer) {
+    clearTimeout(auditSearchTimer)
+  }
+  auditSearchTimer = setTimeout(async () => {
+    await loadAuditServices()
+    auditSearchTimer = null
+  }, 300)
+})
+
+watch(auditStatus, async () => {
+  await loadAuditServices()
+})
+
+watch(auditCategoryFilter, async () => {
+  await loadAuditServices()
 })
 
 watch(filteredCategories, () => {
@@ -2744,6 +2939,7 @@ onMounted(async () => {
     loadAdminAccount(),
     loadOrderLedger(),
     loadAdminCategories(),
+    loadAuditServices(),
   ])
 })
 
@@ -2755,6 +2951,10 @@ onUnmounted(() => {
   if (refundSearchTimer) {
     clearTimeout(refundSearchTimer)
     refundSearchTimer = null
+  }
+  if (auditSearchTimer) {
+    clearTimeout(auditSearchTimer)
+    auditSearchTimer = null
   }
   if (carouselSearchTimer) {
     clearTimeout(carouselSearchTimer)
@@ -3199,6 +3399,21 @@ onUnmounted(() => {
 }
 
 .status-refund_requested {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+}
+
+.status-approved {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.status-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+}
+
+.status-rejected {
   background: rgba(248, 113, 113, 0.2);
   color: #fca5a5;
 }

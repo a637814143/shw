@@ -5,6 +5,7 @@ import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceFavorite;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.ServiceFavoriteRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,9 @@ public class ServiceFavoriteService {
         UserAll user = ensureUser();
         HousekeepService service = housekeepServiceRepository.findById(serviceId)
             .orElseThrow(() -> new RuntimeException("服务不存在"));
+        if (service.getStatus() != null && service.getStatus() != HousekeepServiceStatus.APPROVED) {
+            throw new RuntimeException("服务尚未审核通过，暂不可收藏");
+        }
         if (serviceFavoriteRepository.findByUserAndService(user, service).isPresent()) {
             throw new RuntimeException("已收藏该服务");
         }

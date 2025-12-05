@@ -12,6 +12,7 @@ import com.example.housekeeping.entity.ServiceOrder;
 import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.enums.ServiceOrderStatus;
 import com.example.housekeeping.repository.CompanyMessageRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
@@ -65,6 +66,10 @@ public class ServiceOrderService {
 
         HousekeepService service = housekeepServiceRepository.findById(request.getServiceId())
             .orElseThrow(() -> new RuntimeException("服务不存在"));
+
+        if (service.getStatus() != null && service.getStatus() != HousekeepServiceStatus.APPROVED) {
+            throw new RuntimeException("服务尚未审核通过，暂不可下单");
+        }
 
         BigDecimal price = service.getPrice();
         if (price == null) {

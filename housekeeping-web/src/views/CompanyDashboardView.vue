@@ -188,6 +188,7 @@
                   <th>联系方式</th>
                   <th>服务时长</th>
                   <th>描述</th>
+                  <th>审核状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -212,16 +213,24 @@
                   <td>{{ item.contact }}</td>
                   <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${(item.status || 'APPROVED').toLowerCase()}`">
+                      {{ serviceStatusLabel(item) }}
+                    </span>
+                    <div v-if="item.status === 'REJECTED' && item.rejectionReason" class="order-subtext">
+                      （{{ item.rejectionReason }}）
+                    </div>
+                  </td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="8" class="empty-row">服务加载中…</td>
+                  <td colspan="9" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -894,6 +903,17 @@ const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((it
 const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const serviceStatusLabel = (item: HousekeepServiceItem) => {
+  const status = item.status ?? 'APPROVED'
+  if (status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return '已驳回'
+  }
+  return '待审核'
+}
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
@@ -2870,6 +2890,30 @@ onUnmounted(() => {
 .service-hint {
   color: rgba(15, 23, 42, 0.55);
   font-size: 0.9rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.status-approved {
+  background: #e6f7ed;
+  color: #0b8a42;
+}
+
+.status-pending {
+  background: #fff7e6;
+  color: #b15d00;
+}
+
+.status-rejected {
+  background: #fff1f0;
+  color: #c62828;
 }
 
 @media (max-width: 1024px) {
