@@ -127,7 +127,7 @@ public class PublicPaymentController {
             "  </div>" +
             "  <script>" +
             "    const params = new URLSearchParams(window.location.search);" +
-            "    const returnUrl = params.get('return') || '/';" +
+            "    const returnUrl = params.get('return') || window.location.href;" +
             "    function submitDecision(value) {" +
             "      fetch(window.location.pathname, {" +
             "        method: 'POST'," +
