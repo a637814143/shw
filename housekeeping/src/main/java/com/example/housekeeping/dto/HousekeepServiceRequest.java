@@ -1,7 +1,6 @@
 package com.example.housekeeping.dto;
 
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -27,9 +26,8 @@ public class HousekeepServiceRequest {
     @Size(max = 100, message = "联系方式过长")
     private String contact;
 
-    @NotBlank(message = "服务时长不能为空")
     @Size(max = 100, message = "服务时长过长")
-    private String serviceTime;
+    private String serviceTime = "2小时";
 
     @Size(max = 500, message = "描述过长")
     private String description;

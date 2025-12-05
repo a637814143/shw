@@ -30,6 +30,8 @@ import java.math.RoundingMode;
 @Service
 public class HousekeepServiceManager {
 
+    private static final String DEFAULT_SERVICE_TIME = "2小时";
+
     @Autowired
     private HousekeepServiceRepository housekeepServiceRepository;
 
@@ -107,7 +109,7 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
-        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -129,7 +131,7 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
-        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -234,11 +236,7 @@ public class HousekeepServiceManager {
     }
 
     private String normalizeServiceTime(String serviceTime) {
-        if (serviceTime == null) {
-            return "按需预约";
-        }
-        String trimmed = serviceTime.trim();
-        return trimmed.isEmpty() ? "按需预约" : trimmed;
+        return DEFAULT_SERVICE_TIME;
     }
 
     private String formatServiceTime(HousekeepService service) {
