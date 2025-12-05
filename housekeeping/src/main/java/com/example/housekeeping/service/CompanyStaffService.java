@@ -31,6 +31,13 @@ import java.util.stream.Stream;
 @Service
 public class CompanyStaffService {
 
+    private static final List<ServiceOrderStatus> ACTIVE_STATUSES = List.of(
+        ServiceOrderStatus.SCHEDULED,
+        ServiceOrderStatus.IN_PROGRESS,
+        ServiceOrderStatus.PENDING,
+        ServiceOrderStatus.REFUND_REQUESTED
+    );
+
     @Autowired
     private AccountLookupService accountLookupService;
 
@@ -101,15 +108,23 @@ public class CompanyStaffService {
             || !category.getId().equals(staff.getCategory().getId())) {
             throw new RuntimeException("该人员不属于当前服务的分类");
         }
-        if (staff.isAssigned() && (order.getAssignedStaff() == null
-            || !order.getAssignedStaff().getId().equals(staff.getId()))) {
-            throw new RuntimeException("该人员已指派至其他预约");
-        }
         CompanyStaff previous = order.getAssignedStaff();
         if (previous != null && !previous.getId().equals(staff.getId())) {
             previous.setAssigned(false);
             previous.setUpdatedAt(Instant.now());
             companyStaffRepository.save(previous);
+        }
+        Instant startTime = order.getScheduledAt();
+        Instant endTime = resolveOrderEndTime(order);
+        long conflicts = serviceOrderRepository.countOverlappingOrdersForStaff(
+            staff,
+            order.getId(),
+            ACTIVE_STATUSES,
+            startTime,
+            endTime
+        );
+        if (conflicts > 0) {
+            throw new RuntimeException("该人员在所选时间段已有其他预约，请选择其他员工");
         }
         String workerName = staff.getName() == null ? "" : staff.getName().trim();
         String workerContact = staff.getContact() == null ? "" : staff.getContact().trim();
@@ -235,6 +250,15 @@ public class CompanyStaffService {
             .filter(Objects::nonNull)
             .map(String::toLowerCase)
             .anyMatch(value -> value.contains(lower));
+    }
+
+    private Instant resolveOrderEndTime(ServiceOrder order) {
+        if (order.getScheduledEndAt() != null) {
+            return order.getScheduledEndAt();
+        }
+        Integer durationMinutes = order.getService() == null ? null : order.getService().getDurationMinutes();
+        int safeDuration = durationMinutes != null && durationMinutes > 0 ? durationMinutes : 60;
+        return order.getScheduledAt().plusSeconds(safeDuration * 60L);
     }
 
     private ServiceCategory resolveCategory(Long categoryId) {

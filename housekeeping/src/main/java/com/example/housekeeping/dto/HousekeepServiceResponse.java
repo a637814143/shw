@@ -13,6 +13,7 @@ public class HousekeepServiceResponse {
     private BigDecimal price;
     private String contact;
     private String serviceTime;
+    private Integer durationMinutes;
     private String description;
     private Long companyId;
     private String companyName;
@@ -21,7 +22,7 @@ public class HousekeepServiceResponse {
     private Long availableStaffCount;
 
     public HousekeepServiceResponse(Long id, String name, String unit, BigDecimal price, String contact,
-                                    String serviceTime, String description, Long companyId, String companyName,
+                                    String serviceTime, Integer durationMinutes, String description, Long companyId, String companyName,
                                     Long categoryId, String categoryName, Long availableStaffCount) {
         this.id = id;
         this.name = name;
@@ -29,6 +30,7 @@ public class HousekeepServiceResponse {
         this.price = price;
         this.contact = contact;
         this.serviceTime = serviceTime;
+        this.durationMinutes = durationMinutes;
         this.description = description;
         this.companyId = companyId;
         this.companyName = companyName;
@@ -59,6 +61,10 @@ public class HousekeepServiceResponse {
 
     public String getServiceTime() {
         return serviceTime;
+    }
+
+    public Integer getDurationMinutes() {
+        return durationMinutes;
     }
 
     public String getDescription() {

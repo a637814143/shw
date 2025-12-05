@@ -15,6 +15,8 @@ public interface CompanyStaffRepository extends JpaRepository<CompanyStaff, Long
 
     List<CompanyStaff> findByCompanyAndCategory(UserAll company, ServiceCategory category);
 
+    long countByCompanyAndCategory(UserAll company, ServiceCategory category);
+
     long countByCategory(ServiceCategory category);
 
     long countByCategoryAndAssignedFalse(ServiceCategory category);

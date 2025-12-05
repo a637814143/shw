@@ -3,6 +3,7 @@ package com.example.housekeeping.dto;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -30,6 +31,10 @@ public class HousekeepServiceRequest {
     @NotBlank(message = "服务时长不能为空")
     @Size(max = 100, message = "服务时长过长")
     private String serviceTime;
+
+    @NotNull(message = "请填写服务时长（分钟）")
+    @Positive(message = "服务时长需大于0")
+    private Integer durationMinutes;
 
     @Size(max = 500, message = "描述过长")
     private String description;
@@ -75,6 +80,14 @@ public class HousekeepServiceRequest {
 
     public void setServiceTime(String serviceTime) {
         this.serviceTime = serviceTime;
+    }
+
+    public Integer getDurationMinutes() {
+        return durationMinutes;
+    }
+
+    public void setDurationMinutes(Integer durationMinutes) {
+        this.durationMinutes = durationMinutes;
     }
 
     public String getDescription() {

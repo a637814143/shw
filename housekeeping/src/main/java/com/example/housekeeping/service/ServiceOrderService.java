@@ -25,6 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +44,13 @@ import java.util.stream.Stream;
  */
 @Service
 public class ServiceOrderService {
+
+    private static final List<ServiceOrderStatus> ACTIVE_STATUSES = List.of(
+        ServiceOrderStatus.SCHEDULED,
+        ServiceOrderStatus.IN_PROGRESS,
+        ServiceOrderStatus.PENDING,
+        ServiceOrderStatus.REFUND_REQUESTED
+    );
 
     @Autowired
     private ServiceOrderRepository serviceOrderRepository;
@@ -79,6 +91,11 @@ public class ServiceOrderService {
             throw new RuntimeException("预约时间不能早于当前时间");
         }
 
+        int durationMinutes = resolveDurationMinutes(service);
+        Instant scheduledEndAt = scheduledAt.plusSeconds(durationMinutes * 60L);
+        ensureWithinServiceWindow(service, scheduledAt, scheduledEndAt);
+        ensureCompanyHasCapacity(service, scheduledAt, scheduledEndAt);
+
         String specialRequest = normalizeMessage(request.getSpecialRequest());
         String serviceAddress = normalizeMessage(request.getServiceAddress());
         if (serviceAddress == null) {
@@ -97,6 +114,7 @@ public class ServiceOrderService {
         order.setAmount(price);
         order.setStatus(ServiceOrderStatus.SCHEDULED);
         order.setScheduledAt(scheduledAt);
+        order.setScheduledEndAt(scheduledEndAt);
         order.setSpecialRequest(specialRequest);
         order.setServiceAddress(serviceAddress);
         order.setProgressNote("待上门服务");
@@ -648,10 +666,114 @@ public class ServiceOrderService {
     private void releaseAssignedStaff(ServiceOrder order) {
         CompanyStaff assignedStaff = order.getAssignedStaff();
         if (assignedStaff != null) {
-            assignedStaff.setAssigned(false);
-            assignedStaff.setUpdatedAt(Instant.now());
-            companyStaffRepository.save(assignedStaff);
+            long remaining = serviceOrderRepository.countActiveOrdersForStaff(
+                assignedStaff,
+                order.getId() == null ? -1L : order.getId(),
+                ACTIVE_STATUSES
+            );
+            if (remaining == 0) {
+                assignedStaff.setAssigned(false);
+                assignedStaff.setUpdatedAt(Instant.now());
+                companyStaffRepository.save(assignedStaff);
+            }
             order.setAssignedStaff(null);
+        }
+    }
+
+    private void ensureCompanyHasCapacity(HousekeepService service, Instant startTime, Instant endTime) {
+        ServiceCategory category = service.getCategory();
+        if (category == null) {
+            return;
+        }
+        long totalStaff = companyStaffRepository.countByCompanyAndCategory(service.getCompany(), category);
+        if (totalStaff <= 0) {
+            throw new RuntimeException("该服务暂无可用人员，暂无法预约");
+        }
+        long overlapping = serviceOrderRepository.countOverlappingOrders(
+            service.getCompany(),
+            category,
+            ACTIVE_STATUSES,
+            startTime,
+            endTime
+        );
+        if (overlapping >= totalStaff) {
+            throw new RuntimeException("该时间段可用人员不足，请选择其他时间");
+        }
+    }
+
+    private void ensureStaffAvailableForOrder(CompanyStaff staff, ServiceOrder order) {
+        Instant start = order.getScheduledAt();
+        Instant end = ensureOrderEndTime(order);
+        long conflicts = serviceOrderRepository.countOverlappingOrdersForStaff(
+            staff,
+            order.getId(),
+            ACTIVE_STATUSES,
+            start,
+            end
+        );
+        if (conflicts > 0) {
+            throw new RuntimeException("该人员在所选时间段已有其他预约，请重新选择");
+        }
+    }
+
+    private Instant ensureOrderEndTime(ServiceOrder order) {
+        if (order.getScheduledEndAt() != null) {
+            return order.getScheduledEndAt();
+        }
+        HousekeepService service = order.getService();
+        int durationMinutes = resolveDurationMinutes(service);
+        Instant calculated = order.getScheduledAt().plusSeconds(durationMinutes * 60L);
+        order.setScheduledEndAt(calculated);
+        return calculated;
+    }
+
+    private int resolveDurationMinutes(HousekeepService service) {
+        Integer duration = service.getDurationMinutes();
+        if (duration != null && duration > 0) {
+            return duration;
+        }
+        return Math.max(60, extractDurationFromServiceTime(service.getServiceTime()));
+    }
+
+    private int extractDurationFromServiceTime(String serviceTime) {
+        if (serviceTime == null) {
+            return 60;
+        }
+        String digits = serviceTime.replaceAll("[^0-9]", "");
+        if (digits.isEmpty()) {
+            return 60;
+        }
+        try {
+            int parsed = Integer.parseInt(digits);
+            return parsed > 0 ? parsed : 60;
+        } catch (NumberFormatException ex) {
+            return 60;
+        }
+    }
+
+    private void ensureWithinServiceWindow(HousekeepService service, Instant start, Instant end) {
+        String window = service.getServiceTime();
+        if (window == null || !window.contains("-")) {
+            return;
+        }
+        String[] parts = window.split("-");
+        if (parts.length != 2) {
+            return;
+        }
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm");
+        try {
+            LocalTime open = LocalTime.parse(parts[0].trim(), formatter);
+            LocalTime close = LocalTime.parse(parts[1].trim(), formatter);
+            ZoneId zone = ZoneId.systemDefault();
+            LocalDateTime startDateTime = LocalDateTime.ofInstant(start, zone);
+            LocalDateTime endDateTime = LocalDateTime.ofInstant(end, zone);
+            LocalTime startTime = startDateTime.toLocalTime();
+            LocalTime endTime = endDateTime.toLocalTime();
+            if (startTime.isBefore(open) || endTime.isAfter(close)) {
+                throw new RuntimeException("预约时间超出可服务时段，请选择" + window + "之间的时间");
+            }
+        } catch (DateTimeParseException ignored) {
+            // 无法解析时段时不强制限制
         }
     }
 
