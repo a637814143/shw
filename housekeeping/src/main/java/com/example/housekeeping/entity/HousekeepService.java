@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import com.example.housekeeping.enums.HousekeepServiceStatus;
+
 import java.math.BigDecimal;
 
 /**
@@ -44,4 +46,8 @@ public class HousekeepService {
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private HousekeepServiceStatus status = HousekeepServiceStatus.APPROVED;
 }

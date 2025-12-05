@@ -3,6 +3,7 @@ package com.example.housekeeping.repository;
 import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -94,4 +95,22 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
     Double findAveragePriceByCompany(@Param("company") UserAll company);
 
     long countByCategory(ServiceCategory category);
+
+    @Query("""
+        SELECT s FROM HousekeepService s
+        WHERE (:category IS NULL OR s.category = :category)
+          AND (:status IS NULL OR s.status = :status)
+          AND (
+            :keyword IS NULL OR
+            LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.unit) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTime, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          )
+        ORDER BY s.id DESC
+        """)
+    List<HousekeepService> searchForAdmin(@Param("category") ServiceCategory category,
+                                          @Param("keyword") String keyword,
+                                          @Param("status") HousekeepServiceStatus status);
 }

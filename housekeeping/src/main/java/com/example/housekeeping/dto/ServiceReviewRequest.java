@@ -1,48 +1,27 @@
 package com.example.housekeeping.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
-/**
- * 普通用户提交评价的请求。
- */
 public class ServiceReviewRequest {
 
-    @NotNull(message = "请选择服务")
-    private Long serviceId;
+    @NotNull(message = "请选择是否通过")
+    private Boolean approve;
 
-    @Min(value = 1, message = "评分需在1-5之间")
-    @Max(value = 5, message = "评分需在1-5之间")
-    private Integer rating;
+    private String reason;
 
-    @NotBlank(message = "请填写评价内容")
-    @Size(max = 500, message = "评价内容过长")
-    private String content;
-
-    public Long getServiceId() {
-        return serviceId;
+    public Boolean getApprove() {
+        return approve;
     }
 
-    public void setServiceId(Long serviceId) {
-        this.serviceId = serviceId;
+    public void setApprove(Boolean approve) {
+        this.approve = approve;
     }
 
-    public Integer getRating() {
-        return rating;
+    public String getReason() {
+        return reason;
     }
 
-    public void setRating(Integer rating) {
-        this.rating = rating;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
+    public void setReason(String reason) {
+        this.reason = reason;
     }
 }
