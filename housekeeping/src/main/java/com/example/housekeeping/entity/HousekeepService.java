@@ -49,5 +49,8 @@ public class HousekeepService {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
-    private HousekeepServiceStatus status = HousekeepServiceStatus.APPROVED;
+    private HousekeepServiceStatus status = HousekeepServiceStatus.PENDING;
+
+    @Column(name = "rejection_reason", length = 255)
+    private String rejectionReason;
 }

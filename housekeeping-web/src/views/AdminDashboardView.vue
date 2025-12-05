@@ -652,6 +652,106 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'serviceApproval'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务审核</h2>
+              <p>家政公司提交的新服务需审核通过后才会在用户端展示。</p>
+            </div>
+            <div class="user-actions">
+              <label class="visually-hidden" for="admin-service-search">搜索服务</label>
+              <input
+                id="admin-service-search"
+                v-model="adminServiceSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务名称、单位或联系方式"
+                :disabled="adminServiceLoading"
+                @keyup.enter="loadAdminServices"
+              />
+              <select v-model="adminServiceStatusFilter" class="search-input" :disabled="adminServiceLoading" @change="loadAdminServices">
+                <option value="PENDING">待审核</option>
+                <option value="APPROVED">审核通过</option>
+                <option value="REJECTED">已驳回</option>
+                <option value="all">全部状态</option>
+              </select>
+              <select
+                v-model="adminServiceCategoryFilter"
+                class="search-input"
+                :disabled="adminServiceLoading || !serviceCategories.length"
+                @change="loadAdminServices"
+              >
+                <option value="all">全部分类</option>
+                <option v-for="category in serviceCategories" :key="category.id" :value="category.id">
+                  {{ category.name }}
+                </option>
+              </select>
+              <button type="button" class="ghost-button" @click="loadAdminServices" :disabled="adminServiceLoading">
+                {{ adminServiceLoading ? '加载中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+
+          <div v-if="adminServiceLoading" class="loading-state">正在加载服务审核列表…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务名称</th>
+                  <th>所属公司</th>
+                  <th>分类</th>
+                  <th>价格</th>
+                  <th>联系方式</th>
+                  <th>状态</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in adminServices" :key="item.id">
+                  <td>
+                    <strong>{{ item.name }}</strong>
+                    <div class="order-subtext">单位：{{ item.unit }}</div>
+                    <div class="order-subtext">{{ item.description || '无描述' }}</div>
+                  </td>
+                  <td>{{ item.companyName }}</td>
+                  <td>{{ item.categoryName || '未分类' }}</td>
+                  <td>¥{{ item.price.toFixed(2) }}</td>
+                  <td>{{ item.contact }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${(item.status || 'PENDING').toLowerCase()}`">
+                      {{ serviceStatusText(item.status) }}
+                    </span>
+                    <div v-if="item.status === 'REJECTED' && item.rejectionReason" class="order-subtext">
+                      驳回理由：{{ item.rejectionReason }}
+                    </div>
+                  </td>
+                  <td class="table-actions">
+                    <button
+                      type="button"
+                      class="link-button"
+                      :disabled="adminServiceLoading || reviewingServiceId === item.id || item.status === 'APPROVED'"
+                      @click="handleReviewAdminService(item, true)"
+                    >
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="adminServiceLoading || reviewingServiceId === item.id || item.status === 'REJECTED'"
+                      @click="handleReviewAdminService(item, false)"
+                    >
+                      驳回
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!adminServices.length">
+                  <td colspan="7" class="empty-row">暂无符合条件的服务需要审核。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'content'" class="panel immersive-panel">
           <header class="panel-header">
             <div>
@@ -1114,6 +1214,7 @@ type SectionKey =
   | 'transactions'
   | 'favorites'
   | 'categories'
+  | 'serviceApproval'
   | 'content'
   | 'refunds'
 
@@ -1133,6 +1234,7 @@ const sections: SectionMeta[] = [
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
   { key: 'categories', icon: '🗂️', label: '服务分类' },
+  { key: 'serviceApproval', icon: '🛠️', label: '服务审核' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
   { key: 'refunds', icon: '💰', label: '退款审批' },
 ]
@@ -1181,6 +1283,13 @@ const categoryForm = reactive<ServiceCategoryPayload>({
 })
 const selectedCategoryIds = ref<Set<number>>(new Set())
 const categorySearch = ref('')
+
+const adminServices = ref<HousekeepServiceItem[]>([])
+const adminServiceLoading = ref(false)
+const adminServiceSearch = ref('')
+const adminServiceCategoryFilter = ref<number | 'all'>('all')
+const adminServiceStatusFilter = ref<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
+const reviewingServiceId = ref<number | null>(null)
 
 const filteredCategories = computed(() => {
   const keyword = categorySearch.value.trim().toLowerCase()
@@ -1766,6 +1875,9 @@ const switchSection = (key: SectionKey) => {
     loadFavorites()
   } else if (key === 'categories') {
     loadAdminCategories()
+  } else if (key === 'serviceApproval') {
+    loadAdminCategories()
+    loadAdminServices()
   } else if (key === 'content') {
     loadContent()
   } else if (key === 'refunds') {
@@ -1866,6 +1978,61 @@ const loadAdminCategories = async () => {
     console.error(error)
   } finally {
     categoryLoading.value = false
+  }
+}
+
+const serviceStatusText = (status?: HousekeepServiceItem['status']) => {
+  switch (status) {
+    case 'APPROVED':
+      return '审核通过'
+    case 'REJECTED':
+      return '已驳回'
+    case 'PENDING':
+    default:
+      return '待审核'
+  }
+}
+
+const loadAdminServices = async () => {
+  adminServiceLoading.value = true
+  try {
+    const keyword = adminServiceSearch.value.trim()
+    const params: { keyword?: string; categoryId?: number; status?: 'PENDING' | 'APPROVED' | 'REJECTED' } = {}
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (adminServiceCategoryFilter.value !== 'all') {
+      params.categoryId = adminServiceCategoryFilter.value
+    }
+    if (adminServiceStatusFilter.value !== 'all') {
+      params.status = adminServiceStatusFilter.value
+    }
+    adminServices.value = await fetchAdminServices(params)
+  } catch (error) {
+    console.error(error)
+    adminServices.value = []
+  } finally {
+    adminServiceLoading.value = false
+  }
+}
+
+const handleReviewAdminService = async (item: HousekeepServiceItem, approve: boolean) => {
+  let reason: string | undefined
+  if (!approve) {
+    reason = window.prompt('请输入驳回理由', item.rejectionReason ?? '')?.trim()
+    if (!reason) {
+      window.alert('请填写驳回理由')
+      return
+    }
+  }
+  reviewingServiceId.value = item.id
+  try {
+    await reviewAdminService(item.id, { approve, reason })
+    await loadAdminServices()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '操作失败，请稍后重试')
+  } finally {
+    reviewingServiceId.value = null
   }
 }
 
@@ -2744,6 +2911,7 @@ onMounted(async () => {
     loadAdminAccount(),
     loadOrderLedger(),
     loadAdminCategories(),
+    loadAdminServices(),
   ])
 })
 
