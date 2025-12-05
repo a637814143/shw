@@ -47,14 +47,32 @@
           </header>
           <div class="dialog-body">
             <label class="dialog-field">
-              <span>预约时间</span>
-              <input
-                v-model="bookingForm.scheduledAt"
-                type="datetime-local"
-                required
-                :min="bookingMinConstraint || undefined"
-                :max="bookingMaxConstraint || undefined"
-              />
+              <span>预约日期</span>
+              <div class="booking-date-options" role="group" aria-label="预约日期">
+                <label
+                  v-for="option in BOOKING_DATE_OPTIONS"
+                  :key="option.key"
+                  class="booking-date-chip"
+                >
+                  <input
+                    v-model="bookingForm.selectedDateKey"
+                    type="radio"
+                    name="booking-date"
+                    :value="option.key"
+                  />
+                  <span class="booking-date-label">{{ option.label }}</span>
+                </label>
+              </div>
+              <p class="dialog-subtext">仅支持预约今天或明天的上门服务</p>
+            </label>
+            <label class="dialog-field">
+              <span>时间段</span>
+              <select v-model="bookingForm.timeSlotKey" required class="time-slot-select">
+                <option value="" disabled>请选择时间段</option>
+                <option v-for="slot in BOOKING_TIME_SLOTS" :key="slot.key" :value="slot.key">
+                  {{ slot.label }}
+                </option>
+              </select>
             </label>
             <label class="dialog-field">
               <span>服务地址</span>
@@ -939,99 +957,59 @@ const messageSending = ref(false)
 const activeConversationId = ref<number | null>(null)
 
 const bookingDialogVisible = ref(false)
+
+const BOOKING_DATE_OPTIONS = [
+  { key: 'today', label: '今天' },
+  { key: 'tomorrow', label: '明天' },
+] as const
+
+const BOOKING_TIME_SLOTS = [
+  { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0 },
+  { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0 },
+  { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0 },
+  { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0 },
+  { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0 },
+] as const
+
+type BookingDateOptionKey = (typeof BOOKING_DATE_OPTIONS)[number]['key']
+type BookingTimeSlotKey = (typeof BOOKING_TIME_SLOTS)[number]['key']
+
 const bookingForm = reactive<{
   service: HousekeepServiceItem | null
-  scheduledAt: string
+  selectedDateKey: BookingDateOptionKey
+  timeSlotKey: BookingTimeSlotKey | ''
   specialRequest: string
   serviceAddress: string
 }>({
   service: null,
-  scheduledAt: '',
+  selectedDateKey: 'today',
+  timeSlotKey: '',
   specialRequest: '',
   serviceAddress: '',
 })
 
-const BOOKING_ALLOWED_START_HOUR = 8
-const BOOKING_ALLOWED_END_HOUR = 22
-
-const parseBookingDateTime = (value: string) => {
-  if (!value || !value.includes('T')) {
-    return null
+const resolveBookingDate = (key: BookingDateOptionKey) => {
+  const base = new Date()
+  base.setHours(0, 0, 0, 0)
+  if (key === 'tomorrow') {
+    const tomorrow = new Date(base)
+    tomorrow.setDate(base.getDate() + 1)
+    return tomorrow
   }
-
-  const [datePart, timePart] = value.split('T')
-  if (!datePart || !timePart) {
-    return null
-  }
-
-  const [hourPart, minutePart] = timePart.split(':')
-  const hour = Number(hourPart)
-  const minute = Number(minutePart)
-
-  if (Number.isNaN(hour) || Number.isNaN(minute)) {
-    return null
-  }
-
-  return { datePart, hour, minute }
+  return base
 }
 
-const formatBookingDateTime = (date: string, hour: number, minute: number) =>
-  `${date}T${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+const bookingScheduledAt = computed(() => {
+  const slot = BOOKING_TIME_SLOTS.find((item) => item.key === bookingForm.timeSlotKey)
+  if (!slot) {
+    return ''
+  }
 
-const bookingSelectedDate = computed(() => {
-  const parsed = parseBookingDateTime(bookingForm.scheduledAt)
-  return parsed ? parsed.datePart : ''
+  const selectedDate = resolveBookingDate(bookingForm.selectedDateKey)
+  const scheduled = new Date(selectedDate)
+  scheduled.setHours(slot.startHour, slot.startMinute, 0, 0)
+  return scheduled.toISOString()
 })
-
-const bookingMinConstraint = computed(() =>
-  bookingSelectedDate.value
-    ? formatBookingDateTime(bookingSelectedDate.value, BOOKING_ALLOWED_START_HOUR, 0)
-    : null,
-)
-
-const bookingMaxConstraint = computed(() =>
-  bookingSelectedDate.value
-    ? formatBookingDateTime(bookingSelectedDate.value, BOOKING_ALLOWED_END_HOUR, 0)
-    : null,
-)
-
-const normalizeBookingTime = (value: string) => {
-  const parsed = parseBookingDateTime(value)
-  if (!parsed) {
-    return value
-  }
-
-  if (parsed.hour < BOOKING_ALLOWED_START_HOUR) {
-    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_START_HOUR, 0)
-  }
-
-  if (parsed.hour > BOOKING_ALLOWED_END_HOUR) {
-    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_END_HOUR, 0)
-  }
-
-  if (parsed.hour === BOOKING_ALLOWED_END_HOUR && parsed.minute > 0) {
-    return formatBookingDateTime(parsed.datePart, BOOKING_ALLOWED_END_HOUR, 0)
-  }
-
-  return value
-}
-
-const isBookingTimeAllowed = (value: string) => {
-  const parsed = parseBookingDateTime(value)
-  if (!parsed) {
-    return false
-  }
-
-  if (parsed.hour < BOOKING_ALLOWED_START_HOUR || parsed.hour > BOOKING_ALLOWED_END_HOUR) {
-    return false
-  }
-
-  if (parsed.hour === BOOKING_ALLOWED_END_HOUR && parsed.minute > 0) {
-    return false
-  }
-
-  return true
-}
 
 const paymentDialogVisible = ref(false)
 const paymentChecking = ref(false)
@@ -1495,21 +1473,6 @@ watch(carousels, (items) => {
   carouselIndex.value = carouselIndex.value % items.length
 })
 
-watch(
-  () => bookingForm.scheduledAt,
-  (value) => {
-    if (!value) {
-      return
-    }
-
-    const normalized = normalizeBookingTime(value)
-    if (normalized !== value) {
-      bookingForm.scheduledAt = normalized
-      window.alert('预约时间仅支持 08:00-22:00，请重新选择。')
-    }
-  },
-)
-
 watch(serviceSearch, () => {
   if (serviceSearchTimer) {
     clearTimeout(serviceSearchTimer)
@@ -1601,7 +1564,8 @@ const logout = () => {
 
 const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.service = service
-  bookingForm.scheduledAt = ''
+  bookingForm.selectedDateKey = 'today'
+  bookingForm.timeSlotKey = ''
   bookingForm.specialRequest = ''
   bookingForm.serviceAddress = account.value?.contactAddress || ''
   bookingDialogVisible.value = true
@@ -1609,7 +1573,10 @@ const handleSelectService = (service: HousekeepServiceItem) => {
 
 const closeBooking = () => {
   bookingDialogVisible.value = false
+  bookingForm.selectedDateKey = 'today'
   bookingForm.serviceAddress = ''
+  bookingForm.timeSlotKey = ''
+  bookingForm.specialRequest = ''
 }
 
 const resetPaymentState = () => {
@@ -1625,13 +1592,14 @@ const resetPaymentState = () => {
 }
 
 const submitBooking = async () => {
-  if (!bookingForm.service || !bookingForm.scheduledAt || !bookingForm.serviceAddress.trim()) {
+  if (!bookingForm.service || !bookingForm.serviceAddress.trim()) {
     window.alert('请填写完整的预约信息')
     return
   }
 
-  if (!isBookingTimeAllowed(bookingForm.scheduledAt)) {
-    window.alert('预约时间仅支持 08:00-22:00，请重新选择。')
+  const scheduledAt = bookingScheduledAt.value
+  if (!scheduledAt) {
+    window.alert('请选择预约日期与时间段')
     return
   }
 
@@ -1640,7 +1608,7 @@ const submitBooking = async () => {
     kind: 'order',
     payload: {
       serviceId: bookingForm.service.id,
-      scheduledAt: new Date(bookingForm.scheduledAt).toISOString(),
+      scheduledAt,
       specialRequest: bookingForm.specialRequest,
       serviceAddress: bookingForm.serviceAddress.trim(),
     },
@@ -1723,7 +1691,8 @@ const checkPaymentResult = async () => {
           await createUserOrder(action.payload)
           await Promise.all([loadOrders(), loadAccount()])
           bookingForm.service = null
-          bookingForm.scheduledAt = ''
+          bookingForm.selectedDateKey = 'today'
+          bookingForm.timeSlotKey = ''
           bookingForm.specialRequest = ''
           bookingForm.serviceAddress = ''
           paymentMessage.value = '支付成功，订单已创建。'
@@ -3213,6 +3182,52 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.booking-date-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.booking-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid var(--brand-border);
+  background: var(--brand-surface-strong);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.booking-date-chip:hover {
+  border-color: var(--brand-primary);
+  background: #eef3ff;
+}
+
+.booking-date-chip input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-primary);
+}
+
+.booking-date-label {
+  font-weight: 600;
+}
+
+.booking-date-chip input:checked + .booking-date-label {
+  color: var(--brand-primary);
+}
+
+.time-slot-select {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--brand-border);
+  background: var(--brand-surface);
+  font-size: 1rem;
 }
 
 .dialog-footer {
