@@ -31,6 +31,10 @@ public class AdminServiceApprovalController {
         @RequestParam(value = "status", required = false) String status
     ) {
         HousekeepServiceStatus statusEnum = parseStatus(status);
+        // 默认只展示待审核的服务，避免管理员界面出现空白列表
+        if (statusEnum == null && (status == null || status.isBlank())) {
+            statusEnum = HousekeepServiceStatus.PENDING;
+        }
         return Result.success(housekeepServiceManager.listForAdmin(keyword, categoryId, statusEnum));
     }
 
