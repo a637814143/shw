@@ -53,10 +53,6 @@ public class HousekeepServiceManager {
         List<HousekeepService> services = normalizedKeyword == null
             ? housekeepServiceRepository.findAll()
             : housekeepServiceRepository.searchByKeyword(normalizedKeyword);
-
-        services = services.stream()
-            .filter(service -> HousekeepServiceStatus.APPROVED.equals(service.getStatus()))
-            .collect(Collectors.toList());
         if (category != null) {
             services = services.stream()
                 .filter(service -> service.getCategory() != null
@@ -117,7 +113,6 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setStatus(DEFAULT_STATUS);
-        service.setRejectionReason(null);
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -141,7 +136,6 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setStatus(DEFAULT_STATUS);
-        service.setRejectionReason(null);
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -163,14 +157,7 @@ public class HousekeepServiceManager {
         HousekeepService service = housekeepServiceRepository.findById(serviceId)
             .orElseThrow(() -> new RuntimeException("服务不存在"));
 
-        if (!approve) {
-            if (reason == null || reason.trim().isEmpty()) {
-                throw new RuntimeException("请填写驳回理由");
-            }
-        }
-
         service.setStatus(approve ? HousekeepServiceStatus.APPROVED : HousekeepServiceStatus.REJECTED);
-        service.setRejectionReason(approve ? null : normalizeDescription(reason));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -238,8 +225,7 @@ public class HousekeepServiceManager {
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
             availableStaffForService(service),
-            service.getStatus() == null ? null : service.getStatus().name(),
-            service.getRejectionReason()
+            service.getStatus() == null ? null : service.getStatus().name()
         );
     }
 
