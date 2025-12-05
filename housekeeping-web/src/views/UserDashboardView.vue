@@ -1117,7 +1117,21 @@ const visibleFavorites = computed(() => {
 
 const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
 
-const paymentQrLink = computed(() => paymentSession.value?.qrUrl ?? '')
+const paymentQrLink = computed(() => {
+  const base = paymentSession.value?.qrUrl ?? ''
+  if (!base) {
+    return ''
+  }
+
+  try {
+    const url = new URL(base, window.location.origin)
+    url.searchParams.set('return', window.location.origin)
+    return url.toString()
+  } catch (error) {
+    console.warn('无法附加回跳地址到支付链接：', error)
+    return base
+  }
+})
 
 const paymentQrSrc = computed(() => {
   const link = paymentQrLink.value
@@ -1638,12 +1652,17 @@ const submitBooking = async () => {
   }
   paymentServiceName.value = bookingForm.service.name
   paymentCompanyName.value = bookingForm.service.companyName
-  paymentAmount.value = bookingForm.service.price
+  const paymentAmountValue = Number(bookingForm.service.price ?? 0)
+  if (!Number.isFinite(paymentAmountValue) || paymentAmountValue <= 0) {
+    window.alert('当前服务价格异常，请稍后再试。')
+    return
+  }
+  paymentAmount.value = paymentAmountValue
 
   const payload: CreatePaymentSessionPayload = {
     serviceName: bookingForm.service.name,
     companyName: bookingForm.service.companyName,
-    amount: bookingForm.service.price,
+    amount: paymentAmountValue,
   }
 
   try {
@@ -1975,6 +1994,11 @@ const submitRecharge = async () => {
   walletSaving.value = true
   resetPaymentState()
   const amount = Number(walletForm.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    window.alert('请输入正确的充值金额')
+    walletSaving.value = false
+    return
+  }
   pendingPaymentAction.value = { kind: 'recharge', payload: { amount } }
   paymentServiceName.value = '钱包充值'
   paymentCompanyName.value = '账户中心'

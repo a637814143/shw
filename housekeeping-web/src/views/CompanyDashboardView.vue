@@ -333,15 +333,23 @@
               </div>
               <div class="form-field form-field-full">
                 <label for="staff-service-slots">服务时间段</label>
-                <select
-                  id="staff-service-slots"
-                  v-model="staffForm.serviceTimeSlots"
-                  multiple
-                  :size="serviceTimeSlotOptions.length"
-                >
-                  <option v-for="slot in serviceTimeSlotOptions" :key="slot" :value="slot">{{ slot }}</option>
-                </select>
-                <p class="form-helper">按住 Ctrl / Cmd 键可多选</p>
+                <div id="staff-service-slots" class="slot-selector">
+                  <button
+                    v-for="slot in serviceTimeSlotOptions"
+                    :key="slot"
+                    type="button"
+                    class="slot-pill"
+                    :class="{ active: staffForm.serviceTimeSlots.includes(slot) }"
+                    @click="toggleStaffServiceSlot(slot)"
+                  >
+                    <span class="slot-indicator" aria-hidden="true"></span>
+                    <span class="slot-label">{{ slot }}</span>
+                    <span class="visually-hidden" aria-live="polite">
+                      {{ staffForm.serviceTimeSlots.includes(slot) ? '已选中' : '未选中' }}
+                    </span>
+                  </button>
+                </div>
+                <p class="form-helper">点击可多选</p>
               </div>
               <div class="form-field form-field-full">
                 <label for="staff-notes">备注</label>
@@ -1443,6 +1451,15 @@ const handleBulkDeleteServices = async () => {
     await loadServices()
   } catch (error) {
     window.alert(error instanceof Error ? error.message : '删除失败')
+  }
+}
+
+const toggleStaffServiceSlot = (slot: string) => {
+  const current = staffForm.serviceTimeSlots
+  if (current.includes(slot)) {
+    staffForm.serviceTimeSlots = current.filter((item) => item !== slot)
+  } else {
+    staffForm.serviceTimeSlots = [...current, slot]
   }
 }
 
@@ -2862,6 +2879,55 @@ onUnmounted(() => {
   outline: none;
   border-color: var(--brand-success);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.slot-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.slot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 255, 0.9);
+  color: rgba(15, 23, 42, 0.82);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slot-pill:hover {
+  border-color: var(--brand-primary);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.14);
+}
+
+.slot-pill.active {
+  border-color: var(--brand-primary);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.12));
+  color: var(--brand-primary-dark);
+}
+
+.slot-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.7);
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.slot-pill.active .slot-indicator {
+  border-color: var(--brand-primary);
+  box-shadow: inset 0 0 0 3px #fff;
+  background: var(--brand-primary);
+}
+
+.slot-label {
+  font-weight: 600;
 }
 
 .empty-row {
