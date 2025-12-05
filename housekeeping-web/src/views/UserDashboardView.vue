@@ -1125,8 +1125,8 @@ const paymentQrLink = computed(() => {
 
   try {
     const url = new URL(base, window.location.origin)
-    // 回跳到当前二维码页面，避免跳转到登录页
-    url.searchParams.set('return', url.toString())
+    // 回跳到当前平台页面，便于扫码确认后直接返回二维码界面
+    url.searchParams.set('return', window.location.href)
     return url.toString()
   } catch (error) {
     console.warn('无法附加回跳地址到支付链接：', error)
