@@ -669,23 +669,6 @@
                 :disabled="adminServiceLoading"
                 @keyup.enter="loadAdminServices"
               />
-              <select v-model="adminServiceStatusFilter" class="search-input" :disabled="adminServiceLoading" @change="loadAdminServices">
-                <option value="PENDING">待审核</option>
-                <option value="APPROVED">审核通过</option>
-                <option value="REJECTED">已驳回</option>
-                <option value="all">全部状态</option>
-              </select>
-              <select
-                v-model="adminServiceCategoryFilter"
-                class="search-input"
-                :disabled="adminServiceLoading || !serviceCategories.length"
-                @change="loadAdminServices"
-              >
-                <option value="all">全部分类</option>
-                <option v-for="category in serviceCategories" :key="category.id" :value="category.id">
-                  {{ category.name }}
-                </option>
-              </select>
               <button type="button" class="ghost-button" @click="loadAdminServices" :disabled="adminServiceLoading">
                 {{ adminServiceLoading ? '加载中…' : '刷新列表' }}
               </button>
@@ -1287,8 +1270,6 @@ const categorySearch = ref('')
 const adminServices = ref<HousekeepServiceItem[]>([])
 const adminServiceLoading = ref(false)
 const adminServiceSearch = ref('')
-const adminServiceCategoryFilter = ref<number | 'all'>('all')
-const adminServiceStatusFilter = ref<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING')
 const reviewingServiceId = ref<number | null>(null)
 
 const filteredCategories = computed(() => {
@@ -1876,7 +1857,6 @@ const switchSection = (key: SectionKey) => {
   } else if (key === 'categories') {
     loadAdminCategories()
   } else if (key === 'serviceApproval') {
-    loadAdminCategories()
     loadAdminServices()
   } else if (key === 'content') {
     loadContent()
@@ -1997,15 +1977,9 @@ const loadAdminServices = async () => {
   adminServiceLoading.value = true
   try {
     const keyword = adminServiceSearch.value.trim()
-    const params: { keyword?: string; categoryId?: number; status?: 'PENDING' | 'APPROVED' | 'REJECTED' } = {}
+    const params: { keyword?: string } = {}
     if (keyword) {
       params.keyword = keyword
-    }
-    if (adminServiceCategoryFilter.value !== 'all') {
-      params.categoryId = adminServiceCategoryFilter.value
-    }
-    if (adminServiceStatusFilter.value !== 'all') {
-      params.status = adminServiceStatusFilter.value
     }
     adminServices.value = await fetchAdminServices(params)
   } catch (error) {
