@@ -151,7 +151,12 @@ public class HousekeepServiceManager {
         String normalizedKeyword = normalizeKeyword(keyword);
         ServiceCategory category = categoryId == null ? null : resolveCategory(categoryId);
 
-        List<HousekeepService> services = housekeepServiceRepository.searchForAdmin(category, normalizedKeyword, status);
+        List<HousekeepService> services;
+        if (normalizedKeyword == null && category == null && status == null) {
+            services = housekeepServiceRepository.findAllForAdmin();
+        } else {
+            services = housekeepServiceRepository.searchForAdmin(category, normalizedKeyword, status);
+        }
 
         return services.stream()
             .map(this::mapToResponse)

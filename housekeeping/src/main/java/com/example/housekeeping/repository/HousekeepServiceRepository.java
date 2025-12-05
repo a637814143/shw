@@ -113,4 +113,12 @@ public interface HousekeepServiceRepository extends JpaRepository<HousekeepServi
     List<HousekeepService> searchForAdmin(@Param("category") ServiceCategory category,
                                           @Param("keyword") String keyword,
                                           @Param("status") HousekeepServiceStatus status);
+
+    @Query("""
+        SELECT s FROM HousekeepService s
+        ORDER BY
+            CASE WHEN s.status = 'PENDING' THEN 0 WHEN s.status = 'REJECTED' THEN 1 ELSE 2 END,
+            s.id DESC
+        """)
+    List<HousekeepService> findAllForAdmin();
 }
