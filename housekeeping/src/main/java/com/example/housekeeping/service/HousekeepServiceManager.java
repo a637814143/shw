@@ -7,6 +7,7 @@ import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.ServiceCategoryRepository;
@@ -56,6 +57,8 @@ public class HousekeepServiceManager {
                 .collect(Collectors.toList());
         }
         return services.stream()
+            .filter(service -> service.getStatus() == null
+                || service.getStatus() == HousekeepServiceStatus.APPROVED)
             .map(this::mapToResponse)
             .collect(Collectors.toList());
     }
@@ -95,6 +98,16 @@ public class HousekeepServiceManager {
         );
     }
 
+    @Transactional(readOnly = true)
+    public List<HousekeepServiceResponse> listForAdmin(String keyword, Long categoryId, HousekeepServiceStatus status) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        ServiceCategory categoryFilter = findCategoryForFilter(categoryId);
+        return housekeepServiceRepository.searchForAdmin(categoryFilter, status, normalizedKeyword)
+            .stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
     @Transactional
     public HousekeepServiceResponse createService(HousekeepServiceRequest request) {
         UserAll company = accountLookupService.getCurrentAccount();
@@ -109,6 +122,8 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setStatus(HousekeepServiceStatus.PENDING);
+        service.setRejectionReason(null);
 
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -131,6 +146,25 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setStatus(HousekeepServiceStatus.PENDING);
+        service.setRejectionReason(null);
+        return mapToResponse(housekeepServiceRepository.save(service));
+    }
+
+    @Transactional
+    public HousekeepServiceResponse reviewService(Long serviceId, boolean approve, String rejectionReason) {
+        HousekeepService service = housekeepServiceRepository.findById(serviceId)
+            .orElseThrow(() -> new RuntimeException("服务不存在"));
+
+        if (approve) {
+            service.setStatus(HousekeepServiceStatus.APPROVED);
+            service.setRejectionReason(null);
+        } else {
+            String normalizedReason = normalizeRejectionReason(rejectionReason);
+            service.setStatus(HousekeepServiceStatus.REJECTED);
+            service.setRejectionReason(normalizedReason);
+        }
+
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -197,7 +231,9 @@ public class HousekeepServiceManager {
             service.getCompany().getUsername(),
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
-            availableStaffForService(service)
+            availableStaffForService(service),
+            service.getStatus() == null ? null : service.getStatus().name(),
+            service.getRejectionReason()
         );
     }
 
@@ -231,6 +267,17 @@ public class HousekeepServiceManager {
         }
         String trimmed = description.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeRejectionReason(String reason) {
+        if (reason == null) {
+            throw new RuntimeException("请填写驳回理由");
+        }
+        String trimmed = reason.trim();
+        if (trimmed.isEmpty()) {
+            throw new RuntimeException("驳回理由不能为空");
+        }
+        return trimmed;
     }
 
     private String normalizeServiceTime(String serviceTime) {

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 
 /**
  * 家政公司发布的服务信息。
@@ -44,4 +45,11 @@ public class HousekeepService {
 
     @Column(name = "description", length = 500)
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 32)
+    private HousekeepServiceStatus status = HousekeepServiceStatus.PENDING;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
 }

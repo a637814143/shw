@@ -50,6 +50,8 @@ CREATE TABLE `housekeep_service` (
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `service_time` varchar(100) NOT NULL DEFAULT '按需预约' COMMENT '服务时段或耗时',
   `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
+  `status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '审核状态',
+  `rejection_reason` varchar(500) DEFAULT NULL COMMENT '驳回原因',
   PRIMARY KEY (`id`),
   KEY `idx_company` (`company_id`),
   KEY `idx_service_category` (`category_id`),
