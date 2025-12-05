@@ -39,6 +39,9 @@ public class CompanyStaff {
     @Column(name = "notes", length = 500)
     private String notes;
 
+    @Column(name = "service_time_slots", length = 200)
+    private String serviceTimeSlots;
+
     @Column(name = "assigned", nullable = false)
     private boolean assigned;
 

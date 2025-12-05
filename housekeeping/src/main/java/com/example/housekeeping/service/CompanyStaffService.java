@@ -31,6 +31,14 @@ import java.util.stream.Stream;
 @Service
 public class CompanyStaffService {
 
+    private static final List<String> ALLOWED_SERVICE_SLOTS = List.of(
+        "8:00-10:00",
+        "11:00-13:00",
+        "14:00-16:00",
+        "17:00-19:00",
+        "20:00-22:00"
+    );
+
     @Autowired
     private AccountLookupService accountLookupService;
 
@@ -185,6 +193,7 @@ public class CompanyStaffService {
         staff.setCategory(category);
         staff.setRole(null);
         staff.setNotes(normalizeOptional(request.getNotes()));
+        staff.setServiceTimeSlots(String.join(",", normalizeServiceSlots(request.getServiceTimeSlots())));
     }
 
     private CompanyStaff ensureStaffBelongsToCurrentCompany(Long staffId) {
@@ -220,7 +229,8 @@ public class CompanyStaffService {
             staff.getUpdatedAt(),
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
-            staff.isAssigned()
+            staff.isAssigned(),
+            parseServiceSlots(staff.getServiceTimeSlots())
         );
     }
 
@@ -230,6 +240,7 @@ public class CompanyStaffService {
                 staff.getName(),
                 staff.getContact(),
                 staff.getNotes(),
+                staff.getServiceTimeSlots(),
                 staff.getCategory() == null ? null : staff.getCategory().getName()
             )
             .filter(Objects::nonNull)
@@ -251,5 +262,35 @@ public class CompanyStaffService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private List<String> normalizeServiceSlots(List<String> slots) {
+        if (slots == null || slots.isEmpty()) {
+            throw new RuntimeException("请选择至少一个服务时间段");
+        }
+        List<String> sanitized = slots.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(item -> !item.isEmpty())
+            .distinct()
+            .collect(Collectors.toList());
+        if (sanitized.isEmpty()) {
+            throw new RuntimeException("请选择至少一个服务时间段");
+        }
+        boolean hasInvalid = sanitized.stream().anyMatch(item -> !ALLOWED_SERVICE_SLOTS.contains(item));
+        if (hasInvalid) {
+            throw new RuntimeException("存在无效的服务时间段");
+        }
+        return sanitized;
+    }
+
+    private List<String> parseServiceSlots(String raw) {
+        if (raw == null || raw.trim().isEmpty()) {
+            return List.of();
+        }
+        return Stream.of(raw.split(","))
+            .map(String::trim)
+            .filter(item -> !item.isEmpty())
+            .collect(Collectors.toList());
     }
 }

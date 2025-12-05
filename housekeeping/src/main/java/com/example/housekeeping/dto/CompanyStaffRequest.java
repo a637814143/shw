@@ -1,8 +1,11 @@
 package com.example.housekeeping.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.List;
 
 /**
  * 家政公司人员信息的创建/修改请求。
@@ -22,6 +25,9 @@ public class CompanyStaffRequest {
 
     @Size(max = 500, message = "备注长度不得超过500个字符")
     private String notes;
+
+    @NotEmpty(message = "请选择至少一个服务时间段")
+    private List<String> serviceTimeSlots;
 
     public String getName() {
         return name;
@@ -53,5 +59,13 @@ public class CompanyStaffRequest {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public List<String> getServiceTimeSlots() {
+        return serviceTimeSlots;
+    }
+
+    public void setServiceTimeSlots(List<String> serviceTimeSlots) {
+        this.serviceTimeSlots = serviceTimeSlots;
     }
 }

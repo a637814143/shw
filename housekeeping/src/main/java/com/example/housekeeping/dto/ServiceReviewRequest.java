@@ -4,22 +4,18 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
-/**
- * 普通用户提交评价的请求。
- */
 public class ServiceReviewRequest {
 
     @NotNull(message = "请选择服务")
     private Long serviceId;
 
-    @Min(value = 1, message = "评分需在1-5之间")
-    @Max(value = 5, message = "评分需在1-5之间")
+    @NotNull(message = "请选择评分")
+    @Min(value = 1, message = "评分不能低于1分")
+    @Max(value = 5, message = "评分不能高于5分")
     private Integer rating;
 
     @NotBlank(message = "请填写评价内容")
-    @Size(max = 500, message = "评价内容过长")
     private String content;
 
     public Long getServiceId() {

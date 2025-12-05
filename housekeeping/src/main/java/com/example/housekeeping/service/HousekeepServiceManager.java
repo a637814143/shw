@@ -7,6 +7,7 @@ import com.example.housekeeping.entity.HousekeepService;
 import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.ServiceCategoryRepository;
@@ -29,6 +30,9 @@ import java.math.RoundingMode;
  */
 @Service
 public class HousekeepServiceManager {
+
+    private static final String DEFAULT_SERVICE_TIME = "2小时";
+    private static final HousekeepServiceStatus DEFAULT_STATUS = HousekeepServiceStatus.PENDING;
 
     @Autowired
     private HousekeepServiceRepository housekeepServiceRepository;
@@ -107,7 +111,8 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
-        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setServiceTime(DEFAULT_SERVICE_TIME);
+        service.setStatus(DEFAULT_STATUS);
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -129,8 +134,30 @@ public class HousekeepServiceManager {
         service.setUnit(request.getUnit().trim());
         service.setPrice(request.getPrice());
         service.setContact(request.getContact().trim());
-        service.setServiceTime(normalizeServiceTime(request.getServiceTime()));
+        service.setServiceTime(DEFAULT_SERVICE_TIME);
+        service.setStatus(DEFAULT_STATUS);
         service.setDescription(normalizeDescription(request.getDescription()));
+        return mapToResponse(housekeepServiceRepository.save(service));
+    }
+
+    @Transactional(readOnly = true)
+    public List<HousekeepServiceResponse> listForAdmin(String keyword, Long categoryId, HousekeepServiceStatus status) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        ServiceCategory category = categoryId == null ? null : resolveCategory(categoryId);
+
+        List<HousekeepService> services = housekeepServiceRepository.searchForAdmin(category, normalizedKeyword, status);
+
+        return services.stream()
+            .map(this::mapToResponse)
+            .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public HousekeepServiceResponse reviewService(Long serviceId, boolean approve, String reason) {
+        HousekeepService service = housekeepServiceRepository.findById(serviceId)
+            .orElseThrow(() -> new RuntimeException("服务不存在"));
+
+        service.setStatus(approve ? HousekeepServiceStatus.APPROVED : HousekeepServiceStatus.REJECTED);
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -197,7 +224,8 @@ public class HousekeepServiceManager {
             service.getCompany().getUsername(),
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
-            availableStaffForService(service)
+            availableStaffForService(service),
+            service.getStatus() == null ? null : service.getStatus().name()
         );
     }
 
@@ -234,11 +262,7 @@ public class HousekeepServiceManager {
     }
 
     private String normalizeServiceTime(String serviceTime) {
-        if (serviceTime == null) {
-            return "按需预约";
-        }
-        String trimmed = serviceTime.trim();
-        return trimmed.isEmpty() ? "按需预约" : trimmed;
+        return DEFAULT_SERVICE_TIME;
     }
 
     private String formatServiceTime(HousekeepService service) {

@@ -1,6 +1,7 @@
 package com.example.housekeeping.dto;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 家政公司人员信息响应。
@@ -16,10 +17,12 @@ public class CompanyStaffResponse {
     private final Long categoryId;
     private final String categoryName;
     private final boolean assigned;
+    private final List<String> serviceTimeSlots;
 
     public CompanyStaffResponse(Long id, String name, String contact, String notes,
                                 Instant createdAt, Instant updatedAt,
-                                Long categoryId, String categoryName, boolean assigned) {
+                                Long categoryId, String categoryName, boolean assigned,
+                                List<String> serviceTimeSlots) {
         this.id = id;
         this.name = name;
         this.contact = contact;
@@ -29,6 +32,7 @@ public class CompanyStaffResponse {
         this.categoryId = categoryId;
         this.categoryName = categoryName;
         this.assigned = assigned;
+        this.serviceTimeSlots = serviceTimeSlots;
     }
 
     public Long getId() {
@@ -65,5 +69,9 @@ public class CompanyStaffResponse {
 
     public boolean isAssigned() {
         return assigned;
+    }
+
+    public List<String> getServiceTimeSlots() {
+        return serviceTimeSlots;
     }
 }

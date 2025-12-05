@@ -52,6 +52,15 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return parsed.data as T
 }
 
+const withFixedServiceTime = <T extends HousekeepServiceItem | ServiceOrderItem>(
+  items: (T & { serviceTime?: string | null })[],
+): T[] => {
+  return items.map((item) => ({
+    ...item,
+    serviceTime: '2小时',
+  }))
+}
+
 export type ServiceOrderStatus =
   | 'PENDING'
   | 'SCHEDULED'
@@ -359,6 +368,7 @@ export interface CompanyStaffItem {
   name: string
   contact: string
   notes?: string | null
+  serviceTimeSlots: string[]
   createdAt: string
   updatedAt: string
   categoryId?: number | null
@@ -370,6 +380,7 @@ export interface CompanyStaffPayload {
   name: string
   contact: string
   categoryId: number
+  serviceTimeSlots: string[]
   notes?: string
 }
 
@@ -383,7 +394,8 @@ export const fetchPublicServices = async (params?: { keyword?: string; categoryI
     url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<HousekeepServiceItem[]>(response)
+  const result = await handleResponse<HousekeepServiceItem[]>(response)
+  return withFixedServiceTime(result)
 }
 
 export const fetchPublicTips = async (params?: { keyword?: string }): Promise<DashboardTipItem[]> => {
@@ -445,7 +457,8 @@ export const fetchUserServices = async (params?: { keyword?: string; categoryId?
     url.searchParams.set('categoryId', String(params.categoryId))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<HousekeepServiceItem[]>(response)
+  const result = await handleResponse<HousekeepServiceItem[]>(response)
+  return withFixedServiceTime(result)
 }
 
 export const fetchUserOrders = async (params?: { keyword?: string }): Promise<ServiceOrderItem[]> => {
@@ -669,7 +682,8 @@ export const fetchCompanyServices = async (params?: {
     url.searchParams.set('size', String(params.size))
   }
   const response = await fetch(url.toString(), withAuthHeaders())
-  return handleResponse<CompanyServicePage>(response)
+  const result = await handleResponse<CompanyServicePage>(response)
+  return { ...result, items: withFixedServiceTime(result.items) }
 }
 
 export const createCompanyService = async (

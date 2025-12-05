@@ -27,7 +27,8 @@ public interface CompanyStaffRepository extends JpaRepository<CompanyStaff, Long
             LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(s.contact) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
             LOWER(COALESCE(s.role, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-            LOWER(COALESCE(s.notes, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            LOWER(COALESCE(s.notes, '')) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+            LOWER(COALESCE(s.serviceTimeSlots, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
         )
         ORDER BY s.createdAt DESC
         """)

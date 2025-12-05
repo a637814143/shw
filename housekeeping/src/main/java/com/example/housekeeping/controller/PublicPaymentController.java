@@ -52,12 +52,23 @@ public class PublicPaymentController {
         @RequestBody Map<String, Object> payload
     ) {
         Object decision = payload != null ? payload.get("decision") : null;
-        if (!(decision instanceof Number)) {
+        Integer value = null;
+        if (decision instanceof Number number) {
+            value = number.intValue();
+        } else if (decision instanceof String str) {
+            try {
+                value = Integer.parseInt(str);
+            } catch (NumberFormatException ignored) {
+                // handled below
+            }
+        }
+
+        if (value == null) {
             return ResponseEntity.badRequest().body(Map.of(
                 "error", "invalid decision"
             ));
         }
-        int value = ((Number) decision).intValue();
+
         if (value != 0 && value != 1) {
             return ResponseEntity.badRequest().body(Map.of(
                 "error", "invalid decision"
@@ -115,6 +126,8 @@ public class PublicPaymentController {
             "    <footer>支付令牌：" + escapeHtml(token) + "</footer>" +
             "  </div>" +
             "  <script>" +
+            "    const params = new URLSearchParams(window.location.search);" +
+            "    const returnUrl = params.get('return') || document.referrer || '';" +
             "    function submitDecision(value) {" +
             "      fetch(window.location.pathname, {" +
             "        method: 'POST'," +
@@ -125,8 +138,10 @@ public class PublicPaymentController {
             "        .then((data) => {" +
             "          if (data.result === 1) {" +
             "            alert('已同意支付 ✅');" +
+            "            if (returnUrl) { window.location.href = returnUrl; }" +
             "          } else if (data.result === 0) {" +
             "            alert(data.message || '已拒绝支付 ❌');" +
+            "            if (returnUrl) { window.location.href = returnUrl; }" +
             "          } else if (data.error) {" +
             "            alert('提交失败：' + data.error);" +
             "          } else {" +

@@ -133,15 +133,6 @@
                 <input id="service-contact" v-model="serviceForm.contact" type="text" />
               </div>
               <div class="form-field">
-                <label for="service-time">服务时长</label>
-                <input
-                  id="service-time"
-                  v-model="serviceForm.serviceTime"
-                  type="text"
-                  placeholder="如：2 小时 / 工作日 9:00-18:00"
-                />
-              </div>
-              <div class="form-field">
                 <label for="service-category">服务分类</label>
                 <select
                   id="service-category"
@@ -341,6 +332,26 @@
                 <p v-if="!serviceCategories.length" class="form-helper">请先添加服务分类</p>
               </div>
               <div class="form-field form-field-full">
+                <label for="staff-service-slots">服务时间段</label>
+                <div id="staff-service-slots" class="slot-selector">
+                  <button
+                    v-for="slot in serviceTimeSlotOptions"
+                    :key="slot"
+                    type="button"
+                    class="slot-pill"
+                    :class="{ active: staffForm.serviceTimeSlots.includes(slot) }"
+                    @click="toggleStaffServiceSlot(slot)"
+                  >
+                    <span class="slot-indicator" aria-hidden="true"></span>
+                    <span class="slot-label">{{ slot }}</span>
+                    <span class="visually-hidden" aria-live="polite">
+                      {{ staffForm.serviceTimeSlots.includes(slot) ? '已选中' : '未选中' }}
+                    </span>
+                  </button>
+                </div>
+                <p class="form-helper">点击可多选</p>
+              </div>
+              <div class="form-field form-field-full">
                 <label for="staff-notes">备注</label>
                 <textarea id="staff-notes" v-model="staffForm.notes" rows="3"></textarea>
               </div>
@@ -369,6 +380,7 @@
                   <th>姓名</th>
                   <th>联系方式</th>
                   <th>服务类别</th>
+                  <th>服务时间段</th>
                   <th>状态</th>
                   <th>备注</th>
                   <th>创建时间</th>
@@ -389,6 +401,7 @@
                   <td>{{ item.name }}</td>
                   <td>{{ item.contact }}</td>
                   <td>{{ item.categoryName || '—' }}</td>
+                  <td>{{ formatServiceSlots(item.serviceTimeSlots) }}</td>
                   <td>
                     <span class="status-badge" :class="item.assigned ? 'status-assigned' : 'status-available'">
                       {{ item.assigned ? '已分配' : '未分配' }}
@@ -402,7 +415,7 @@
                   </td>
                 </tr>
                 <tr v-if="!staffList.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasStaffFilter">未找到匹配的人员，尝试调整搜索条件。</span>
                     <span v-else>还没有添加人员，点击右上角按钮即可新增。</span>
                   </td>
@@ -863,7 +876,7 @@ const serviceForm = reactive<CompanyServicePayload>({
   unit: '',
   price: 0,
   contact: '',
-  serviceTime: '按需预约',
+  serviceTime: '2小时',
   description: '',
   categoryId: 0,
 })
@@ -877,11 +890,13 @@ const staffFormVisible = ref(false)
 const staffSaving = ref(false)
 const editingStaffId = ref<number | null>(null)
 const staffCategoryFilter = ref<number | 'all'>('all')
+const serviceTimeSlotOptions = ['8:00-10:00', '11:00-13:00', '14:00-16:00', '17:00-19:00', '20:00-22:00']
 const staffForm = reactive<CompanyStaffPayload>({
   name: '',
   contact: '',
   categoryId: 0,
   notes: '',
+  serviceTimeSlots: [serviceTimeSlotOptions[0]],
 })
 const assignmentModalVisible = ref(false)
 const assignmentModalLoading = ref(false)
@@ -1341,7 +1356,7 @@ const resetServiceForm = () => {
   serviceForm.unit = ''
   serviceForm.price = 0
   serviceForm.contact = ''
-  serviceForm.serviceTime = '按需预约'
+  serviceForm.serviceTime = '2小时'
   serviceForm.description = ''
   serviceForm.categoryId = serviceCategories.value[0]?.id ?? 0
   editingServiceId.value = null
@@ -1353,7 +1368,7 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
     serviceForm.unit = item.unit
     serviceForm.price = item.price
     serviceForm.contact = item.contact
-    serviceForm.serviceTime = item.serviceTime || '按需预约'
+    serviceForm.serviceTime = '2小时'
     serviceForm.description = item.description || ''
     serviceForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
     editingServiceId.value = item.id
@@ -1371,10 +1386,6 @@ const closeServiceForm = () => {
 const submitServiceForm = async () => {
   if (!serviceForm.name.trim() || !serviceForm.unit.trim() || !serviceForm.contact.trim()) {
     window.alert('请完整填写服务信息')
-    return
-  }
-  if (!serviceForm.serviceTime.trim()) {
-    window.alert('请填写服务时长')
     return
   }
   if (serviceForm.price <= 0) {
@@ -1443,11 +1454,21 @@ const handleBulkDeleteServices = async () => {
   }
 }
 
+const toggleStaffServiceSlot = (slot: string) => {
+  const current = staffForm.serviceTimeSlots
+  if (current.includes(slot)) {
+    staffForm.serviceTimeSlots = current.filter((item) => item !== slot)
+  } else {
+    staffForm.serviceTimeSlots = [...current, slot]
+  }
+}
+
 const resetStaffForm = () => {
   staffForm.name = ''
   staffForm.contact = ''
   staffForm.categoryId = serviceCategories.value[0]?.id ?? 0
   staffForm.notes = ''
+  staffForm.serviceTimeSlots = [serviceTimeSlotOptions[0]]
   editingStaffId.value = null
 }
 
@@ -1457,6 +1478,9 @@ const openStaffForm = (item?: CompanyStaffItem) => {
     staffForm.contact = item.contact
     staffForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
     staffForm.notes = item.notes || ''
+    staffForm.serviceTimeSlots = item.serviceTimeSlots?.length
+      ? item.serviceTimeSlots.slice()
+      : [serviceTimeSlotOptions[0]]
     editingStaffId.value = item.id
   } else {
     resetStaffForm()
@@ -1478,12 +1502,17 @@ const submitStaffForm = async () => {
     window.alert('请选择服务类别')
     return
   }
+  if (!staffForm.serviceTimeSlots.length) {
+    window.alert('请选择服务时间段')
+    return
+  }
   staffSaving.value = true
   try {
     const payload: CompanyStaffPayload = {
       name: staffForm.name.trim(),
       contact: staffForm.contact.trim(),
       categoryId: staffForm.categoryId,
+      serviceTimeSlots: staffForm.serviceTimeSlots.slice(),
       notes: staffForm.notes?.trim() || undefined,
     }
     if (editingStaffId.value) {
@@ -1937,7 +1966,11 @@ const loadStaff = async () => {
       params.categoryId = staffCategoryFilter.value
     }
     const query = Object.keys(params).length ? params : undefined
-    staffList.value = await fetchCompanyStaff(query)
+    const result = await fetchCompanyStaff(query)
+    staffList.value = result.map((item) => ({
+      ...item,
+      serviceTimeSlots: item.serviceTimeSlots ?? [],
+    }))
     pruneStaffSelection()
   } catch (error) {
     console.error(error)
@@ -2022,6 +2055,13 @@ const statusText = (status: ServiceOrderItem['status']) => {
     default:
       return status
   }
+}
+
+const formatServiceSlots = (slots: string[] | undefined) => {
+  if (!slots || !slots.length) {
+    return '—'
+  }
+  return slots.join('、')
 }
 
 const formatDateTime = (value: string) => {
@@ -2839,6 +2879,55 @@ onUnmounted(() => {
   outline: none;
   border-color: var(--brand-success);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.slot-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.slot-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(248, 250, 255, 0.9);
+  color: rgba(15, 23, 42, 0.82);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slot-pill:hover {
+  border-color: var(--brand-primary);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.14);
+}
+
+.slot-pill.active {
+  border-color: var(--brand-primary);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(16, 185, 129, 0.12));
+  color: var(--brand-primary-dark);
+}
+
+.slot-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(148, 163, 184, 0.7);
+  background: #fff;
+  transition: all 0.2s ease;
+}
+
+.slot-pill.active .slot-indicator {
+  border-color: var(--brand-primary);
+  box-shadow: inset 0 0 0 3px #fff;
+  background: var(--brand-primary);
+}
+
+.slot-label {
+  font-weight: 600;
 }
 
 .empty-row {
