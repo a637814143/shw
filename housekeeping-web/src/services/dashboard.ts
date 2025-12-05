@@ -83,6 +83,8 @@ export interface HousekeepServiceItem {
   categoryId?: number | null
   categoryName?: string | null
   availableStaffCount: number
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectionReason?: string | null
 }
 
 export interface CompanyServicePage {
@@ -199,6 +201,11 @@ export interface CompanyServicePayload {
 export interface RefundDecisionPayload {
   approve: boolean
   message?: string
+}
+
+export interface ServiceApprovalPayload {
+  approve: boolean
+  reason?: string
 }
 
 export interface UpdateWalletPayload {
@@ -971,6 +978,37 @@ export const fetchAdminRefunds = async (params?: {
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<ServiceOrderItem[]>(response)
+}
+
+export const fetchAdminServices = async (params?: {
+  keyword?: string
+  categoryId?: number
+  status?: 'PENDING' | 'APPROVED' | 'REJECTED'
+}): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/admin/services/approval'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
+  }
+  if (params?.status) {
+    url.searchParams.set('status', params.status)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  const result = await handleResponse<HousekeepServiceItem[]>(response)
+  return withFixedServiceTime(result)
+}
+
+export const reviewAdminService = async (
+  serviceId: number,
+  payload: ServiceApprovalPayload,
+): Promise<HousekeepServiceItem> => {
+  const response = await fetch(buildUrl(`/api/admin/services/${serviceId}/review`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<HousekeepServiceItem>(response)
 }
 
 export const handleAdminRefund = async (

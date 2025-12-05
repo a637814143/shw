@@ -179,6 +179,7 @@
                   <th>联系方式</th>
                   <th>服务时长</th>
                   <th>描述</th>
+                  <th>状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -203,6 +204,14 @@
                   <td>{{ item.contact }}</td>
                   <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
+                  <td>
+                    <span class="status-badge" :class="`status-${(item.status || 'PENDING').toLowerCase()}`">
+                      {{ serviceStatusText(item.status) }}
+                    </span>
+                    <div v-if="item.status === 'REJECTED' && item.rejectionReason" class="order-subtext">
+                      驳回理由：{{ item.rejectionReason }}
+                    </div>
+                  </td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
@@ -911,6 +920,18 @@ const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((ite
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
+
+const serviceStatusText = (status?: HousekeepServiceItem['status']) => {
+  switch (status) {
+    case 'APPROVED':
+      return '审核通过'
+    case 'REJECTED':
+      return '已驳回'
+    case 'PENDING':
+    default:
+      return '待审核'
+  }
+}
 
 const hasStaffSelection = computed(() => selectedStaffIds.value.size > 0)
 const allStaffSelected = computed(
