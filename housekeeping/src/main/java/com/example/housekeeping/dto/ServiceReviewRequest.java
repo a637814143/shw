@@ -1,27 +1,44 @@
 package com.example.housekeeping.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public class ServiceReviewRequest {
 
-    @NotNull(message = "请选择是否通过")
-    private Boolean approve;
+    @NotNull(message = "请选择服务")
+    private Long serviceId;
 
-    private String reason;
+    @NotNull(message = "请选择评分")
+    @Min(value = 1, message = "评分不能低于1分")
+    @Max(value = 5, message = "评分不能高于5分")
+    private Integer rating;
 
-    public Boolean getApprove() {
-        return approve;
+    @NotBlank(message = "请填写评价内容")
+    private String content;
+
+    public Long getServiceId() {
+        return serviceId;
     }
 
-    public void setApprove(Boolean approve) {
-        this.approve = approve;
+    public void setServiceId(Long serviceId) {
+        this.serviceId = serviceId;
     }
 
-    public String getReason() {
-        return reason;
+    public Integer getRating() {
+        return rating;
     }
 
-    public void setReason(String reason) {
-        this.reason = reason;
+    public void setRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
     }
 }

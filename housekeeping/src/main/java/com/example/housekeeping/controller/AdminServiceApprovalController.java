@@ -2,7 +2,7 @@ package com.example.housekeeping.controller;
 
 import com.example.housekeeping.common.Result;
 import com.example.housekeeping.dto.HousekeepServiceResponse;
-import com.example.housekeeping.dto.ServiceReviewRequest;
+import com.example.housekeeping.dto.ServiceApprovalRequest;
 import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.service.HousekeepServiceManager;
 import jakarta.validation.Valid;
@@ -37,7 +37,7 @@ public class AdminServiceApprovalController {
     @PostMapping("/{serviceId}/review")
     public Result<HousekeepServiceResponse> review(
         @PathVariable Long serviceId,
-        @Valid @RequestBody ServiceReviewRequest request
+        @Valid @RequestBody ServiceApprovalRequest request
     ) {
         return Result.success(
             "操作成功",
