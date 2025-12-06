@@ -1668,8 +1668,23 @@ const confirmPayment = async () => {
 
   try {
     const action = pendingPaymentAction.value
+    if (!action) {
+      paymentError.value = '当前没有待支付的事项，请重新操作。'
+      return
+    }
+
     if (action.kind === 'order') {
-      await createUserOrder(action.payload)
+      const normalizedDate = new Date(action.payload.scheduledAt)
+      if (Number.isNaN(normalizedDate.getTime())) {
+        throw new Error('预约时间无效，请重新选择预约时间')
+      }
+      const payload = {
+        ...action.payload,
+        scheduledAt: normalizedDate.toISOString(),
+        specialRequest: action.payload.specialRequest?.trim() || undefined,
+        serviceAddress: action.payload.serviceAddress?.trim() || undefined,
+      }
+      await createUserOrder(payload)
       await Promise.all([loadOrders(), loadAccount()])
       bookingForm.service = null
       bookingForm.selectedDate = bookingDateLimits.value.min
@@ -1678,7 +1693,11 @@ const confirmPayment = async () => {
       bookingForm.serviceAddress = ''
       paymentMessage.value = `支付成功，已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}创建订单。`
     } else {
-      account.value = await rechargeUserWallet({ amount: action.payload.amount })
+      const amount = Number(action.payload.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('充值金额无效，请重新输入金额')
+      }
+      account.value = await rechargeUserWallet({ amount })
       walletForm.amount = null
       paymentMessage.value = `支付成功，钱包已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}充值。`
     }
@@ -1689,7 +1708,7 @@ const confirmPayment = async () => {
   } catch (orderError) {
     console.error(orderError)
     const fallbackMessage =
-      pendingPaymentAction.value?.kind === 'order' ? '下单失败，请稍后再试。' : '充值失败，请稍后再试。'
+      pendingPaymentAction.value?.kind === 'order' ? '下单失败，请确认预约信息后再试。' : '充值失败，请稍后再试。'
     paymentError.value = orderError instanceof Error ? orderError.message : fallbackMessage
   } finally {
     paymentProcessing.value = false
