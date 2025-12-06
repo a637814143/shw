@@ -70,6 +70,8 @@ export type ServiceOrderStatus =
   | 'REFUND_APPROVED'
   | 'REFUND_REJECTED'
 
+export type HousekeepServiceStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
 export interface HousekeepServiceItem {
   id: number
   name: string
@@ -83,6 +85,8 @@ export interface HousekeepServiceItem {
   categoryId?: number | null
   categoryName?: string | null
   availableStaffCount: number
+  status?: HousekeepServiceStatus | null
+  reviewNote?: string | null
 }
 
 export interface CompanyServicePage {
@@ -201,6 +205,11 @@ export interface CompanyServicePayload {
   serviceTime: string
   description?: string
   categoryId: number
+}
+
+export interface ServiceApprovalDecisionPayload {
+  approve: boolean
+  reason?: string
 }
 
 export interface RefundDecisionPayload {
@@ -847,6 +856,36 @@ export const deleteAdminServiceCategories = async (ids: number[]): Promise<void>
     body: JSON.stringify({ ids }),
   })
   await handleResponse<null>(response)
+}
+
+export const fetchAdminServiceApprovals = async (params?: {
+  keyword?: string
+  categoryId?: number
+  status?: HousekeepServiceStatus
+}): Promise<HousekeepServiceItem[]> => {
+  const url = new URL(buildUrl('/api/admin/services/approval'))
+  if (params?.keyword) {
+    url.searchParams.set('keyword', params.keyword)
+  }
+  if (typeof params?.categoryId === 'number') {
+    url.searchParams.set('categoryId', String(params.categoryId))
+  }
+  if (params?.status) {
+    url.searchParams.set('status', params.status)
+  }
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<HousekeepServiceItem[]>(response)
+}
+
+export const reviewAdminService = async (
+  serviceId: number,
+  payload: ServiceApprovalDecisionPayload,
+): Promise<HousekeepServiceItem> => {
+  const response = await fetch(buildUrl(`/api/admin/services/${serviceId}/review`), {
+    ...withAuthHeaders({ method: 'POST' }),
+    body: JSON.stringify(payload),
+  })
+  return handleResponse<HousekeepServiceItem>(response)
 }
 
 export const fetchCompanyOrders = async (params?: { keyword?: string; categoryId?: number }): Promise<ServiceOrderItem[]> => {

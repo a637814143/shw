@@ -11,6 +11,7 @@ import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.dto.ServiceReviewResponse;
 import com.example.housekeeping.dto.TimeSlotAvailabilityResponse;
 import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.service.CompanyStaffService;
 import com.example.housekeeping.service.HousekeepServiceManager;
 import com.example.housekeeping.service.ServiceFavoriteService;
@@ -63,6 +64,9 @@ public class UserServiceController {
             throw new RuntimeException("预约日期格式无效");
         }
         HousekeepService service = housekeepServiceManager.getServiceById(serviceId);
+        if (service.getStatus() != HousekeepServiceStatus.APPROVED) {
+            throw new RuntimeException("当前服务未审核通过，暂不可预约");
+        }
         return Result.success(companyStaffService.buildSlotAvailability(service, targetDate));
     }
 

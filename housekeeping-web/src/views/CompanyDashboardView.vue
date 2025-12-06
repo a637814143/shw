@@ -179,6 +179,7 @@
                   <th>联系方式</th>
                   <th>服务时间段</th>
                   <th>描述</th>
+                  <th>状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -202,16 +203,21 @@
                   <td>{{ item.contact }}</td>
                   <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
+                  <td>
+                    <span class="status-chip" :class="serviceStatusClass(item.status)">
+                      {{ serviceStatusText(item) }}
+                    </span>
+                  </td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="8" class="empty-row">服务加载中…</td>
+                  <td colspan="9" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -803,6 +809,7 @@ import {
   type CompanyConversationItem,
   type CompanyMessageItem,
   type HousekeepServiceItem,
+  type HousekeepServiceStatus,
   type ServiceReviewItem,
   type ServiceOrderItem,
   type UpdateOrderProgressPayload,
@@ -906,6 +913,22 @@ const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((it
 const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const serviceStatusText = (item: HousekeepServiceItem) => {
+  const status = item.status || 'PENDING'
+  if (status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return item.reviewNote ? `驳回（${item.reviewNote}）` : '驳回'
+  }
+  return '待审核'
+}
+
+const serviceStatusClass = (status?: HousekeepServiceStatus | null) => {
+  const key = (status || 'PENDING').toLowerCase()
+  return `status-${key}`
+}
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
@@ -2645,6 +2668,32 @@ onUnmounted(() => {
 
 .status-refund_rejected {
   background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(226, 232, 240, 0.85);
+  color: #0f172a;
+}
+
+.status-chip.status-pending {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.status-chip.status-approved {
+  background: rgba(16, 185, 129, 0.16);
+  color: #047857;
+}
+
+.status-chip.status-rejected {
+  background: rgba(248, 113, 113, 0.18);
+  color: #b91c1c;
 }
 
 .status-assigned {

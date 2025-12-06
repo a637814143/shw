@@ -20,10 +20,12 @@ public class HousekeepServiceResponse {
     private String categoryName;
     private Long availableStaffCount;
     private String status;
+    private String reviewNote;
 
     public HousekeepServiceResponse(Long id, String name, String unit, BigDecimal price, String contact,
                                     String serviceTime, String description, Long companyId, String companyName,
-                                    Long categoryId, String categoryName, Long availableStaffCount, String status) {
+                                    Long categoryId, String categoryName, Long availableStaffCount, String status,
+                                    String reviewNote) {
         this.id = id;
         this.name = name;
         this.unit = unit;
@@ -37,6 +39,7 @@ public class HousekeepServiceResponse {
         this.categoryName = categoryName;
         this.availableStaffCount = availableStaffCount;
         this.status = status;
+        this.reviewNote = reviewNote;
     }
 
     public Long getId() {
@@ -89,5 +92,9 @@ public class HousekeepServiceResponse {
 
     public String getStatus() {
         return status;
+    }
+
+    public String getReviewNote() {
+        return reviewNote;
     }
 }

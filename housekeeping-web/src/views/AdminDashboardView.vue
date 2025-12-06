@@ -541,6 +541,115 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'approvals'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务审核</h2>
+              <p>审核家政公司提交的服务，审核通过后用户端才能展示。</p>
+            </div>
+            <div class="user-actions">
+              <label class="visually-hidden" for="approval-search">搜索服务</label>
+              <input
+                id="approval-search"
+                v-model="approvalSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务名称、公司或联系方式"
+                :disabled="approvalsLoading"
+              />
+              <select v-model="approvalStatusFilter" class="search-input" :disabled="approvalsLoading">
+                <option value="PENDING">待审核</option>
+                <option value="APPROVED">审核通过</option>
+                <option value="REJECTED">驳回</option>
+                <option value="all">全部状态</option>
+              </select>
+              <button
+                v-if="hasApprovalFilter"
+                type="button"
+                class="ghost-button"
+                :disabled="approvalsLoading"
+                @click="resetApprovalFilters"
+              >
+                清除筛选
+              </button>
+              <button type="button" class="ghost-button" @click="loadServiceApprovals" :disabled="approvalsLoading">
+                {{ approvalsLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+
+          <div class="category-menu service-category-menu" role="tablist" aria-label="按服务类别筛选审核记录">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: approvalCategoryFilter === 'all' }"
+              @click="approvalCategoryFilter = 'all'"
+            >
+              全部
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: approvalCategoryFilter === category.id }"
+              @click="approvalCategoryFilter = category.id"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount ?? 0 }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">暂无服务分类</p>
+          </div>
+
+          <div v-if="approvalsLoading" class="loading-state">正在加载服务审核列表…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务信息</th>
+                  <th>价格</th>
+                  <th>联系方式</th>
+                  <th>状态</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in serviceApprovals" :key="item.id">
+                  <td>
+                    <strong>{{ item.name }}</strong>
+                    <div class="order-subtext">公司：{{ item.companyName }}</div>
+                    <div class="order-subtext">分类：{{ item.categoryName || '未分类' }}</div>
+                  </td>
+                  <td>¥{{ item.price.toFixed(2) }} / {{ item.unit }}</td>
+                  <td>{{ item.contact }}</td>
+                  <td>
+                    <span class="status-badge" :class="approvalBadgeClass(item.status)">
+                      {{ approvalStatusText(item) }}
+                    </span>
+                  </td>
+                  <td class="table-actions actions-inline">
+                    <template v-if="item.status === 'PENDING'">
+                      <button type="button" class="link-button" @click="handleServiceReview(item, true)">
+                        通过
+                      </button>
+                      <button type="button" class="link-button danger" @click="handleServiceReview(item, false)">
+                        驳回
+                      </button>
+                    </template>
+                    <span v-else class="order-subtext muted">已处理</span>
+                  </td>
+                </tr>
+                <tr v-if="!serviceApprovals.length">
+                  <td colspan="5" class="empty-row">
+                    <span v-if="approvalStatusFilter === 'PENDING'">暂无待审核的服务。</span>
+                    <span v-else>暂无符合筛选条件的服务记录。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'categories'" class="panel">
           <header class="panel-header">
             <div>
@@ -1067,6 +1176,7 @@ import {
   deleteAdminTransactions,
   deleteAdminServiceCategory,
   deleteAdminServiceCategories,
+  fetchAdminServiceApprovals,
   fetchAdminFavorites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -1090,9 +1200,12 @@ import {
   updateDashboardAnnouncement,
   updateDashboardCarousel,
   updateDashboardTip,
+  reviewAdminService,
   type AccountTransactionItem,
   type AdminOverviewItem,
   type AccountProfileItem,
+  type HousekeepServiceItem,
+  type HousekeepServiceStatus,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
   type DashboardTipItem,
@@ -1100,6 +1213,7 @@ import {
   type ServiceOrderItem,
   type ServiceCategoryItem,
   type ServiceCategoryPayload,
+  type ServiceApprovalDecisionPayload,
   type UpdateLoyaltyPayload,
   type UpdatePasswordPayload,
   type UpdateWalletPayload,
@@ -1113,6 +1227,7 @@ type SectionKey =
   | 'ledger'
   | 'transactions'
   | 'favorites'
+  | 'approvals'
   | 'categories'
   | 'content'
   | 'refunds'
@@ -1132,6 +1247,7 @@ const sections: SectionMeta[] = [
   { key: 'ledger', icon: '💼', label: '订单管理' },
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
+  { key: 'approvals', icon: '✅', label: '服务审核' },
   { key: 'categories', icon: '🗂️', label: '服务分类' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
   { key: 'refunds', icon: '💰', label: '退款审批' },
@@ -1169,6 +1285,13 @@ const favoritesLoading = ref(false)
 const favoriteSearch = ref('')
 const selectedFavoriteIds = ref<Set<number>>(new Set())
 let favoriteSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+const serviceApprovals = ref<HousekeepServiceItem[]>([])
+const approvalsLoading = ref(false)
+const approvalSearch = ref('')
+const approvalStatusFilter = ref<HousekeepServiceStatus | 'all'>('PENDING')
+const approvalCategoryFilter = ref<number | 'all'>('all')
+let approvalSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const serviceCategories = ref<ServiceCategoryItem[]>([])
 const categoryLoading = ref(false)
@@ -1208,6 +1331,13 @@ const refundStage = ref<'pending' | 'processed' | 'all'>('pending')
 const refundSearch = ref('')
 const selectedRefundIds = ref<Set<number>>(new Set())
 let refundSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+const hasApprovalFilter = computed(
+  () =>
+    approvalSearch.value.trim().length > 0 ||
+    approvalStatusFilter.value !== 'PENDING' ||
+    approvalCategoryFilter.value !== 'all',
+)
 
 const selectedUserCount = computed(() => selectedUserIds.value.size)
 const hasUserSelection = computed(() => selectedUserIds.value.size > 0)
@@ -1764,6 +1894,8 @@ const switchSection = (key: SectionKey) => {
     loadTransactions()
   } else if (key === 'favorites') {
     loadFavorites()
+  } else if (key === 'approvals') {
+    loadServiceApprovals()
   } else if (key === 'categories') {
     loadAdminCategories()
   } else if (key === 'content') {
@@ -1867,6 +1999,73 @@ const loadAdminCategories = async () => {
   } finally {
     categoryLoading.value = false
   }
+}
+
+const loadServiceApprovals = async () => {
+  approvalsLoading.value = true
+  try {
+    const keyword = approvalSearch.value.trim()
+    const params: { keyword?: string; categoryId?: number; status?: HousekeepServiceStatus } = {}
+    if (keyword) {
+      params.keyword = keyword
+    }
+    if (approvalCategoryFilter.value !== 'all') {
+      params.categoryId = approvalCategoryFilter.value
+    }
+    if (approvalStatusFilter.value !== 'all') {
+      params.status = approvalStatusFilter.value
+    }
+    serviceApprovals.value = await fetchAdminServiceApprovals(params)
+  } catch (error) {
+    console.error(error)
+    serviceApprovals.value = []
+  } finally {
+    approvalsLoading.value = false
+  }
+}
+
+const approvalBadgeClass = (status?: HousekeepServiceStatus | null) => {
+  const key = (status || 'PENDING').toLowerCase()
+  return `status-${key}`
+}
+
+const approvalStatusText = (item: HousekeepServiceItem) => {
+  const status = item.status || 'PENDING'
+  let label = '待审核'
+  if (status === 'APPROVED') {
+    label = '审核通过'
+  } else if (status === 'REJECTED') {
+    label = '驳回'
+  }
+  if (status === 'REJECTED' && item.reviewNote) {
+    return `${label}（${item.reviewNote}）`
+  }
+  return label
+}
+
+const handleServiceReview = async (item: HousekeepServiceItem, approve: boolean) => {
+  let reason: string | undefined
+  if (!approve) {
+    const input = window.prompt('请输入驳回理由')
+    if (!input || !input.trim()) {
+      window.alert('请填写驳回理由')
+      return
+    }
+    reason = input.trim()
+  }
+  try {
+    await reviewAdminService(item.id, { approve, reason })
+    await loadServiceApprovals()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '操作失败，请稍后再试')
+  }
+}
+
+const resetApprovalFilters = async () => {
+  approvalSearch.value = ''
+  approvalStatusFilter.value = 'PENDING'
+  approvalCategoryFilter.value = 'all'
+  await loadServiceApprovals()
 }
 
 const resetCategoryForm = () => {
@@ -2129,6 +2328,24 @@ watch(transactionSearch, () => {
     await loadTransactions()
     transactionSearchTimer = null
   }, 300)
+})
+
+watch(approvalSearch, () => {
+  if (approvalSearchTimer) {
+    clearTimeout(approvalSearchTimer)
+  }
+  approvalSearchTimer = setTimeout(async () => {
+    await loadServiceApprovals()
+    approvalSearchTimer = null
+  }, 300)
+})
+
+watch(approvalStatusFilter, async () => {
+  await loadServiceApprovals()
+})
+
+watch(approvalCategoryFilter, async () => {
+  await loadServiceApprovals()
 })
 
 watch(favoriteSearch, () => {
@@ -2744,6 +2961,7 @@ onMounted(async () => {
     loadAdminAccount(),
     loadOrderLedger(),
     loadAdminCategories(),
+    loadServiceApprovals(),
   ])
 })
 
@@ -2779,6 +2997,10 @@ onUnmounted(() => {
   if (favoriteSearchTimer) {
     clearTimeout(favoriteSearchTimer)
     favoriteSearchTimer = null
+  }
+  if (approvalSearchTimer) {
+    clearTimeout(approvalSearchTimer)
+    approvalSearchTimer = null
   }
 })
 </script>
@@ -3199,6 +3421,21 @@ onUnmounted(() => {
 }
 
 .status-refund_requested {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fca5a5;
+}
+
+.status-pending {
+  background: rgba(248, 180, 28, 0.18);
+  color: #fcd34d;
+}
+
+.status-approved {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.status-rejected {
   background: rgba(248, 113, 113, 0.2);
   color: #fca5a5;
 }
