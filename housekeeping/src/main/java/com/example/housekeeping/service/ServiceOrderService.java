@@ -13,6 +13,7 @@ import com.example.housekeeping.entity.ServiceCategory;
 import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.ServiceOrderStatus;
+import com.example.housekeeping.service.ServiceTimeSlotHelper.SlotDefinition;
 import com.example.housekeeping.repository.CompanyMessageRepository;
 import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
@@ -25,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +61,9 @@ public class ServiceOrderService {
     @Autowired
     private CompanyStaffRepository companyStaffRepository;
 
+    @Autowired
+    private CompanyStaffService companyStaffService;
+
     @Transactional
     public ServiceOrderResponse createOrder(ServiceOrderRequest request) {
         UserAll user = accountLookupService.getCurrentAccount();
@@ -77,6 +83,14 @@ public class ServiceOrderService {
         Instant scheduledAt = Objects.requireNonNull(request.getScheduledAt(), "预约时间不能为空");
         if (scheduledAt.isBefore(Instant.now().minusSeconds(60))) {
             throw new RuntimeException("预约时间不能早于当前时间");
+        }
+
+        SlotDefinition slot = ServiceTimeSlotHelper.resolveByInstant(scheduledAt, ZoneId.systemDefault())
+            .orElseThrow(() -> new RuntimeException("预约时间不在允许的服务时间段内"));
+        LocalDate localDate = scheduledAt.atZone(ZoneId.systemDefault()).toLocalDate();
+        long availableStaff = companyStaffService.countAvailableStaffForSlot(service, localDate, slot);
+        if (availableStaff <= 0) {
+            throw new RuntimeException("该时间段暂无空闲人员，无法预约");
         }
 
         String specialRequest = normalizeMessage(request.getSpecialRequest());
@@ -458,8 +472,11 @@ public class ServiceOrderService {
                 throw new RuntimeException("只能删除当前账号的订单");
             }
             ServiceOrderStatus status = order.getStatus();
-            if (status != ServiceOrderStatus.COMPLETED && status != ServiceOrderStatus.REFUND_APPROVED) {
-                throw new RuntimeException("仅已完成或已退款的订单可以删除");
+            boolean confirmed = order.isUserConfirmed();
+            boolean refundInProgressOrDone = status == ServiceOrderStatus.REFUND_REQUESTED
+                || status == ServiceOrderStatus.REFUND_APPROVED;
+            if (!confirmed && !refundInProgressOrDone) {
+                throw new RuntimeException("仅已确认或已申请退款的订单可以删除");
             }
         }
 
