@@ -338,10 +338,6 @@
                   <dt>服务时长</dt>
                   <dd>{{ service.serviceTime }}</dd>
                 </div>
-                <div>
-                  <dt>空闲人员</dt>
-                  <dd>{{ service.availableStaffCount }} 人</dd>
-                </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
               <footer class="service-card-footer">
@@ -981,11 +977,11 @@ const bookingDateLimits = computed(() => ({
 }))
 
 const BOOKING_TIME_SLOTS = [
-  { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0 },
-  { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0 },
-  { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0 },
-  { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0 },
-  { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0 },
+  { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0, endHour: 10, endMinute: 0 },
+  { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0, endHour: 13, endMinute: 0 },
+  { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0, endHour: 16, endMinute: 0 },
+  { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0, endHour: 19, endMinute: 0 },
+  { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0, endHour: 22, endMinute: 0 },
 ] as const
 
 type BookingTimeSlotKey = (typeof BOOKING_TIME_SLOTS)[number]['key']
@@ -2105,7 +2101,28 @@ const formatTimeText = (date: Date) => {
   return `${hours}:${minutes}`
 }
 
+const isSlotPastForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    return false
+  }
+
+  const today = new Date()
+  const normalizedToday = new Date(today)
+  normalizedToday.setHours(0, 0, 0, 0)
+  if (normalizedToday.getTime() !== selectedDate.getTime()) {
+    return false
+  }
+
+  const slotEnd = new Date(selectedDate)
+  slotEnd.setHours(slot.endHour ?? slot.startHour, slot.endMinute ?? slot.startMinute, 0, 0)
+  return slotEnd <= today
+}
+
 const slotLabelWithAvailability = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+  if (isSlotPastForSelectedDate(slot)) {
+    return slot.label
+  }
   const info = timeSlotAvailability.value[slot.key]
   const countText = info ? info.availableStaff : 0
   return `${slot.label}（空闲人员：${countText}个）`
