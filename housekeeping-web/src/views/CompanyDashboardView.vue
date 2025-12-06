@@ -177,7 +177,7 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -490,7 +490,7 @@
                     />
                   </th>
                   <th>服务</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>服务类别</th>
                   <th>预约时间</th>
                   <th>用户</th>
@@ -525,9 +525,9 @@
                       用户需求：{{ order.specialRequest }}
                     </div>
                   </td>
-                  <td>{{ order.serviceTime || '按需预约' }}</td>
+                  <td>{{ formatOrderServiceWindow(order) }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
-                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
+                  <td>{{ formatDateTime(order.createdAt) }}</td>
                   <td>{{ order.username }}</td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
@@ -2064,9 +2064,46 @@ const formatServiceSlots = (slots: string[] | undefined) => {
   return slots.join('、')
 }
 
+const extractServiceHours = (value?: string | null) => {
+  if (!value) {
+    return null
+  }
+  const match = value.match(/([0-9]+(?:\.\d+)?)/)
+  const hours = match ? Number.parseFloat(match[1]) : NaN
+  return Number.isFinite(hours) && hours > 0 ? hours : null
+}
+
 const formatDateTime = (value: string) => {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+const formatOrderServiceWindow = (order: ServiceOrderItem) => {
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return order.serviceTime || '未提供预约时间'
+  }
+
+  const hours = extractServiceHours(order.serviceTime)
+  if (!hours) {
+    return formatDateTime(order.scheduledAt)
+  }
+
+  const end = new Date(start.getTime() + hours * 60 * 60 * 1000)
+  const formatTimePart = (date: Date) =>
+    new Intl.DateTimeFormat('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }).format(date)
+
+  return `${formatDateTime(order.scheduledAt)} - ${formatTimePart(end)}`
 }
 
 const formatProgressText = (order: ServiceOrderItem): string => {

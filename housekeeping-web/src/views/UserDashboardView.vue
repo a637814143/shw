@@ -503,9 +503,10 @@
                       <span>积分 +{{ order.loyaltyPoints }}</span>
                     </div>
                     <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
+                    <div class="order-subtext">服务时间段：{{ formatServiceWindow(order) }}</div>
                   </td>
                   <td>
-                    <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
+                    <div class="order-subtext">{{ formatAppointmentStart(order) }}</div>
                   </td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
@@ -2055,8 +2056,64 @@ const jumpToMessages = (orderId: number) => {
   })
 }
 
+const formatTimeText = (date: Date) => {
+  const hours = `${date.getHours()}`.padStart(2, '0')
+  const minutes = `${date.getMinutes()}`.padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const formatServiceWindow = (order: ServiceOrderItem) => {
+  if (!order?.scheduledAt) {
+    return '未提供'
+  }
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return '未提供'
+  }
+  const matchedSlot = BOOKING_TIME_SLOTS.find(
+    (slot) => slot.startHour === start.getHours() && slot.startMinute === start.getMinutes(),
+  )
+  if (matchedSlot) {
+    return matchedSlot.label
+  }
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000)
+  return `${formatTimeText(start)}-${formatTimeText(end)}`
+}
+
+const formatAppointmentStart = (order: ServiceOrderItem) => {
+  if (!order?.scheduledAt) {
+    return '未提供'
+  }
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return '未提供'
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(start)
+}
+
 const formatDateTime = (value: string) => {
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  if (!value) {
+    return '未提供'
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return '未提供'
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
 }
 
 const statusText = (status: ServiceOrderItem['status']) => {
