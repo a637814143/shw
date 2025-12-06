@@ -2136,11 +2136,8 @@ const isSlotUnavailableForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[numb
     return false
   }
 
-  const today = new Date()
-  const normalizedToday = new Date(today)
-  normalizedToday.setHours(0, 0, 0, 0)
-  if (normalizedToday.getTime() !== selectedDate.getTime()) {
-    return false
+  if (isSlotPastForSelectedDate(slot)) {
+    return true
   }
 
   const availability = timeSlotAvailability.value[slot.key]
