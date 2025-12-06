@@ -648,25 +648,59 @@
               <button
                 type="button"
                 class="tab-button"
-                :class="{ active: reviewTab === 'reviewed' }"
-                :aria-pressed="reviewTab === 'reviewed'"
-                @click="setReviewTab('reviewed')"
-              >
-                已评价
-              </button>
-              <button
-                type="button"
-                class="tab-button"
                 :class="{ active: reviewTab === 'unreviewed' }"
                 :aria-pressed="reviewTab === 'unreviewed'"
                 @click="setReviewTab('unreviewed')"
               >
                 未评价
               </button>
+              <button
+                type="button"
+                class="tab-button"
+                :class="{ active: reviewTab === 'reviewed' }"
+                :aria-pressed="reviewTab === 'reviewed'"
+                @click="setReviewTab('reviewed')"
+              >
+                已评价
+              </button>
             </div>
           </div>
 
-          <div v-if="reviewTab === 'reviewed'" class="review-section">
+          <div v-if="reviewTab === 'unreviewed'" class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>最近预约</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="service in pendingReviewServices" :key="service.id">
+                  <td>
+                    <strong>{{ service.name }}</strong>
+                    <div class="order-subtext muted">服务公司：{{ service.companyName }}</div>
+                  </td>
+                  <td>{{ service.lastScheduledAt ? formatDateTime(service.lastScheduledAt) : '—' }}</td>
+                  <td class="table-actions actions-inline">
+                    <button type="button" class="primary-button" @click="openReviewModal(service)">
+                      去评价
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="ordersLoading || userReviewsLoading">
+                  <td colspan="3" class="empty-row">数据加载中…</td>
+                </tr>
+                <tr v-else-if="!pendingReviewServices.length">
+                  <td colspan="3" class="empty-row">
+                    <span v-if="hasReviewSearch">没有匹配的待评价服务。</span>
+                    <span v-else>暂无待评价的服务，完成订单后即可发布评价。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="review-section">
             <div class="review-actions">
               <button
                 type="button"
@@ -742,40 +776,6 @@
                 </tbody>
               </table>
             </div>
-          </div>
-          <div v-else class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>服务</th>
-                  <th>最近预约</th>
-                  <th class="table-actions">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="service in pendingReviewServices" :key="service.id">
-                  <td>
-                    <strong>{{ service.name }}</strong>
-                    <div class="order-subtext muted">服务公司：{{ service.companyName }}</div>
-                  </td>
-                  <td>{{ service.lastScheduledAt ? formatDateTime(service.lastScheduledAt) : '—' }}</td>
-                  <td class="table-actions actions-inline">
-                    <button type="button" class="primary-button" @click="openReviewModal(service)">
-                      去评价
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="ordersLoading || userReviewsLoading">
-                  <td colspan="3" class="empty-row">数据加载中…</td>
-                </tr>
-                <tr v-else-if="!pendingReviewServices.length">
-                  <td colspan="3" class="empty-row">
-                    <span v-if="hasReviewSearch">没有匹配的待评价服务。</span>
-                    <span v-else>暂无待评价的服务，完成订单后即可发布评价。</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
 
           <div
@@ -1084,7 +1084,7 @@ const paymentForm = reactive<{ account: string; method: PaymentMethod }>({
   method: 'wechat',
 })
 
-const reviewTab = ref<'reviewed' | 'unreviewed'>('reviewed')
+const reviewTab = ref<'reviewed' | 'unreviewed'>('unreviewed')
 const reviewModalVisible = ref(false)
 const reviewModalService = ref<ReviewableServiceSummary | null>(null)
 const reviewModalForm = reactive<{ rating: number; content: string }>({ rating: 5, content: '' })
