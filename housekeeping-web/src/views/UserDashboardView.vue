@@ -2081,10 +2081,11 @@ const formatServiceWindow = (order: ServiceOrderItem) => {
 }
 
 const formatAppointmentStart = (order: ServiceOrderItem) => {
-  if (!order?.scheduledAt) {
+  const timestamp = order?.createdAt || order?.scheduledAt
+  if (!timestamp) {
     return '未提供'
   }
-  const start = new Date(order.scheduledAt)
+  const start = new Date(timestamp)
   if (Number.isNaN(start.getTime())) {
     return '未提供'
   }

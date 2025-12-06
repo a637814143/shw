@@ -515,9 +515,7 @@
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
                     <div class="order-subtext">联系方式：{{ order.contact }}</div>
-                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
                     <div class="order-subtext">用户电话：{{ order.customerContactPhone || '未提供' }}</div>
-                    <div class="order-subtext">用户地址：{{ order.customerAddress || '—' }}</div>
                     <div v-if="order.assignedWorker" class="order-subtext">
                       指派人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
                     </div>
