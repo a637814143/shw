@@ -52,6 +52,9 @@ public class HousekeepServiceManager {
         List<HousekeepService> services = normalizedKeyword == null
             ? housekeepServiceRepository.findAll()
             : housekeepServiceRepository.searchByKeyword(normalizedKeyword);
+        services = services.stream()
+            .filter(service -> service.getStatus() == HousekeepServiceStatus.APPROVED)
+            .collect(Collectors.toList());
         if (category != null) {
             services = services.stream()
                 .filter(service -> service.getCategory() != null
@@ -112,6 +115,7 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setStatus(DEFAULT_STATUS);
+        service.setReviewNote(null);
         service.setDescription(normalizeDescription(request.getDescription()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
@@ -135,6 +139,7 @@ public class HousekeepServiceManager {
         service.setContact(request.getContact().trim());
         service.setServiceTime(DEFAULT_SERVICE_TIME);
         service.setStatus(DEFAULT_STATUS);
+        service.setReviewNote(null);
         service.setDescription(normalizeDescription(request.getDescription()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -166,6 +171,7 @@ public class HousekeepServiceManager {
             .orElseThrow(() -> new RuntimeException("服务不存在"));
 
         service.setStatus(approve ? HousekeepServiceStatus.APPROVED : HousekeepServiceStatus.REJECTED);
+        service.setReviewNote(approve ? null : normalizeReviewNote(reason));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -233,7 +239,8 @@ public class HousekeepServiceManager {
             category == null ? null : category.getId(),
             category == null ? null : category.getName(),
             availableStaffForService(service),
-            service.getStatus() == null ? null : service.getStatus().name()
+            service.getStatus() == null ? null : service.getStatus().name(),
+            service.getReviewNote()
         );
     }
 
@@ -267,6 +274,17 @@ public class HousekeepServiceManager {
         }
         String trimmed = description.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeReviewNote(String reviewNote) {
+        if (reviewNote == null) {
+            throw new RuntimeException("请填写驳回理由");
+        }
+        String trimmed = reviewNote.trim();
+        if (trimmed.isEmpty()) {
+            throw new RuntimeException("请填写驳回理由");
+        }
+        return trimmed;
     }
 
     private String normalizeServiceTime(String serviceTime) {

@@ -62,7 +62,12 @@
               <span>时间段</span>
               <select v-model="bookingForm.timeSlotKey" required class="time-slot-select">
                 <option value="" disabled>请选择时间段</option>
-                <option v-for="slot in BOOKING_TIME_SLOTS" :key="slot.key" :value="slot.key">
+                <option
+                  v-for="slot in BOOKING_TIME_SLOTS"
+                  :key="slot.key"
+                  :value="slot.key"
+                  :disabled="isSlotUnavailableForSelectedDate(slot)"
+                >
                   {{ slotLabelWithAvailability(slot) }}
                 </option>
               </select>
@@ -1667,6 +1672,12 @@ const submitBooking = async () => {
     return
   }
 
+  const selectedSlot = BOOKING_TIME_SLOTS.find((item) => item.key === bookingForm.timeSlotKey)
+  if (selectedSlot && isSlotUnavailableForSelectedDate(selectedSlot)) {
+    window.alert('当前时间段暂无可用人员，请选择其他时间段或日期')
+    return
+  }
+
   resetPaymentState()
   pendingPaymentAction.value = {
     kind: 'order',
@@ -2117,6 +2128,23 @@ const isSlotPastForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) =>
   const slotEnd = new Date(selectedDate)
   slotEnd.setHours(slot.endHour ?? slot.startHour, slot.endMinute ?? slot.startMinute, 0, 0)
   return slotEnd <= today
+}
+
+const isSlotUnavailableForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    return false
+  }
+
+  const today = new Date()
+  const normalizedToday = new Date(today)
+  normalizedToday.setHours(0, 0, 0, 0)
+  if (normalizedToday.getTime() !== selectedDate.getTime()) {
+    return false
+  }
+
+  const availability = timeSlotAvailability.value[slot.key]
+  return Boolean(availability && availability.availableStaff <= 0)
 }
 
 const slotLabelWithAvailability = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
