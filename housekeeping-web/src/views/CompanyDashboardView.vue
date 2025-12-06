@@ -196,7 +196,6 @@
                   <td>
                     <strong>{{ item.name }}</strong>
                     <div class="order-subtext">单位：{{ item.unit }}</div>
-                    <div class="order-subtext">空闲人员：{{ item.availableStaffCount }}</div>
                   </td>
                   <td>{{ item.categoryName || '—' }}</td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
