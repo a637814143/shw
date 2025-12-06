@@ -177,7 +177,7 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>描述</th>
                   <th class="table-actions">操作</th>
                 </tr>
@@ -490,7 +490,7 @@
                     />
                   </th>
                   <th>服务</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>服务类别</th>
                   <th>预约时间</th>
                   <th>用户</th>
@@ -525,7 +525,7 @@
                       用户需求：{{ order.specialRequest }}
                     </div>
                   </td>
-                  <td>{{ order.serviceTime || '按需预约' }}</td>
+                  <td>{{ formatOrderServiceWindow(order) }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
                   <td>{{ formatDateTime(order.scheduledAt) }}</td>
                   <td>{{ order.username }}</td>
@@ -2064,9 +2064,33 @@ const formatServiceSlots = (slots: string[] | undefined) => {
   return slots.join('、')
 }
 
+const extractServiceHours = (value?: string | null) => {
+  if (!value) {
+    return null
+  }
+  const match = value.match(/([0-9]+(?:\.\d+)?)/)
+  const hours = match ? Number.parseFloat(match[1]) : NaN
+  return Number.isFinite(hours) && hours > 0 ? hours : null
+}
+
 const formatDateTime = (value: string) => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+const formatOrderServiceWindow = (order: ServiceOrderItem) => {
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return order.serviceTime || '未提供预约时间'
+  }
+
+  const hours = extractServiceHours(order.serviceTime)
+  if (!hours) {
+    return formatDateTime(order.scheduledAt)
+  }
+
+  const end = new Date(start.getTime() + hours * 60 * 60 * 1000)
+  return `${start.toLocaleString()} - ${end.toLocaleTimeString()}`
 }
 
 const formatProgressText = (order: ServiceOrderItem): string => {
