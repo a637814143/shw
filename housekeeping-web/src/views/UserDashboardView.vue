@@ -116,7 +116,7 @@
         <p class="payment-tip">
           二维码链接：
           <template v-if="paymentQrLink">
-            <a :href="paymentQrLink" target="_blank" rel="noopener">{{ paymentQrLink }}</a>
+            <a :href="paymentQrLink" target="_blank">{{ paymentQrLink }}</a>
           </template>
           <template v-else>—</template>
         </p>
