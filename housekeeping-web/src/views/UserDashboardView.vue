@@ -1615,6 +1615,18 @@ const submitBooking = async () => {
     return
   }
 
+  const scheduledDate = new Date(scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    window.alert('预约时间无效，请重新选择')
+    return
+  }
+
+  const now = new Date()
+  if (scheduledDate.getTime() < now.getTime()) {
+    window.alert('预约时间需晚于当前时间，请重新选择时间段')
+    return
+  }
+
   resetPaymentState()
   pendingPaymentAction.value = {
     kind: 'order',
@@ -1666,6 +1678,7 @@ const confirmPayment = async () => {
   paymentError.value = ''
   paymentMessage.value = ''
 
+  let lastActionKind: PendingPaymentAction['kind'] | null = null
   try {
     const action = pendingPaymentAction.value
     if (!action) {
@@ -1673,10 +1686,16 @@ const confirmPayment = async () => {
       return
     }
 
+    lastActionKind = action.kind
+
     if (action.kind === 'order') {
       const normalizedDate = new Date(action.payload.scheduledAt)
       if (Number.isNaN(normalizedDate.getTime())) {
         throw new Error('预约时间无效，请重新选择预约时间')
+      }
+      if (normalizedDate.getTime() < Date.now()) {
+        pendingPaymentAction.value = null
+        throw new Error('预约时间已过期，请重新选择预约时间')
       }
       const payload = {
         ...action.payload,
@@ -1708,8 +1727,13 @@ const confirmPayment = async () => {
   } catch (orderError) {
     console.error(orderError)
     const fallbackMessage =
-      pendingPaymentAction.value?.kind === 'order' ? '下单失败，请确认预约信息后再试。' : '充值失败，请稍后再试。'
-    paymentError.value = orderError instanceof Error ? orderError.message : fallbackMessage
+      lastActionKind === 'order' ? '下单失败，请确认预约信息后再试。' : '充值失败，请稍后再试。'
+    const rawMessage = orderError instanceof Error ? orderError.message : fallbackMessage
+    paymentError.value = rawMessage.includes('参数验证失败')
+      ? lastActionKind === 'order'
+        ? '预约信息未通过校验，请确保时间未过期且地址填写完整。'
+        : '充值金额格式不符合要求，请输入最多两位小数的金额。'
+      : rawMessage
   } finally {
     paymentProcessing.value = false
   }
@@ -1945,10 +1969,16 @@ const submitRecharge = async () => {
     walletSaving.value = false
     return
   }
-  pendingPaymentAction.value = { kind: 'recharge', payload: { amount } }
+  const normalizedAmount = Math.round(amount * 100) / 100
+  if (normalizedAmount <= 0) {
+    window.alert('请输入正确的充值金额')
+    walletSaving.value = false
+    return
+  }
+  pendingPaymentAction.value = { kind: 'recharge', payload: { amount: normalizedAmount } }
   paymentServiceName.value = '钱包充值'
   paymentCompanyName.value = '账户中心'
-  paymentAmount.value = amount
+  paymentAmount.value = normalizedAmount
 
   paymentDialogVisible.value = true
   walletSaving.value = false
