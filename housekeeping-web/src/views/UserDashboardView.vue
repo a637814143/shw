@@ -97,50 +97,54 @@
 
 <transition name="fade">
   <div v-if="paymentDialogVisible" class="dialog-backdrop" @click.self="closePaymentDialog">
-    <div class="dialog-card payment-card">
+    <form class="dialog-card payment-card" @submit.prevent="confirmPayment">
       <header class="dialog-header">
-        <h2>扫描二维码完成支付</h2>
-        <p>请使用手机扫描下方二维码，在支付页面确认后系统将自动创建订单。</p>
+        <h2>确认支付</h2>
+        <p>请填写付款账号并选择支付方式，确认后系统将直接处理订单。</p>
       </header>
       <div class="payment-body">
-        <img v-if="paymentQrSrc" :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
-        <div v-else class="payment-qr placeholder">二维码生成中…</div>
         <p class="payment-summary">
           服务：{{ paymentServiceName || '—' }}
           <span v-if="paymentCompanyName"> · 提供方：{{ paymentCompanyName }}</span>
         </p>
         <p v-if="paymentAmount !== null" class="payment-summary">金额：¥{{ paymentAmount.toFixed(2) }}</p>
-        <p v-if="paymentSession?.expiresAt" class="payment-tip">
-          二维码有效期至：{{ formatDateTime(paymentSession.expiresAt) }}
-        </p>
-        <p class="payment-tip">
-          二维码链接：
-          <template v-if="paymentQrLink">
-            <a :href="paymentQrLink" target="_blank" rel="noopener">{{ paymentQrLink }}</a>
-          </template>
-          <template v-else>—</template>
-        </p>
-        <p v-if="paymentStatus === 'checking'" class="payment-status checking">正在获取支付结果，请稍候…</p>
-        <p v-else-if="paymentStatus === 'success'" class="payment-status success">{{ paymentMessage }}</p>
-        <p v-else-if="paymentStatus === 'failed'" class="payment-status error">{{ paymentError }}</p>
-        <p v-else class="payment-status">请扫码并在手机上完成支付确认。</p>
+
+        <label class="dialog-field">
+          <span>支付账号</span>
+          <input
+            v-model.trim="paymentForm.account"
+            type="text"
+            maxlength="100"
+            placeholder="请输入微信或支付宝账号"
+            required
+          />
+        </label>
+
+        <fieldset class="payment-methods">
+          <legend>支付方式</legend>
+          <label class="method-option">
+            <input v-model="paymentForm.method" type="radio" value="wechat" />
+            微信支付
+          </label>
+          <label class="method-option">
+            <input v-model="paymentForm.method" type="radio" value="alipay" />
+            支付宝
+          </label>
+        </fieldset>
+
+        <p v-if="paymentMessage" class="payment-status success">{{ paymentMessage }}</p>
+        <p v-else-if="paymentError" class="payment-status error">{{ paymentError }}</p>
+        <p v-else class="payment-status">确认后将立即处理支付并创建订单。</p>
       </div>
       <footer class="dialog-footer">
-        <button type="button" class="secondary-button" :disabled="paymentChecking" @click="closePaymentDialog">
-          {{ paymentStatus === 'success' ? '关闭' : '取消' }}
+        <button type="button" class="secondary-button" :disabled="paymentProcessing" @click="closePaymentDialog">
+          取消
         </button>
-        <button
-          v-if="paymentStatus !== 'success'"
-          type="button"
-          class="primary-button"
-          :disabled="paymentChecking"
-          @click="checkPaymentResult"
-        >
-          {{ paymentChecking ? '查询中…' : '已完成支付，查询结果' }}
+        <button type="submit" class="primary-button" :disabled="paymentProcessing">
+          {{ paymentProcessing ? '支付中…' : '确认支付' }}
         </button>
-        <button v-else type="button" class="primary-button" @click="closePaymentDialog">返回平台</button>
       </footer>
-    </div>
+    </form>
   </div>
 </transition>
 
@@ -837,8 +841,6 @@ import { useRouter } from 'vue-router'
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
   addUserFavorite,
-  checkQrPaymentStatus,
-  createQrPaymentSession,
   fetchCurrentAccount,
   createUserOrder,
   exchangeUserPoints,
@@ -865,13 +867,10 @@ import {
   deleteUserReviews,
   type AccountProfileItem,
   type CreateOrderPayload,
-  type CreatePaymentSessionPayload,
   type CompanyMessageItem,
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
-  type PaymentGatewayCheckResult,
-  type PaymentSessionInfo,
   type DashboardTipItem,
   type HousekeepServiceItem,
   type ServiceCategoryItem,
@@ -907,7 +906,7 @@ type SectionKey =
   | 'messages'
   | 'reviews'
 
-type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
+type PaymentMethod = 'wechat' | 'alipay'
 
 type PendingPaymentAction =
   | { kind: 'order'; payload: CreateOrderPayload }
@@ -1035,15 +1034,17 @@ const bookingScheduledAt = computed(() => {
 })
 
 const paymentDialogVisible = ref(false)
-const paymentChecking = ref(false)
-const paymentStatus = ref<PaymentStatus>('idle')
+const paymentProcessing = ref(false)
 const paymentMessage = ref('')
 const paymentError = ref('')
 const pendingPaymentAction = ref<PendingPaymentAction | null>(null)
 const paymentServiceName = ref('')
 const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
-const paymentSession = ref<PaymentSessionInfo | null>(null)
+const paymentForm = reactive<{ account: string; method: PaymentMethod }>({
+  account: '',
+  method: 'wechat',
+})
 
 const reviewTab = ref<'reviewed' | 'unreviewed'>('reviewed')
 const reviewModalVisible = ref(false)
@@ -1116,32 +1117,6 @@ const visibleFavorites = computed(() => {
 })
 
 const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
-
-const paymentQrLink = computed(() => {
-  const base = paymentSession.value?.qrUrl ?? ''
-  if (!base) {
-    return ''
-  }
-
-  try {
-    const url = new URL(base, window.location.origin)
-    // 回跳到当前平台页面，便于扫码确认后直接返回二维码界面
-    url.searchParams.set('return', window.location.href)
-    return url.toString()
-  } catch (error) {
-    console.warn('无法附加回跳地址到支付链接：', error)
-    return base
-  }
-})
-
-const paymentQrSrc = computed(() => {
-  const link = paymentQrLink.value
-  if (!link) {
-    return ''
-  }
-  const base = 'https://api.qrserver.com/v1/create-qr-code/'
-  return `${base}?size=240x240&data=${encodeURIComponent(link)}`
-})
 
 const normalizeUserSearchValue = (value: unknown) => {
   if (value == null) {
@@ -1618,15 +1593,14 @@ const closeBooking = () => {
 }
 
 const resetPaymentState = () => {
-  paymentStatus.value = 'idle'
   paymentMessage.value = ''
   paymentError.value = ''
-  paymentChecking.value = false
   pendingPaymentAction.value = null
   paymentServiceName.value = ''
   paymentCompanyName.value = ''
   paymentAmount.value = null
-  paymentSession.value = null
+  paymentForm.account = account.value?.username || account.value?.displayName || ''
+  paymentForm.method = 'wechat'
 }
 
 const submitBooking = async () => {
@@ -1638,6 +1612,18 @@ const submitBooking = async () => {
   const scheduledAt = bookingScheduledAt.value
   if (!scheduledAt) {
     window.alert('请选择预约日期与时间段')
+    return
+  }
+
+  const scheduledDate = new Date(scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    window.alert('预约时间无效，请重新选择')
+    return
+  }
+
+  const now = new Date()
+  if (scheduledDate.getTime() < now.getTime()) {
+    window.alert('预约时间需晚于当前时间，请重新选择时间段')
     return
   }
 
@@ -1660,113 +1646,96 @@ const submitBooking = async () => {
   }
   paymentAmount.value = paymentAmountValue
 
-  const payload: CreatePaymentSessionPayload = {
-    serviceName: bookingForm.service.name,
-    companyName: bookingForm.service.companyName,
-    amount: paymentAmountValue,
-  }
-
-  try {
-    const sessionInfo = await createQrPaymentSession(payload)
-    paymentSession.value = sessionInfo
-    bookingDialogVisible.value = false
-    paymentDialogVisible.value = true
-  } catch (error) {
-    console.error(error)
-    window.alert('生成支付二维码失败，请稍后再试。')
-    resetPaymentState()
-  }
+  bookingDialogVisible.value = false
+  paymentDialogVisible.value = true
 }
 
 const closePaymentDialog = () => {
-  if (paymentChecking.value) {
+  if (paymentProcessing.value) {
     return
   }
   paymentDialogVisible.value = false
   resetPaymentState()
 }
 
-const checkPaymentResult = async () => {
-  if (paymentChecking.value) {
+const confirmPayment = async () => {
+  if (paymentProcessing.value) {
     return
   }
+
+  const accountInput = paymentForm.account.trim()
+  if (!accountInput) {
+    window.alert('请输入支付账号')
+    return
+  }
+
   if (!pendingPaymentAction.value) {
-    if (paymentStatus.value === 'success') {
-      closePaymentDialog()
-      return
-    }
-    paymentStatus.value = 'failed'
     paymentError.value = '当前没有待支付的事项，请重新操作。'
     return
   }
 
-  const token = paymentSession.value?.token
-  if (!token) {
-    paymentStatus.value = 'failed'
-    paymentError.value = '支付会话不存在或已过期，请重新生成二维码。'
-    return
-  }
-
-  paymentChecking.value = true
-  paymentStatus.value = 'checking'
+  paymentProcessing.value = true
   paymentError.value = ''
+  paymentMessage.value = ''
 
+  let lastActionKind: PendingPaymentAction['kind'] | null = null
   try {
-    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus(token)
-    if (gatewayResult.rawPayload) {
-      console.debug('支付网关返回原始数据：', gatewayResult.rawPayload)
+    const action = pendingPaymentAction.value
+    if (!action) {
+      paymentError.value = '当前没有待支付的事项，请重新操作。'
+      return
     }
 
-    if (gatewayResult.token) {
-      const current = paymentSession.value
-      paymentSession.value = {
-        token: gatewayResult.token,
-        qrPath: current?.qrPath ?? '',
-        qrUrl: current?.qrUrl ?? '',
-        expiresAt: gatewayResult.expiresAt || current?.expiresAt || '',
+    lastActionKind = action.kind
+
+    if (action.kind === 'order') {
+      const normalizedDate = new Date(action.payload.scheduledAt)
+      if (Number.isNaN(normalizedDate.getTime())) {
+        throw new Error('预约时间无效，请重新选择预约时间')
       }
-    }
-
-    if (gatewayResult.status === 'CONFIRMED') {
-      const action = pendingPaymentAction.value
-      try {
-        if (action.kind === 'order') {
-          await createUserOrder(action.payload)
-          await Promise.all([loadOrders(), loadAccount()])
-          bookingForm.service = null
-          bookingForm.selectedDate = bookingDateLimits.value.min
-          bookingForm.timeSlotKey = ''
-          bookingForm.specialRequest = ''
-          bookingForm.serviceAddress = ''
-          paymentMessage.value = '支付成功，订单已创建。'
-        } else {
-          account.value = await rechargeUserWallet({ amount: action.payload.amount })
-          walletForm.amount = null
-          paymentMessage.value = '支付成功，余额已更新。'
-        }
+      if (normalizedDate.getTime() < Date.now()) {
         pendingPaymentAction.value = null
-        paymentStatus.value = 'success'
-      } catch (orderError) {
-        console.error(orderError)
-        paymentStatus.value = 'failed'
-        const fallbackMessage = action.kind === 'order' ? '下单失败，请稍后再试。' : '充值失败，请稍后再试。'
-        paymentError.value = orderError instanceof Error ? orderError.message : fallbackMessage
+        throw new Error('预约时间已过期，请重新选择预约时间')
       }
+      const payload = {
+        ...action.payload,
+        scheduledAt: normalizedDate.toISOString(),
+        specialRequest: action.payload.specialRequest?.trim() || undefined,
+        serviceAddress: action.payload.serviceAddress?.trim() || undefined,
+      }
+      await createUserOrder(payload)
+      await Promise.all([loadOrders(), loadAccount()])
+      bookingForm.service = null
+      bookingForm.selectedDate = bookingDateLimits.value.min
+      bookingForm.timeSlotKey = ''
+      bookingForm.specialRequest = ''
+      bookingForm.serviceAddress = ''
+      paymentMessage.value = `支付成功，已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}创建订单。`
     } else {
-      paymentStatus.value = 'failed'
-      paymentError.value =
-        gatewayResult.message || '未能获取支付结果，请确认后再试。'
-      if (gatewayResult.status === 'DECLINED') {
-        pendingPaymentAction.value = null
+      const amount = Number(action.payload.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('充值金额无效，请重新输入金额')
       }
+      account.value = await rechargeUserWallet({ amount })
+      walletForm.amount = null
+      paymentMessage.value = `支付成功，钱包已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}充值。`
     }
-  } catch (error) {
-    console.error(error)
-    paymentStatus.value = 'failed'
-    paymentError.value =
-      error instanceof Error ? error.message : '获取支付结果失败，请检查网络后重试。'
+    pendingPaymentAction.value = null
+    setTimeout(() => {
+      closePaymentDialog()
+    }, 600)
+  } catch (orderError) {
+    console.error(orderError)
+    const fallbackMessage =
+      lastActionKind === 'order' ? '下单失败，请确认预约信息后再试。' : '充值失败，请稍后再试。'
+    const rawMessage = orderError instanceof Error ? orderError.message : fallbackMessage
+    paymentError.value = rawMessage.includes('参数验证失败')
+      ? lastActionKind === 'order'
+        ? '预约信息未通过校验，请确保时间未过期且地址填写完整。'
+        : '充值金额格式不符合要求，请输入最多两位小数的金额。'
+      : rawMessage
   } finally {
-    paymentChecking.value = false
+    paymentProcessing.value = false
   }
 }
 
@@ -2000,28 +1969,19 @@ const submitRecharge = async () => {
     walletSaving.value = false
     return
   }
-  pendingPaymentAction.value = { kind: 'recharge', payload: { amount } }
+  const normalizedAmount = Math.round(amount * 100) / 100
+  if (normalizedAmount <= 0) {
+    window.alert('请输入正确的充值金额')
+    walletSaving.value = false
+    return
+  }
+  pendingPaymentAction.value = { kind: 'recharge', payload: { amount: normalizedAmount } }
   paymentServiceName.value = '钱包充值'
   paymentCompanyName.value = '账户中心'
-  paymentAmount.value = amount
+  paymentAmount.value = normalizedAmount
 
-  const payload: CreatePaymentSessionPayload = {
-    serviceName: '钱包充值',
-    companyName: '账户中心',
-    amount,
-  }
-
-  try {
-    const sessionInfo = await createQrPaymentSession(payload)
-    paymentSession.value = sessionInfo
-    paymentDialogVisible.value = true
-  } catch (error) {
-    console.error(error)
-    window.alert('生成支付二维码失败，请稍后再试。')
-    resetPaymentState()
-  } finally {
-    walletSaving.value = false
-  }
+  paymentDialogVisible.value = true
+  walletSaving.value = false
 }
 
 const submitExchange = async () => {
@@ -3160,27 +3120,8 @@ onUnmounted(() => {
 .payment-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
-  text-align: center;
-}
-
-.payment-qr {
-  width: 220px;
-  height: 220px;
-  border-radius: 1rem;
-  background: #fff;
-  padding: 0.75rem;
-}
-
-.payment-qr.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  color: var(--brand-text-muted);
-  background: rgba(248, 250, 255, 0.8);
-  font-weight: 500;
 }
 
 .payment-tip {
@@ -3190,6 +3131,28 @@ onUnmounted(() => {
 
 .payment-tip a {
   color: var(--brand-primary);
+}
+
+.payment-methods {
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.payment-methods legend {
+  font-weight: 600;
+  color: var(--brand-text-muted);
+  padding: 0 0.25rem;
+}
+
+.method-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
 }
 
 .payment-summary {
