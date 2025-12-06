@@ -1125,8 +1125,11 @@ const paymentQrLink = computed(() => {
 
   try {
     const url = new URL(base, window.location.origin)
+    const fallbackUrl = `${url.origin}${url.pathname}`
     // 回跳到当前平台页面，便于扫码确认后直接返回二维码界面
     url.searchParams.set('return', window.location.href)
+    // 若无法访问原窗口，至少回退到公开的二维码确认页，避免跳到登录页
+    url.searchParams.set('fallback', fallbackUrl)
     return url.toString()
   } catch (error) {
     console.warn('无法附加回跳地址到支付链接：', error)
