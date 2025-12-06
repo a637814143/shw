@@ -25,8 +25,17 @@ public class CompanyStaffController {
 
     @GetMapping
     public Result<List<CompanyStaffResponse>> listStaff(@RequestParam(value = "keyword", required = false) String keyword,
-                                                        @RequestParam(value = "categoryId", required = false) Long categoryId) {
-        return Result.success(companyStaffService.listStaff(keyword, categoryId));
+                                                        @RequestParam(value = "categoryId", required = false) Long categoryId,
+                                                        @RequestParam(value = "scheduledAt", required = false) String scheduledAt) {
+        java.time.Instant slotInstant = null;
+        if (scheduledAt != null && !scheduledAt.isBlank()) {
+            try {
+                slotInstant = java.time.Instant.parse(scheduledAt.trim());
+            } catch (Exception ex) {
+                throw new RuntimeException("预约时间格式无效");
+            }
+        }
+        return Result.success(companyStaffService.listStaff(keyword, categoryId, slotInstant));
     }
 
     @PostMapping

@@ -186,6 +186,13 @@ export interface ReviewPayload {
   content: string
 }
 
+export interface TimeSlotAvailabilityItem {
+  slotKey: string
+  label: string
+  availableStaff: number
+  totalStaff: number
+}
+
 export interface CompanyServicePayload {
   name: string
   unit: string
@@ -470,6 +477,16 @@ export const fetchUserOrders = async (params?: { keyword?: string }): Promise<Se
   return handleResponse<ServiceOrderItem[]>(response)
 }
 
+export const fetchServiceSlotAvailability = async (
+  serviceId: number,
+  date: string,
+): Promise<TimeSlotAvailabilityItem[]> => {
+  const url = new URL(buildUrl(`/api/user/services/${serviceId}/slots`))
+  url.searchParams.set('date', date)
+  const response = await fetch(url.toString(), withAuthHeaders())
+  return handleResponse<TimeSlotAvailabilityItem[]>(response)
+}
+
 export const deleteUserOrder = async (orderId: number): Promise<void> => {
   const response = await fetch(buildUrl(`/api/user/services/orders/${orderId}`), {
     ...withAuthHeaders({ method: 'DELETE' }),
@@ -722,13 +739,18 @@ export const deleteCompanyServices = async (ids: number[]): Promise<void> => {
   await handleResponse<null>(response)
 }
 
-export const fetchCompanyStaff = async (params?: { keyword?: string; categoryId?: number }): Promise<CompanyStaffItem[]> => {
+export const fetchCompanyStaff = async (
+  params?: { keyword?: string; categoryId?: number; scheduledAt?: string },
+): Promise<CompanyStaffItem[]> => {
   const url = new URL(buildUrl('/api/company/staff'))
   if (params?.keyword) {
     url.searchParams.set('keyword', params.keyword)
   }
   if (typeof params?.categoryId === 'number') {
     url.searchParams.set('categoryId', String(params.categoryId))
+  }
+  if (params?.scheduledAt) {
+    url.searchParams.set('scheduledAt', params.scheduledAt)
   }
   const response = await fetch(url.toString(), withAuthHeaders())
   return handleResponse<CompanyStaffItem[]>(response)

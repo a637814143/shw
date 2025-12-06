@@ -63,7 +63,7 @@
               <select v-model="bookingForm.timeSlotKey" required class="time-slot-select">
                 <option value="" disabled>请选择时间段</option>
                 <option v-for="slot in BOOKING_TIME_SLOTS" :key="slot.key" :value="slot.key">
-                  {{ slot.label }}
+                  {{ slotLabelWithAvailability(slot) }}
                 </option>
               </select>
             </label>
@@ -858,6 +858,7 @@ import {
   fetchUserServices,
   removeUserFavorite,
   markUserConversationRead,
+  fetchServiceSlotAvailability,
   rechargeUserWallet,
   requestUserRefund,
   sendUserMessage,
@@ -876,6 +877,7 @@ import {
   type HousekeepServiceItem,
   type ServiceCategoryItem,
   type ServiceFavoriteItem,
+  type TimeSlotAvailabilityItem,
   type ServiceOrderItem,
   type ServiceReviewItem,
   type UserConversationItem,
@@ -950,6 +952,8 @@ const messageSending = ref(false)
 const activeConversationId = ref<number | null>(null)
 
 const bookingDialogVisible = ref(false)
+const timeSlotAvailability = ref<Record<string, TimeSlotAvailabilityItem>>({})
+const timeSlotAvailabilityLoading = ref(false)
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear()
@@ -1033,6 +1037,43 @@ const bookingScheduledAt = computed(() => {
   scheduled.setHours(slot.startHour, slot.startMinute, 0, 0)
   return scheduled.toISOString()
 })
+
+const refreshSlotAvailability = async () => {
+  if (!bookingForm.service) {
+    timeSlotAvailability.value = {}
+    return
+  }
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    timeSlotAvailability.value = {}
+    return
+  }
+  timeSlotAvailabilityLoading.value = true
+  try {
+    const items = await fetchServiceSlotAvailability(bookingForm.service.id, bookingForm.selectedDate)
+    const next: Record<string, TimeSlotAvailabilityItem> = {}
+    items.forEach((item) => {
+      if (item?.slotKey) {
+        next[item.slotKey] = item
+      }
+    })
+    timeSlotAvailability.value = next
+  } catch (error) {
+    console.error(error)
+    timeSlotAvailability.value = {}
+  } finally {
+    timeSlotAvailabilityLoading.value = false
+  }
+}
+
+watch(
+  () => bookingForm.selectedDate,
+  () => {
+    if (bookingDialogVisible.value && bookingForm.service) {
+      refreshSlotAvailability()
+    }
+  },
+)
 
 const paymentDialogVisible = ref(false)
 const paymentProcessing = ref(false)
@@ -1583,6 +1624,7 @@ const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.specialRequest = ''
   bookingForm.serviceAddress = account.value?.contactAddress || ''
   bookingDialogVisible.value = true
+  refreshSlotAvailability()
 }
 
 const closeBooking = () => {
@@ -1591,6 +1633,7 @@ const closeBooking = () => {
   bookingForm.serviceAddress = ''
   bookingForm.timeSlotKey = ''
   bookingForm.specialRequest = ''
+  timeSlotAvailability.value = {}
 }
 
 const resetPaymentState = () => {
@@ -2060,6 +2103,12 @@ const formatTimeText = (date: Date) => {
   const hours = `${date.getHours()}`.padStart(2, '0')
   const minutes = `${date.getMinutes()}`.padStart(2, '0')
   return `${hours}:${minutes}`
+}
+
+const slotLabelWithAvailability = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+  const info = timeSlotAvailability.value[slot.key]
+  const countText = info ? info.availableStaff : 0
+  return `${slot.label}（空闲人员：${countText}个）`
 }
 
 const formatServiceWindow = (order: ServiceOrderItem) => {

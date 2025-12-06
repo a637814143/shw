@@ -1567,7 +1567,10 @@ const openAssignmentModal = async (order: ServiceOrderItem) => {
   assignmentModalError.value = null
   assignmentModalLoading.value = true
   try {
-    assignmentModalStaff.value = await fetchCompanyStaff({ categoryId: order.categoryId })
+    assignmentModalStaff.value = await fetchCompanyStaff({
+      categoryId: order.categoryId,
+      scheduledAt: order.scheduledAt,
+    })
   } catch (error) {
     assignmentModalError.value = error instanceof Error ? error.message : '加载人员列表失败'
     assignmentModalStaff.value = []

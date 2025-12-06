@@ -9,6 +9,9 @@ import com.example.housekeeping.dto.ServiceOrderRequest;
 import com.example.housekeeping.dto.ServiceOrderResponse;
 import com.example.housekeeping.dto.ServiceReviewRequest;
 import com.example.housekeeping.dto.ServiceReviewResponse;
+import com.example.housekeeping.dto.TimeSlotAvailabilityResponse;
+import com.example.housekeeping.entity.HousekeepService;
+import com.example.housekeeping.service.CompanyStaffService;
 import com.example.housekeeping.service.HousekeepServiceManager;
 import com.example.housekeeping.service.ServiceFavoriteService;
 import com.example.housekeeping.service.ServiceOrderService;
@@ -17,6 +20,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -33,6 +37,9 @@ public class UserServiceController {
     private ServiceOrderService serviceOrderService;
 
     @Autowired
+    private CompanyStaffService companyStaffService;
+
+    @Autowired
     private ServiceReviewService serviceReviewService;
 
     @Autowired
@@ -44,6 +51,19 @@ public class UserServiceController {
                                                                @RequestParam(value = "categoryId", required = false)
                                                                Long categoryId) {
         return Result.success(housekeepServiceManager.listAllServices(keyword, categoryId));
+    }
+
+    @GetMapping("/{serviceId}/slots")
+    public Result<List<TimeSlotAvailabilityResponse>> listSlotAvailability(@PathVariable Long serviceId,
+                                                                           @RequestParam("date") String date) {
+        LocalDate targetDate;
+        try {
+            targetDate = LocalDate.parse(date.trim());
+        } catch (Exception ex) {
+            throw new RuntimeException("预约日期格式无效");
+        }
+        HousekeepService service = housekeepServiceManager.getServiceById(serviceId);
+        return Result.success(companyStaffService.buildSlotAvailability(service, targetDate));
     }
 
     @GetMapping("/orders")

@@ -9,7 +9,6 @@ import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.HousekeepServiceStatus;
 import com.example.housekeeping.repository.HousekeepServiceRepository;
-import com.example.housekeeping.repository.CompanyStaffRepository;
 import com.example.housekeeping.repository.ServiceCategoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -44,7 +43,7 @@ public class HousekeepServiceManager {
     private ServiceCategoryRepository serviceCategoryRepository;
 
     @Autowired
-    private CompanyStaffRepository companyStaffRepository;
+    private CompanyStaffService companyStaffService;
 
     @Transactional(readOnly = true)
     public List<HousekeepServiceResponse> listAllServices(String keyword, Long categoryId) {
@@ -141,6 +140,15 @@ public class HousekeepServiceManager {
     }
 
     @Transactional(readOnly = true)
+    public HousekeepService getServiceById(Long id) {
+        if (id == null) {
+            throw new RuntimeException("请选择服务");
+        }
+        return housekeepServiceRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("服务不存在"));
+    }
+
+    @Transactional(readOnly = true)
     public List<HousekeepServiceResponse> listForAdmin(String keyword, Long categoryId, HousekeepServiceStatus status) {
         String normalizedKeyword = normalizeKeyword(keyword);
         ServiceCategory category = categoryId == null ? null : resolveCategory(categoryId);
@@ -234,7 +242,7 @@ public class HousekeepServiceManager {
         if (category == null) {
             return 0L;
         }
-        return companyStaffRepository.countByCompanyAndCategoryAndAssignedFalse(service.getCompany(), category);
+        return companyStaffService.countAvailableStaffForCompanyCategory(service.getCompany(), category);
     }
 
     private ServiceCategory findCategoryForFilter(Long categoryId) {
