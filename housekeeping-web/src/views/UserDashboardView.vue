@@ -506,7 +506,7 @@
                     <div class="order-subtext">服务时间段：{{ formatServiceWindow(order) }}</div>
                   </td>
                   <td>
-                    <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
+                    <div class="order-subtext">{{ formatAppointmentStart(order) }}</div>
                   </td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
@@ -2078,6 +2078,24 @@ const formatServiceWindow = (order: ServiceOrderItem) => {
   }
   const end = new Date(start.getTime() + 2 * 60 * 60 * 1000)
   return `${formatTimeText(start)}-${formatTimeText(end)}`
+}
+
+const formatAppointmentStart = (order: ServiceOrderItem) => {
+  if (!order?.scheduledAt) {
+    return '未提供'
+  }
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return '未提供'
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(start)
 }
 
 const formatDateTime = (value: string) => {

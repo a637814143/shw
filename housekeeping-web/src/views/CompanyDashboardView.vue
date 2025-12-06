@@ -527,7 +527,7 @@
                   </td>
                   <td>{{ formatOrderServiceWindow(order) }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
-                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
+                  <td>{{ formatDateTime(order.createdAt) }}</td>
                   <td>{{ order.username }}</td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
@@ -2075,7 +2075,17 @@ const extractServiceHours = (value?: string | null) => {
 
 const formatDateTime = (value: string) => {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }
 
 const formatOrderServiceWindow = (order: ServiceOrderItem) => {
@@ -2090,7 +2100,10 @@ const formatOrderServiceWindow = (order: ServiceOrderItem) => {
   }
 
   const end = new Date(start.getTime() + hours * 60 * 60 * 1000)
-  return `${start.toLocaleString()} - ${end.toLocaleTimeString()}`
+  const formatTimePart = (date: Date) =>
+    new Intl.DateTimeFormat('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }).format(date)
+
+  return `${formatDateTime(order.scheduledAt)} - ${formatTimePart(end)}`
 }
 
 const formatProgressText = (order: ServiceOrderItem): string => {
