@@ -652,6 +652,145 @@
           </div>
         </section>
 
+        <section v-else-if="activeSection === 'serviceApproval'" class="panel">
+          <header class="panel-header">
+            <div>
+              <h2>服务审核</h2>
+              <p>对家政公司新发布的服务进行审核，确保用户只看到已通过的项目。</p>
+            </div>
+            <div class="refund-actions">
+              <div class="stage-switch">
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: serviceApprovalStatus === 'PENDING' }"
+                  @click="changeServiceApprovalStatus('PENDING')"
+                  :disabled="serviceApprovalLoading"
+                >
+                  待审核
+                </button>
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: serviceApprovalStatus === 'APPROVED' }"
+                  @click="changeServiceApprovalStatus('APPROVED')"
+                  :disabled="serviceApprovalLoading"
+                >
+                  审核通过
+                </button>
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: serviceApprovalStatus === 'REJECTED' }"
+                  @click="changeServiceApprovalStatus('REJECTED')"
+                  :disabled="serviceApprovalLoading"
+                >
+                  已驳回
+                </button>
+                <button
+                  type="button"
+                  class="chip-button"
+                  :class="{ active: serviceApprovalStatus === 'ALL' }"
+                  @click="changeServiceApprovalStatus('ALL')"
+                  :disabled="serviceApprovalLoading"
+                >
+                  全部
+                </button>
+              </div>
+              <label class="visually-hidden" for="service-approval-search">搜索服务</label>
+              <input
+                id="service-approval-search"
+                v-model="serviceApprovalSearch"
+                class="search-input"
+                type="search"
+                placeholder="搜索服务、公司或分类"
+                :disabled="serviceApprovalLoading"
+              />
+              <button type="button" class="ghost-button" @click="loadServiceApprovals" :disabled="serviceApprovalLoading">
+                {{ serviceApprovalLoading ? '刷新中…' : '刷新列表' }}
+              </button>
+            </div>
+          </header>
+
+          <div class="category-menu service-category-menu" role="tablist" aria-label="按服务类别筛选审核列表">
+            <button
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceApprovalCategory === 'all' }"
+              @click="selectServiceApprovalCategory('all')"
+            >
+              全部分类
+            </button>
+            <button
+              v-for="category in serviceCategories"
+              :key="category.id"
+              type="button"
+              class="category-chip"
+              :class="{ active: serviceApprovalCategory === category.id }"
+              @click="selectServiceApprovalCategory(category.id)"
+            >
+              {{ category.name }}
+              <span class="chip-count">{{ category.serviceCount }}</span>
+            </button>
+            <p v-if="!serviceCategories.length" class="category-empty">尚未配置服务分类。</p>
+          </div>
+
+          <div v-if="serviceApprovalLoading" class="loading-state">正在加载待审核的服务…</div>
+          <div v-else class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>服务类别</th>
+                  <th>家政公司</th>
+                  <th>价格</th>
+                  <th>联系方式</th>
+                  <th>状态</th>
+                  <th>审核备注</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in serviceApprovalList" :key="item.id">
+                  <td>
+                    <strong>{{ item.name }}</strong>
+                    <div class="order-subtext">{{ item.serviceTime }} · {{ item.unit }}</div>
+                  </td>
+                  <td>{{ item.categoryName || '—' }}</td>
+                  <td>{{ item.companyName }}</td>
+                  <td>¥{{ item.price.toFixed(2) }}</td>
+                  <td>{{ item.contact }}</td>
+                  <td>
+                    <span class="status-badge" :class="serviceApprovalStatusClass(item.status)">
+                      {{ serviceApprovalStatusText(item) }}
+                    </span>
+                  </td>
+                  <td>{{ item.reviewNote || '—' }}</td>
+                  <td class="table-actions actions-inline">
+                    <button type="button" class="link-button" :disabled="serviceApprovalLoading" @click="handleReviewService(item, true)">
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      class="link-button danger"
+                      :disabled="serviceApprovalLoading"
+                      @click="handleReviewService(item, false)"
+                    >
+                      驳回
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="!serviceApprovalList.length">
+                  <td colspan="8" class="empty-row">
+                    <span v-if="hasServiceApprovalFilter">未找到匹配的服务，请调整搜索条件。</span>
+                    <span v-else>暂无待审核的服务。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section v-else-if="activeSection === 'content'" class="panel immersive-panel">
           <header class="panel-header">
             <div>
@@ -1067,6 +1206,7 @@ import {
   deleteAdminTransactions,
   deleteAdminServiceCategory,
   deleteAdminServiceCategories,
+  fetchAdminServiceApprovals,
   fetchAdminFavorites,
   fetchAdminOrders,
   fetchAdminOverview,
@@ -1082,6 +1222,7 @@ import {
   deleteAdminUser,
   deleteAdminUsers,
   handleAdminRefund,
+  reviewAdminService,
   updateAdminLoyalty,
   updateAdminPassword,
   updateAdminWallet,
@@ -1097,6 +1238,8 @@ import {
   type DashboardCarouselItem,
   type DashboardTipItem,
   type ServiceFavoriteItem,
+  type HousekeepServiceItem,
+  type HousekeepServiceStatus,
   type ServiceOrderItem,
   type ServiceCategoryItem,
   type ServiceCategoryPayload,
@@ -1114,6 +1257,7 @@ type SectionKey =
   | 'transactions'
   | 'favorites'
   | 'categories'
+  | 'serviceApproval'
   | 'content'
   | 'refunds'
 
@@ -1133,6 +1277,7 @@ const sections: SectionMeta[] = [
   { key: 'transactions', icon: '💳', label: '充值流水' },
   { key: 'favorites', icon: '❤️', label: '收藏洞察' },
   { key: 'categories', icon: '🗂️', label: '服务分类' },
+  { key: 'serviceApproval', icon: '✅', label: '服务审核' },
   { key: 'content', icon: '🖼️', label: '内容运营' },
   { key: 'refunds', icon: '💰', label: '退款审批' },
 ]
@@ -1200,6 +1345,14 @@ const allCategoriesSelected = computed(
   () => filteredCategories.value.length > 0 && filteredCategories.value.every((item) => selectedCategoryIds.value.has(item.id)),
 )
 const hasCategoryFilter = computed(() => categorySearch.value.trim().length > 0)
+
+const serviceApprovalList = ref<HousekeepServiceItem[]>([])
+const serviceApprovalLoading = ref(false)
+const serviceApprovalSearch = ref('')
+const serviceApprovalStatus = ref<HousekeepServiceStatus | 'ALL'>('PENDING')
+const serviceApprovalCategory = ref<number | 'all'>('all')
+let serviceApprovalSearchTimer: ReturnType<typeof setTimeout> | null = null
+const hasServiceApprovalFilter = computed(() => serviceApprovalSearch.value.trim().length > 0)
 
 const refundOrders = ref<ServiceOrderItem[]>([])
 const refundsLoading = ref(false)
@@ -1766,6 +1919,8 @@ const switchSection = (key: SectionKey) => {
     loadFavorites()
   } else if (key === 'categories') {
     loadAdminCategories()
+  } else if (key === 'serviceApproval') {
+    loadServiceApprovals()
   } else if (key === 'content') {
     loadContent()
   } else if (key === 'refunds') {
@@ -1869,10 +2024,64 @@ const loadAdminCategories = async () => {
   }
 }
 
+const loadServiceApprovals = async () => {
+  serviceApprovalLoading.value = true
+  try {
+    const keyword = serviceApprovalSearch.value.trim()
+    const status = serviceApprovalStatus.value === 'ALL' ? undefined : serviceApprovalStatus.value
+    const categoryId = serviceApprovalCategory.value === 'all' ? undefined : serviceApprovalCategory.value
+    serviceApprovalList.value = await fetchAdminServiceApprovals({ keyword, status, categoryId })
+  } catch (error) {
+    console.error(error)
+  } finally {
+    serviceApprovalLoading.value = false
+  }
+}
+
 const resetCategoryForm = () => {
   editingCategoryId.value = null
   categoryForm.name = ''
   categoryForm.description = ''
+}
+
+const serviceApprovalStatusText = (item: HousekeepServiceItem) => {
+  const status = (item.status ?? 'PENDING').toUpperCase()
+  if (status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return item.reviewNote ? `驳回（${item.reviewNote}）` : '驳回'
+  }
+  return '待审核'
+}
+
+const serviceApprovalStatusClass = (status?: string) => `status-${(status ?? 'PENDING').toLowerCase()}`
+
+const changeServiceApprovalStatus = (status: HousekeepServiceStatus | 'ALL') => {
+  serviceApprovalStatus.value = status
+  loadServiceApprovals()
+}
+
+const selectServiceApprovalCategory = (categoryId: number | 'all') => {
+  serviceApprovalCategory.value = categoryId
+  loadServiceApprovals()
+}
+
+const handleReviewService = async (item: HousekeepServiceItem, approve: boolean) => {
+  let reason: string | undefined
+  if (!approve) {
+    reason = window.prompt('请输入驳回理由：')?.trim()
+    if (!reason) {
+      window.alert('请填写驳回理由')
+      return
+    }
+  }
+  try {
+    await reviewAdminService(item.id, { approve, reason })
+    await loadServiceApprovals()
+  } catch (error) {
+    window.alert(error instanceof Error ? error.message : '操作失败，请稍后再试')
+  }
 }
 
 const openCategoryForm = () => {
@@ -2138,6 +2347,16 @@ watch(favoriteSearch, () => {
   favoriteSearchTimer = setTimeout(async () => {
     await loadFavorites()
     favoriteSearchTimer = null
+  }, 300)
+})
+
+watch(serviceApprovalSearch, () => {
+  if (serviceApprovalSearchTimer) {
+    clearTimeout(serviceApprovalSearchTimer)
+  }
+  serviceApprovalSearchTimer = setTimeout(async () => {
+    await loadServiceApprovals()
+    serviceApprovalSearchTimer = null
   }, 300)
 })
 
@@ -2744,6 +2963,7 @@ onMounted(async () => {
     loadAdminAccount(),
     loadOrderLedger(),
     loadAdminCategories(),
+    loadServiceApprovals(),
   ])
 })
 
@@ -2779,6 +2999,10 @@ onUnmounted(() => {
   if (favoriteSearchTimer) {
     clearTimeout(favoriteSearchTimer)
     favoriteSearchTimer = null
+  }
+  if (serviceApprovalSearchTimer) {
+    clearTimeout(serviceApprovalSearchTimer)
+    serviceApprovalSearchTimer = null
   }
 })
 </script>
@@ -3191,6 +3415,21 @@ onUnmounted(() => {
 .status-in_progress {
   background: rgba(45, 212, 191, 0.2);
   color: #5eead4;
+}
+
+.status-pending {
+  background: rgba(96, 165, 250, 0.18);
+  color: #bfdbfe;
+}
+
+.status-approved {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.status-rejected {
+  background: rgba(248, 113, 113, 0.2);
+  color: #fecdd3;
 }
 
 .status-completed {

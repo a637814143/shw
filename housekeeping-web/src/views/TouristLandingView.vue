@@ -141,10 +141,6 @@
                 <dt>服务时长</dt>
                 <dd>{{ service.serviceTime }}</dd>
               </div>
-              <div>
-                <dt>空闲人员</dt>
-                <dd>{{ service.availableStaffCount }} 人</dd>
-              </div>
             </dl>
             <p v-if="service.description" class="service-desc">{{ service.description }}</p>
             <footer class="service-card-footer">

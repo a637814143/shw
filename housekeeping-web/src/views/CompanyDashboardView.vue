@@ -177,8 +177,9 @@
                   <th>服务类别</th>
                   <th>价格</th>
                   <th>联系方式</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>描述</th>
+                  <th>状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -196,23 +197,27 @@
                   <td>
                     <strong>{{ item.name }}</strong>
                     <div class="order-subtext">单位：{{ item.unit }}</div>
-                    <div class="order-subtext">空闲人员：{{ item.availableStaffCount }}</div>
                   </td>
                   <td>{{ item.categoryName || '—' }}</td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
                   <td>{{ item.contact }}</td>
                   <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
+                  <td>
+                    <span class="status-badge" :class="serviceStatusClass(item.status)">
+                      {{ serviceStatusText(item) }}
+                    </span>
+                  </td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="8" class="empty-row">服务加载中…</td>
+                  <td colspan="9" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -490,7 +495,7 @@
                     />
                   </th>
                   <th>服务</th>
-                  <th>服务时长</th>
+                  <th>服务时间段</th>
                   <th>服务类别</th>
                   <th>预约时间</th>
                   <th>用户</th>
@@ -515,9 +520,7 @@
                     <strong>{{ order.serviceName }}</strong>
                     <div class="order-subtext">价格：¥{{ order.price.toFixed(2) }} / {{ order.unit }}</div>
                     <div class="order-subtext">联系方式：{{ order.contact }}</div>
-                    <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
                     <div class="order-subtext">用户电话：{{ order.customerContactPhone || '未提供' }}</div>
-                    <div class="order-subtext">用户地址：{{ order.customerAddress || '—' }}</div>
                     <div v-if="order.assignedWorker" class="order-subtext">
                       指派人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
                     </div>
@@ -525,9 +528,9 @@
                       用户需求：{{ order.specialRequest }}
                     </div>
                   </td>
-                  <td>{{ order.serviceTime || '按需预约' }}</td>
+                  <td>{{ formatOrderServiceWindow(order) }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
-                  <td>{{ formatDateTime(order.scheduledAt) }}</td>
+                  <td>{{ formatDateTime(order.createdAt) }}</td>
                   <td>{{ order.username }}</td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">
@@ -891,12 +894,13 @@ const staffSaving = ref(false)
 const editingStaffId = ref<number | null>(null)
 const staffCategoryFilter = ref<number | 'all'>('all')
 const serviceTimeSlotOptions = ['8:00-10:00', '11:00-13:00', '14:00-16:00', '17:00-19:00', '20:00-22:00']
+const defaultServiceTimeSlot = serviceTimeSlotOptions[0] ?? ''
 const staffForm = reactive<CompanyStaffPayload>({
   name: '',
   contact: '',
   categoryId: 0,
   notes: '',
-  serviceTimeSlots: [serviceTimeSlotOptions[0]],
+  serviceTimeSlots: defaultServiceTimeSlot ? [defaultServiceTimeSlot] : [],
 })
 const assignmentModalVisible = ref(false)
 const assignmentModalLoading = ref(false)
@@ -909,6 +913,19 @@ const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((it
 const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const serviceStatusText = (item: HousekeepServiceItem) => {
+  const status = (item.status ?? 'PENDING').toUpperCase()
+  if (status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return item.reviewNote ? `驳回（${item.reviewNote}）` : '驳回'
+  }
+  return '待审核'
+}
+
+const serviceStatusClass = (status?: string) => `status-${(status ?? 'PENDING').toLowerCase()}`
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
@@ -1468,7 +1485,7 @@ const resetStaffForm = () => {
   staffForm.contact = ''
   staffForm.categoryId = serviceCategories.value[0]?.id ?? 0
   staffForm.notes = ''
-  staffForm.serviceTimeSlots = [serviceTimeSlotOptions[0]]
+  staffForm.serviceTimeSlots = defaultServiceTimeSlot ? [defaultServiceTimeSlot] : []
   editingStaffId.value = null
 }
 
@@ -1480,7 +1497,9 @@ const openStaffForm = (item?: CompanyStaffItem) => {
     staffForm.notes = item.notes || ''
     staffForm.serviceTimeSlots = item.serviceTimeSlots?.length
       ? item.serviceTimeSlots.slice()
-      : [serviceTimeSlotOptions[0]]
+      : defaultServiceTimeSlot
+        ? [defaultServiceTimeSlot]
+        : []
     editingStaffId.value = item.id
   } else {
     resetStaffForm()
@@ -1569,7 +1588,10 @@ const openAssignmentModal = async (order: ServiceOrderItem) => {
   assignmentModalError.value = null
   assignmentModalLoading.value = true
   try {
-    assignmentModalStaff.value = await fetchCompanyStaff({ categoryId: order.categoryId })
+    assignmentModalStaff.value = await fetchCompanyStaff({
+      categoryId: order.categoryId,
+      scheduledAt: order.scheduledAt,
+    })
   } catch (error) {
     assignmentModalError.value = error instanceof Error ? error.message : '加载人员列表失败'
     assignmentModalStaff.value = []
@@ -2064,9 +2086,46 @@ const formatServiceSlots = (slots: string[] | undefined) => {
   return slots.join('、')
 }
 
+const extractServiceHours = (value?: string | null) => {
+  if (!value) {
+    return null
+  }
+  const match = value.match(/([0-9]+(?:\.\d+)?)/)
+  const hours = match?.[1] ? Number.parseFloat(match[1]) : NaN
+  return Number.isFinite(hours) && hours > 0 ? hours : null
+}
+
 const formatDateTime = (value: string) => {
   const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+const formatOrderServiceWindow = (order: ServiceOrderItem) => {
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return order.serviceTime || '未提供预约时间'
+  }
+
+  const hours = extractServiceHours(order.serviceTime)
+  if (!hours) {
+    return formatDateTime(order.scheduledAt)
+  }
+
+  const end = new Date(start.getTime() + hours * 60 * 60 * 1000)
+  const formatTimePart = (date: Date) =>
+    new Intl.DateTimeFormat('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' }).format(date)
+
+  return `${formatDateTime(order.scheduledAt)} - ${formatTimePart(end)}`
 }
 
 const formatProgressText = (order: ServiceOrderItem): string => {
@@ -2592,6 +2651,14 @@ onUnmounted(() => {
 
 .status-pending {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.status-approved {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.status-rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
 }
 
 .status-completed {

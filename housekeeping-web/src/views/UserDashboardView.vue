@@ -62,8 +62,13 @@
               <span>时间段</span>
               <select v-model="bookingForm.timeSlotKey" required class="time-slot-select">
                 <option value="" disabled>请选择时间段</option>
-                <option v-for="slot in BOOKING_TIME_SLOTS" :key="slot.key" :value="slot.key">
-                  {{ slot.label }}
+                <option
+                  v-for="slot in BOOKING_TIME_SLOTS"
+                  :key="slot.key"
+                  :value="slot.key"
+                  :disabled="isSlotUnavailableForSelectedDate(slot)"
+                >
+                  {{ slotLabelWithAvailability(slot) }}
                 </option>
               </select>
             </label>
@@ -97,50 +102,54 @@
 
 <transition name="fade">
   <div v-if="paymentDialogVisible" class="dialog-backdrop" @click.self="closePaymentDialog">
-    <div class="dialog-card payment-card">
+    <form class="dialog-card payment-card" @submit.prevent="confirmPayment">
       <header class="dialog-header">
-        <h2>扫描二维码完成支付</h2>
-        <p>请使用手机扫描下方二维码，在支付页面确认后系统将自动创建订单。</p>
+        <h2>确认支付</h2>
+        <p>请填写付款账号并选择支付方式，确认后系统将直接处理订单。</p>
       </header>
       <div class="payment-body">
-        <img v-if="paymentQrSrc" :src="paymentQrSrc" alt="支付二维码" class="payment-qr" />
-        <div v-else class="payment-qr placeholder">二维码生成中…</div>
         <p class="payment-summary">
           服务：{{ paymentServiceName || '—' }}
           <span v-if="paymentCompanyName"> · 提供方：{{ paymentCompanyName }}</span>
         </p>
         <p v-if="paymentAmount !== null" class="payment-summary">金额：¥{{ paymentAmount.toFixed(2) }}</p>
-        <p v-if="paymentSession?.expiresAt" class="payment-tip">
-          二维码有效期至：{{ formatDateTime(paymentSession.expiresAt) }}
-        </p>
-        <p class="payment-tip">
-          二维码链接：
-          <template v-if="paymentQrLink">
-            <a :href="paymentQrLink" target="_blank" rel="noopener">{{ paymentQrLink }}</a>
-          </template>
-          <template v-else>—</template>
-        </p>
-        <p v-if="paymentStatus === 'checking'" class="payment-status checking">正在获取支付结果，请稍候…</p>
-        <p v-else-if="paymentStatus === 'success'" class="payment-status success">{{ paymentMessage }}</p>
-        <p v-else-if="paymentStatus === 'failed'" class="payment-status error">{{ paymentError }}</p>
-        <p v-else class="payment-status">请扫码并在手机上完成支付确认。</p>
+
+        <label class="dialog-field">
+          <span>支付账号</span>
+          <input
+            v-model.trim="paymentForm.account"
+            type="text"
+            maxlength="100"
+            placeholder="请输入微信或支付宝账号"
+            required
+          />
+        </label>
+
+        <fieldset class="payment-methods">
+          <legend>支付方式</legend>
+          <label class="method-option">
+            <input v-model="paymentForm.method" type="radio" value="wechat" />
+            微信支付
+          </label>
+          <label class="method-option">
+            <input v-model="paymentForm.method" type="radio" value="alipay" />
+            支付宝
+          </label>
+        </fieldset>
+
+        <p v-if="paymentMessage" class="payment-status success">{{ paymentMessage }}</p>
+        <p v-else-if="paymentError" class="payment-status error">{{ paymentError }}</p>
+        <p v-else class="payment-status">确认后将立即处理支付并创建订单。</p>
       </div>
       <footer class="dialog-footer">
-        <button type="button" class="secondary-button" :disabled="paymentChecking" @click="closePaymentDialog">
-          {{ paymentStatus === 'success' ? '关闭' : '取消' }}
+        <button type="button" class="secondary-button" :disabled="paymentProcessing" @click="closePaymentDialog">
+          取消
         </button>
-        <button
-          v-if="paymentStatus !== 'success'"
-          type="button"
-          class="primary-button"
-          :disabled="paymentChecking"
-          @click="checkPaymentResult"
-        >
-          {{ paymentChecking ? '查询中…' : '已完成支付，查询结果' }}
+        <button type="submit" class="primary-button" :disabled="paymentProcessing">
+          {{ paymentProcessing ? '支付中…' : '确认支付' }}
         </button>
-        <button v-else type="button" class="primary-button" @click="closePaymentDialog">返回平台</button>
       </footer>
-    </div>
+    </form>
   </div>
 </transition>
 
@@ -334,10 +343,6 @@
                   <dt>服务时长</dt>
                   <dd>{{ service.serviceTime }}</dd>
                 </div>
-                <div>
-                  <dt>空闲人员</dt>
-                  <dd>{{ service.availableStaffCount }} 人</dd>
-                </div>
               </dl>
               <p v-if="service.description" class="service-desc">{{ service.description }}</p>
               <footer class="service-card-footer">
@@ -499,9 +504,10 @@
                       <span>积分 +{{ order.loyaltyPoints }}</span>
                     </div>
                     <div class="order-subtext">上门地址：{{ order.serviceAddress || '未填写' }}</div>
+                    <div class="order-subtext">服务时间段：{{ formatServiceWindow(order) }}</div>
                   </td>
                   <td>
-                    <div class="order-subtext">{{ formatDateTime(order.scheduledAt) }}</div>
+                    <div class="order-subtext">{{ formatAppointmentStart(order) }}</div>
                   </td>
                   <td>
                     <span class="status-badge" :class="`status-${order.status.toLowerCase()}`">{{ statusText(order.status) }}</span>
@@ -647,25 +653,59 @@
               <button
                 type="button"
                 class="tab-button"
-                :class="{ active: reviewTab === 'reviewed' }"
-                :aria-pressed="reviewTab === 'reviewed'"
-                @click="setReviewTab('reviewed')"
-              >
-                已评价
-              </button>
-              <button
-                type="button"
-                class="tab-button"
                 :class="{ active: reviewTab === 'unreviewed' }"
                 :aria-pressed="reviewTab === 'unreviewed'"
                 @click="setReviewTab('unreviewed')"
               >
                 未评价
               </button>
+              <button
+                type="button"
+                class="tab-button"
+                :class="{ active: reviewTab === 'reviewed' }"
+                :aria-pressed="reviewTab === 'reviewed'"
+                @click="setReviewTab('reviewed')"
+              >
+                已评价
+              </button>
             </div>
           </div>
 
-          <div v-if="reviewTab === 'reviewed'" class="review-section">
+          <div v-if="reviewTab === 'unreviewed'" class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>服务</th>
+                  <th>最近预约</th>
+                  <th class="table-actions">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="service in pendingReviewServices" :key="service.id">
+                  <td>
+                    <strong>{{ service.name }}</strong>
+                    <div class="order-subtext muted">服务公司：{{ service.companyName }}</div>
+                  </td>
+                  <td>{{ service.lastScheduledAt ? formatDateTime(service.lastScheduledAt) : '—' }}</td>
+                  <td class="table-actions actions-inline">
+                    <button type="button" class="primary-button" @click="openReviewModal(service)">
+                      去评价
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="ordersLoading || userReviewsLoading">
+                  <td colspan="3" class="empty-row">数据加载中…</td>
+                </tr>
+                <tr v-else-if="!pendingReviewServices.length">
+                  <td colspan="3" class="empty-row">
+                    <span v-if="hasReviewSearch">没有匹配的待评价服务。</span>
+                    <span v-else>暂无待评价的服务，完成订单后即可发布评价。</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="review-section">
             <div class="review-actions">
               <button
                 type="button"
@@ -742,40 +782,6 @@
               </table>
             </div>
           </div>
-          <div v-else class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>服务</th>
-                  <th>最近预约</th>
-                  <th class="table-actions">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="service in pendingReviewServices" :key="service.id">
-                  <td>
-                    <strong>{{ service.name }}</strong>
-                    <div class="order-subtext muted">服务公司：{{ service.companyName }}</div>
-                  </td>
-                  <td>{{ service.lastScheduledAt ? formatDateTime(service.lastScheduledAt) : '—' }}</td>
-                  <td class="table-actions actions-inline">
-                    <button type="button" class="primary-button" @click="openReviewModal(service)">
-                      去评价
-                    </button>
-                  </td>
-                </tr>
-                <tr v-if="ordersLoading || userReviewsLoading">
-                  <td colspan="3" class="empty-row">数据加载中…</td>
-                </tr>
-                <tr v-else-if="!pendingReviewServices.length">
-                  <td colspan="3" class="empty-row">
-                    <span v-if="hasReviewSearch">没有匹配的待评价服务。</span>
-                    <span v-else>暂无待评价的服务，完成订单后即可发布评价。</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
 
           <div
             v-if="reviewModalVisible"
@@ -837,8 +843,6 @@ import { useRouter } from 'vue-router'
 import { AUTH_ACCOUNT_KEY, AUTH_ROLE_KEY, AUTH_TOKEN_KEY } from '../constants/auth'
 import {
   addUserFavorite,
-  checkQrPaymentStatus,
-  createQrPaymentSession,
   fetchCurrentAccount,
   createUserOrder,
   exchangeUserPoints,
@@ -855,6 +859,7 @@ import {
   fetchUserServices,
   removeUserFavorite,
   markUserConversationRead,
+  fetchServiceSlotAvailability,
   rechargeUserWallet,
   requestUserRefund,
   sendUserMessage,
@@ -865,17 +870,15 @@ import {
   deleteUserReviews,
   type AccountProfileItem,
   type CreateOrderPayload,
-  type CreatePaymentSessionPayload,
   type CompanyMessageItem,
   type CompanyMessagePayload,
   type DashboardAnnouncementItem,
   type DashboardCarouselItem,
-  type PaymentGatewayCheckResult,
-  type PaymentSessionInfo,
   type DashboardTipItem,
   type HousekeepServiceItem,
   type ServiceCategoryItem,
   type ServiceFavoriteItem,
+  type TimeSlotAvailabilityItem,
   type ServiceOrderItem,
   type ServiceReviewItem,
   type UserConversationItem,
@@ -907,7 +910,7 @@ type SectionKey =
   | 'messages'
   | 'reviews'
 
-type PaymentStatus = 'idle' | 'checking' | 'success' | 'failed'
+type PaymentMethod = 'wechat' | 'alipay'
 
 type PendingPaymentAction =
   | { kind: 'order'; payload: CreateOrderPayload }
@@ -950,6 +953,8 @@ const messageSending = ref(false)
 const activeConversationId = ref<number | null>(null)
 
 const bookingDialogVisible = ref(false)
+const timeSlotAvailability = ref<Record<string, TimeSlotAvailabilityItem>>({})
+const timeSlotAvailabilityLoading = ref(false)
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear()
@@ -976,13 +981,22 @@ const bookingDateLimits = computed(() => ({
   max: getTomorrowInputValue(),
 }))
 
+interface BookingTimeSlot {
+  key: string
+  label: string
+  startHour: number
+  startMinute: number
+  endHour: number
+  endMinute: number
+}
+
 const BOOKING_TIME_SLOTS = [
-  { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0 },
-  { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0 },
-  { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0 },
-  { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0 },
-  { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0 },
-] as const
+  { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0, endHour: 10, endMinute: 0 },
+  { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0, endHour: 13, endMinute: 0 },
+  { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0, endHour: 16, endMinute: 0 },
+  { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0, endHour: 19, endMinute: 0 },
+  { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0, endHour: 22, endMinute: 0 },
+] as const satisfies readonly BookingTimeSlot[]
 
 type BookingTimeSlotKey = (typeof BOOKING_TIME_SLOTS)[number]['key']
 
@@ -1034,18 +1048,57 @@ const bookingScheduledAt = computed(() => {
   return scheduled.toISOString()
 })
 
+const refreshSlotAvailability = async () => {
+  if (!bookingForm.service) {
+    timeSlotAvailability.value = {}
+    return
+  }
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    timeSlotAvailability.value = {}
+    return
+  }
+  timeSlotAvailabilityLoading.value = true
+  try {
+    const items = await fetchServiceSlotAvailability(bookingForm.service.id, bookingForm.selectedDate)
+    const next: Record<string, TimeSlotAvailabilityItem> = {}
+    items.forEach((item) => {
+      if (item?.slotKey) {
+        next[item.slotKey] = item
+      }
+    })
+    timeSlotAvailability.value = next
+  } catch (error) {
+    console.error(error)
+    timeSlotAvailability.value = {}
+  } finally {
+    timeSlotAvailabilityLoading.value = false
+  }
+}
+
+watch(
+  () => bookingForm.selectedDate,
+  () => {
+    if (bookingDialogVisible.value && bookingForm.service) {
+      refreshSlotAvailability()
+    }
+  },
+)
+
 const paymentDialogVisible = ref(false)
-const paymentChecking = ref(false)
-const paymentStatus = ref<PaymentStatus>('idle')
+const paymentProcessing = ref(false)
 const paymentMessage = ref('')
 const paymentError = ref('')
 const pendingPaymentAction = ref<PendingPaymentAction | null>(null)
 const paymentServiceName = ref('')
 const paymentCompanyName = ref('')
 const paymentAmount = ref<number | null>(null)
-const paymentSession = ref<PaymentSessionInfo | null>(null)
+const paymentForm = reactive<{ account: string; method: PaymentMethod }>({
+  account: '',
+  method: 'wechat',
+})
 
-const reviewTab = ref<'reviewed' | 'unreviewed'>('reviewed')
+const reviewTab = ref<'reviewed' | 'unreviewed'>('unreviewed')
 const reviewModalVisible = ref(false)
 const reviewModalService = ref<ReviewableServiceSummary | null>(null)
 const reviewModalForm = reactive<{ rating: number; content: string }>({ rating: 5, content: '' })
@@ -1116,32 +1169,6 @@ const visibleFavorites = computed(() => {
 })
 
 const hasFavoriteFilter = computed(() => favoriteSearch.value.trim().length > 0)
-
-const paymentQrLink = computed(() => {
-  const base = paymentSession.value?.qrUrl ?? ''
-  if (!base) {
-    return ''
-  }
-
-  try {
-    const url = new URL(base, window.location.origin)
-    // 回跳到当前平台页面，便于扫码确认后直接返回二维码界面
-    url.searchParams.set('return', window.location.href)
-    return url.toString()
-  } catch (error) {
-    console.warn('无法附加回跳地址到支付链接：', error)
-    return base
-  }
-})
-
-const paymentQrSrc = computed(() => {
-  const link = paymentQrLink.value
-  if (!link) {
-    return ''
-  }
-  const base = 'https://api.qrserver.com/v1/create-qr-code/'
-  return `${base}?size=240x240&data=${encodeURIComponent(link)}`
-})
 
 const normalizeUserSearchValue = (value: unknown) => {
   if (value == null) {
@@ -1607,6 +1634,7 @@ const handleSelectService = (service: HousekeepServiceItem) => {
   bookingForm.specialRequest = ''
   bookingForm.serviceAddress = account.value?.contactAddress || ''
   bookingDialogVisible.value = true
+  refreshSlotAvailability()
 }
 
 const closeBooking = () => {
@@ -1615,18 +1643,18 @@ const closeBooking = () => {
   bookingForm.serviceAddress = ''
   bookingForm.timeSlotKey = ''
   bookingForm.specialRequest = ''
+  timeSlotAvailability.value = {}
 }
 
 const resetPaymentState = () => {
-  paymentStatus.value = 'idle'
   paymentMessage.value = ''
   paymentError.value = ''
-  paymentChecking.value = false
   pendingPaymentAction.value = null
   paymentServiceName.value = ''
   paymentCompanyName.value = ''
   paymentAmount.value = null
-  paymentSession.value = null
+  paymentForm.account = account.value?.username || account.value?.displayName || ''
+  paymentForm.method = 'wechat'
 }
 
 const submitBooking = async () => {
@@ -1638,6 +1666,24 @@ const submitBooking = async () => {
   const scheduledAt = bookingScheduledAt.value
   if (!scheduledAt) {
     window.alert('请选择预约日期与时间段')
+    return
+  }
+
+  const scheduledDate = new Date(scheduledAt)
+  if (Number.isNaN(scheduledDate.getTime())) {
+    window.alert('预约时间无效，请重新选择')
+    return
+  }
+
+  const now = new Date()
+  if (scheduledDate.getTime() < now.getTime()) {
+    window.alert('预约时间需晚于当前时间，请重新选择时间段')
+    return
+  }
+
+  const selectedSlot = BOOKING_TIME_SLOTS.find((item) => item.key === bookingForm.timeSlotKey)
+  if (selectedSlot && isSlotUnavailableForSelectedDate(selectedSlot)) {
+    window.alert('当前时间段暂无可用人员，请选择其他时间段或日期')
     return
   }
 
@@ -1660,113 +1706,96 @@ const submitBooking = async () => {
   }
   paymentAmount.value = paymentAmountValue
 
-  const payload: CreatePaymentSessionPayload = {
-    serviceName: bookingForm.service.name,
-    companyName: bookingForm.service.companyName,
-    amount: paymentAmountValue,
-  }
-
-  try {
-    const sessionInfo = await createQrPaymentSession(payload)
-    paymentSession.value = sessionInfo
-    bookingDialogVisible.value = false
-    paymentDialogVisible.value = true
-  } catch (error) {
-    console.error(error)
-    window.alert('生成支付二维码失败，请稍后再试。')
-    resetPaymentState()
-  }
+  bookingDialogVisible.value = false
+  paymentDialogVisible.value = true
 }
 
 const closePaymentDialog = () => {
-  if (paymentChecking.value) {
+  if (paymentProcessing.value) {
     return
   }
   paymentDialogVisible.value = false
   resetPaymentState()
 }
 
-const checkPaymentResult = async () => {
-  if (paymentChecking.value) {
+const confirmPayment = async () => {
+  if (paymentProcessing.value) {
     return
   }
+
+  const accountInput = paymentForm.account.trim()
+  if (!accountInput) {
+    window.alert('请输入支付账号')
+    return
+  }
+
   if (!pendingPaymentAction.value) {
-    if (paymentStatus.value === 'success') {
-      closePaymentDialog()
-      return
-    }
-    paymentStatus.value = 'failed'
     paymentError.value = '当前没有待支付的事项，请重新操作。'
     return
   }
 
-  const token = paymentSession.value?.token
-  if (!token) {
-    paymentStatus.value = 'failed'
-    paymentError.value = '支付会话不存在或已过期，请重新生成二维码。'
-    return
-  }
-
-  paymentChecking.value = true
-  paymentStatus.value = 'checking'
+  paymentProcessing.value = true
   paymentError.value = ''
+  paymentMessage.value = ''
 
+  let lastActionKind: PendingPaymentAction['kind'] | null = null
   try {
-    const gatewayResult: PaymentGatewayCheckResult = await checkQrPaymentStatus(token)
-    if (gatewayResult.rawPayload) {
-      console.debug('支付网关返回原始数据：', gatewayResult.rawPayload)
+    const action = pendingPaymentAction.value
+    if (!action) {
+      paymentError.value = '当前没有待支付的事项，请重新操作。'
+      return
     }
 
-    if (gatewayResult.token) {
-      const current = paymentSession.value
-      paymentSession.value = {
-        token: gatewayResult.token,
-        qrPath: current?.qrPath ?? '',
-        qrUrl: current?.qrUrl ?? '',
-        expiresAt: gatewayResult.expiresAt || current?.expiresAt || '',
+    lastActionKind = action.kind
+
+    if (action.kind === 'order') {
+      const normalizedDate = new Date(action.payload.scheduledAt)
+      if (Number.isNaN(normalizedDate.getTime())) {
+        throw new Error('预约时间无效，请重新选择预约时间')
       }
-    }
-
-    if (gatewayResult.status === 'CONFIRMED') {
-      const action = pendingPaymentAction.value
-      try {
-        if (action.kind === 'order') {
-          await createUserOrder(action.payload)
-          await Promise.all([loadOrders(), loadAccount()])
-          bookingForm.service = null
-          bookingForm.selectedDate = bookingDateLimits.value.min
-          bookingForm.timeSlotKey = ''
-          bookingForm.specialRequest = ''
-          bookingForm.serviceAddress = ''
-          paymentMessage.value = '支付成功，订单已创建。'
-        } else {
-          account.value = await rechargeUserWallet({ amount: action.payload.amount })
-          walletForm.amount = null
-          paymentMessage.value = '支付成功，余额已更新。'
-        }
+      if (normalizedDate.getTime() < Date.now()) {
         pendingPaymentAction.value = null
-        paymentStatus.value = 'success'
-      } catch (orderError) {
-        console.error(orderError)
-        paymentStatus.value = 'failed'
-        const fallbackMessage = action.kind === 'order' ? '下单失败，请稍后再试。' : '充值失败，请稍后再试。'
-        paymentError.value = orderError instanceof Error ? orderError.message : fallbackMessage
+        throw new Error('预约时间已过期，请重新选择预约时间')
       }
+      const payload = {
+        ...action.payload,
+        scheduledAt: normalizedDate.toISOString(),
+        specialRequest: action.payload.specialRequest?.trim() || undefined,
+        serviceAddress: action.payload.serviceAddress?.trim() || undefined,
+      }
+      await createUserOrder(payload)
+      await Promise.all([loadOrders(), loadAccount()])
+      bookingForm.service = null
+      bookingForm.selectedDate = bookingDateLimits.value.min
+      bookingForm.timeSlotKey = ''
+      bookingForm.specialRequest = ''
+      bookingForm.serviceAddress = ''
+      paymentMessage.value = `支付成功，已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}创建订单。`
     } else {
-      paymentStatus.value = 'failed'
-      paymentError.value =
-        gatewayResult.message || '未能获取支付结果，请确认后再试。'
-      if (gatewayResult.status === 'DECLINED') {
-        pendingPaymentAction.value = null
+      const amount = Number(action.payload.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error('充值金额无效，请重新输入金额')
       }
+      account.value = await rechargeUserWallet({ amount })
+      walletForm.amount = null
+      paymentMessage.value = `支付成功，钱包已通过${paymentForm.method === 'wechat' ? '微信' : '支付宝'}充值。`
     }
-  } catch (error) {
-    console.error(error)
-    paymentStatus.value = 'failed'
-    paymentError.value =
-      error instanceof Error ? error.message : '获取支付结果失败，请检查网络后重试。'
+    pendingPaymentAction.value = null
+    setTimeout(() => {
+      closePaymentDialog()
+    }, 600)
+  } catch (orderError) {
+    console.error(orderError)
+    const fallbackMessage =
+      lastActionKind === 'order' ? '下单失败，请确认预约信息后再试。' : '充值失败，请稍后再试。'
+    const rawMessage = orderError instanceof Error ? orderError.message : fallbackMessage
+    paymentError.value = rawMessage.includes('参数验证失败')
+      ? lastActionKind === 'order'
+        ? '预约信息未通过校验，请确保时间未过期且地址填写完整。'
+        : '充值金额格式不符合要求，请输入最多两位小数的金额。'
+      : rawMessage
   } finally {
-    paymentChecking.value = false
+    paymentProcessing.value = false
   }
 }
 
@@ -2000,28 +2029,19 @@ const submitRecharge = async () => {
     walletSaving.value = false
     return
   }
-  pendingPaymentAction.value = { kind: 'recharge', payload: { amount } }
+  const normalizedAmount = Math.round(amount * 100) / 100
+  if (normalizedAmount <= 0) {
+    window.alert('请输入正确的充值金额')
+    walletSaving.value = false
+    return
+  }
+  pendingPaymentAction.value = { kind: 'recharge', payload: { amount: normalizedAmount } }
   paymentServiceName.value = '钱包充值'
   paymentCompanyName.value = '账户中心'
-  paymentAmount.value = amount
+  paymentAmount.value = normalizedAmount
 
-  const payload: CreatePaymentSessionPayload = {
-    serviceName: '钱包充值',
-    companyName: '账户中心',
-    amount,
-  }
-
-  try {
-    const sessionInfo = await createQrPaymentSession(payload)
-    paymentSession.value = sessionInfo
-    paymentDialogVisible.value = true
-  } catch (error) {
-    console.error(error)
-    window.alert('生成支付二维码失败，请稍后再试。')
-    resetPaymentState()
-  } finally {
-    walletSaving.value = false
-  }
+  paymentDialogVisible.value = true
+  walletSaving.value = false
 }
 
 const submitExchange = async () => {
@@ -2095,8 +2115,106 @@ const jumpToMessages = (orderId: number) => {
   })
 }
 
+const formatTimeText = (date: Date) => {
+  const hours = `${date.getHours()}`.padStart(2, '0')
+  const minutes = `${date.getMinutes()}`.padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const isSlotPastForSelectedDate = (slot: BookingTimeSlot) => {
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    return false
+  }
+
+  const today = new Date()
+  const normalizedToday = new Date(today)
+  normalizedToday.setHours(0, 0, 0, 0)
+  if (normalizedToday.getTime() !== selectedDate.getTime()) {
+    return false
+  }
+
+  const slotEnd = new Date(selectedDate)
+  slotEnd.setHours(slot.endHour ?? slot.startHour, slot.endMinute ?? slot.startMinute, 0, 0)
+  return slotEnd <= today
+}
+
+const isSlotUnavailableForSelectedDate = (slot: BookingTimeSlot) => {
+  const selectedDate = resolveBookingDate(bookingForm.selectedDate)
+  if (!selectedDate) {
+    return false
+  }
+
+  if (isSlotPastForSelectedDate(slot)) {
+    return true
+  }
+
+  const availability = timeSlotAvailability.value[slot.key]
+  return Boolean(availability && availability.availableStaff <= 0)
+}
+
+const slotLabelWithAvailability = (slot: BookingTimeSlot) => {
+  if (isSlotPastForSelectedDate(slot)) {
+    return slot.label
+  }
+  const info = timeSlotAvailability.value[slot.key]
+  const countText = info ? info.availableStaff : 0
+  return `${slot.label}（空闲人员：${countText}个）`
+}
+
+const formatServiceWindow = (order: ServiceOrderItem) => {
+  if (!order?.scheduledAt) {
+    return '未提供'
+  }
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return '未提供'
+  }
+  const matchedSlot = BOOKING_TIME_SLOTS.find(
+    (slot) => slot.startHour === start.getHours() && slot.startMinute === start.getMinutes(),
+  )
+  if (matchedSlot) {
+    return matchedSlot.label
+  }
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000)
+  return `${formatTimeText(start)}-${formatTimeText(end)}`
+}
+
+const formatAppointmentStart = (order: ServiceOrderItem) => {
+  const timestamp = order?.createdAt || order?.scheduledAt
+  if (!timestamp) {
+    return '未提供'
+  }
+  const start = new Date(timestamp)
+  if (Number.isNaN(start.getTime())) {
+    return '未提供'
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(start)
+}
+
 const formatDateTime = (value: string) => {
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
+  if (!value) {
+    return '未提供'
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return '未提供'
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(parsed)
 }
 
 const statusText = (status: ServiceOrderItem['status']) => {
@@ -3160,27 +3278,8 @@ onUnmounted(() => {
 .payment-body {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
-  text-align: center;
-}
-
-.payment-qr {
-  width: 220px;
-  height: 220px;
-  border-radius: 1rem;
-  background: #fff;
-  padding: 0.75rem;
-}
-
-.payment-qr.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.95rem;
-  color: var(--brand-text-muted);
-  background: rgba(248, 250, 255, 0.8);
-  font-weight: 500;
 }
 
 .payment-tip {
@@ -3190,6 +3289,28 @@ onUnmounted(() => {
 
 .payment-tip a {
   color: var(--brand-primary);
+}
+
+.payment-methods {
+  border: 1px solid var(--brand-border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.payment-methods legend {
+  font-weight: 600;
+  color: var(--brand-text-muted);
+  padding: 0 0.25rem;
+}
+
+.method-option {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 600;
 }
 
 .payment-summary {

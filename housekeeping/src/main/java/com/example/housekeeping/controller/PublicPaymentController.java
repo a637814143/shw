@@ -128,6 +128,31 @@ public class PublicPaymentController {
             "  <script>" +
             "    const params = new URLSearchParams(window.location.search);" +
             "    const returnUrl = params.get('return') || document.referrer || '';" +
+            "    const fallbackUrl = params.get('fallback') || '';" +
+            "    function navigateSameTab(target) {" +
+            "      if (!target) { return false; }" +
+            "      try {" +
+            "        window.location.replace(target);" +
+            "        return true;" +
+            "      } catch (error) {" +
+            "        console.warn('跳转失败：', error);" +
+            "        return false;" +
+            "      }" +
+            "    }" +
+            "    function redirectBack() {" +
+            "      if (!returnUrl) { return; }" +
+            "      try {" +
+            "        if (window.opener && !window.opener.closed) {" +
+            "          window.opener.location.href = returnUrl;" +
+            "          window.close();" +
+            "          return;" +
+            "        }" +
+            "      } catch (error) {" +
+            "        console.warn('无法通过原页面跳转：', error);" +
+            "      }" +
+            "      if (fallbackUrl && navigateSameTab(fallbackUrl)) { return; }" +
+            "      navigateSameTab(returnUrl);" +
+            "    }" +
             "    function submitDecision(value) {" +
             "      fetch(window.location.pathname, {" +
             "        method: 'POST'," +
@@ -138,10 +163,10 @@ public class PublicPaymentController {
             "        .then((data) => {" +
             "          if (data.result === 1) {" +
             "            alert('已同意支付 ✅');" +
-            "            if (returnUrl) { window.location.href = returnUrl; }" +
+            "            redirectBack();" +
             "          } else if (data.result === 0) {" +
             "            alert(data.message || '已拒绝支付 ❌');" +
-            "            if (returnUrl) { window.location.href = returnUrl; }" +
+            "            redirectBack();" +
             "          } else if (data.error) {" +
             "            alert('提交失败：' + data.error);" +
             "          } else {" +
