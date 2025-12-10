@@ -179,6 +179,7 @@
                   <th>联系方式</th>
                   <th>服务时间段</th>
                   <th>描述</th>
+                  <th>状态</th>
                   <th class="table-actions">操作</th>
                 </tr>
               </thead>
@@ -202,16 +203,21 @@
                   <td>{{ item.contact }}</td>
                   <td>{{ item.serviceTime }}</td>
                   <td>{{ item.description || '—' }}</td>
+                  <td>
+                    <span class="status-badge" :class="serviceStatusClass(item.status)">
+                      {{ serviceStatusText(item) }}
+                    </span>
+                  </td>
                   <td class="table-actions">
                     <button type="button" class="link-button" @click="openServiceForm(item)">编辑</button>
                     <button type="button" class="link-button danger" @click="handleDeleteService(item)">删除</button>
                   </td>
                 </tr>
                 <tr v-if="serviceLoading">
-                  <td colspan="8" class="empty-row">服务加载中…</td>
+                  <td colspan="9" class="empty-row">服务加载中…</td>
                 </tr>
                 <tr v-else-if="!services.length">
-                  <td colspan="8" class="empty-row">
+                  <td colspan="9" class="empty-row">
                     <span v-if="hasServiceFilter">未找到匹配的服务，请调整搜索关键词。</span>
                     <span v-else>还没有服务内容，请点击上方按钮进行新增。</span>
                   </td>
@@ -888,12 +894,13 @@ const staffSaving = ref(false)
 const editingStaffId = ref<number | null>(null)
 const staffCategoryFilter = ref<number | 'all'>('all')
 const serviceTimeSlotOptions = ['8:00-10:00', '11:00-13:00', '14:00-16:00', '17:00-19:00', '20:00-22:00']
+const defaultServiceTimeSlot = serviceTimeSlotOptions[0] ?? ''
 const staffForm = reactive<CompanyStaffPayload>({
   name: '',
   contact: '',
   categoryId: 0,
   notes: '',
-  serviceTimeSlots: [serviceTimeSlotOptions[0]],
+  serviceTimeSlots: defaultServiceTimeSlot ? [defaultServiceTimeSlot] : [],
 })
 const assignmentModalVisible = ref(false)
 const assignmentModalLoading = ref(false)
@@ -906,6 +913,19 @@ const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((it
 const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+
+const serviceStatusText = (item: HousekeepServiceItem) => {
+  const status = (item.status ?? 'PENDING').toUpperCase()
+  if (status === 'APPROVED') {
+    return '审核通过'
+  }
+  if (status === 'REJECTED') {
+    return item.reviewNote ? `驳回（${item.reviewNote}）` : '驳回'
+  }
+  return '待审核'
+}
+
+const serviceStatusClass = (status?: string) => `status-${(status ?? 'PENDING').toLowerCase()}`
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
@@ -1465,7 +1485,7 @@ const resetStaffForm = () => {
   staffForm.contact = ''
   staffForm.categoryId = serviceCategories.value[0]?.id ?? 0
   staffForm.notes = ''
-  staffForm.serviceTimeSlots = [serviceTimeSlotOptions[0]]
+  staffForm.serviceTimeSlots = defaultServiceTimeSlot ? [defaultServiceTimeSlot] : []
   editingStaffId.value = null
 }
 
@@ -1477,7 +1497,9 @@ const openStaffForm = (item?: CompanyStaffItem) => {
     staffForm.notes = item.notes || ''
     staffForm.serviceTimeSlots = item.serviceTimeSlots?.length
       ? item.serviceTimeSlots.slice()
-      : [serviceTimeSlotOptions[0]]
+      : defaultServiceTimeSlot
+        ? [defaultServiceTimeSlot]
+        : []
     editingStaffId.value = item.id
   } else {
     resetStaffForm()
@@ -2069,7 +2091,7 @@ const extractServiceHours = (value?: string | null) => {
     return null
   }
   const match = value.match(/([0-9]+(?:\.\d+)?)/)
-  const hours = match ? Number.parseFloat(match[1]) : NaN
+  const hours = match?.[1] ? Number.parseFloat(match[1]) : NaN
   return Number.isFinite(hours) && hours > 0 ? hours : null
 }
 
@@ -2629,6 +2651,14 @@ onUnmounted(() => {
 
 .status-pending {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+
+.status-approved {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.status-rejected {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
 }
 
 .status-completed {

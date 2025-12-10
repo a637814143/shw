@@ -981,13 +981,22 @@ const bookingDateLimits = computed(() => ({
   max: getTomorrowInputValue(),
 }))
 
+interface BookingTimeSlot {
+  key: string
+  label: string
+  startHour: number
+  startMinute: number
+  endHour: number
+  endMinute: number
+}
+
 const BOOKING_TIME_SLOTS = [
   { key: '08-10', label: '08:00-10:00', startHour: 8, startMinute: 0, endHour: 10, endMinute: 0 },
   { key: '11-13', label: '11:00-13:00', startHour: 11, startMinute: 0, endHour: 13, endMinute: 0 },
   { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0, endHour: 16, endMinute: 0 },
   { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0, endHour: 19, endMinute: 0 },
   { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0, endHour: 22, endMinute: 0 },
-] as const
+] as const satisfies readonly BookingTimeSlot[]
 
 type BookingTimeSlotKey = (typeof BOOKING_TIME_SLOTS)[number]['key']
 
@@ -2112,7 +2121,7 @@ const formatTimeText = (date: Date) => {
   return `${hours}:${minutes}`
 }
 
-const isSlotPastForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+const isSlotPastForSelectedDate = (slot: BookingTimeSlot) => {
   const selectedDate = resolveBookingDate(bookingForm.selectedDate)
   if (!selectedDate) {
     return false
@@ -2130,7 +2139,7 @@ const isSlotPastForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) =>
   return slotEnd <= today
 }
 
-const isSlotUnavailableForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+const isSlotUnavailableForSelectedDate = (slot: BookingTimeSlot) => {
   const selectedDate = resolveBookingDate(bookingForm.selectedDate)
   if (!selectedDate) {
     return false
@@ -2144,7 +2153,7 @@ const isSlotUnavailableForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[numb
   return Boolean(availability && availability.availableStaff <= 0)
 }
 
-const slotLabelWithAvailability = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+const slotLabelWithAvailability = (slot: BookingTimeSlot) => {
   if (isSlotPastForSelectedDate(slot)) {
     return slot.label
   }
