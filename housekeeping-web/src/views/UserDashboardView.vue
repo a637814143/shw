@@ -996,7 +996,11 @@ const BOOKING_TIME_SLOTS = [
   { key: '14-16', label: '14:00-16:00', startHour: 14, startMinute: 0, endHour: 16, endMinute: 0 },
   { key: '17-19', label: '17:00-19:00', startHour: 17, startMinute: 0, endHour: 19, endMinute: 0 },
   { key: '20-22', label: '20:00-22:00', startHour: 20, startMinute: 0, endHour: 22, endMinute: 0 },
+<<<<<<< HEAD
 ] as const satisfies readonly BookingTimeSlot[]
+=======
+] as const
+>>>>>>> d29a02ae4748b93457e99dfed12b9325a249dcac
 
 type BookingTimeSlotKey = (typeof BOOKING_TIME_SLOTS)[number]['key']
 
@@ -2121,7 +2125,11 @@ const formatTimeText = (date: Date) => {
   return `${hours}:${minutes}`
 }
 
+<<<<<<< HEAD
 const isSlotPastForSelectedDate = (slot: BookingTimeSlot) => {
+=======
+const isSlotPastForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+>>>>>>> d29a02ae4748b93457e99dfed12b9325a249dcac
   const selectedDate = resolveBookingDate(bookingForm.selectedDate)
   if (!selectedDate) {
     return false
@@ -2139,7 +2147,11 @@ const isSlotPastForSelectedDate = (slot: BookingTimeSlot) => {
   return slotEnd <= today
 }
 
+<<<<<<< HEAD
 const isSlotUnavailableForSelectedDate = (slot: BookingTimeSlot) => {
+=======
+const isSlotUnavailableForSelectedDate = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+>>>>>>> d29a02ae4748b93457e99dfed12b9325a249dcac
   const selectedDate = resolveBookingDate(bookingForm.selectedDate)
   if (!selectedDate) {
     return false
@@ -2153,7 +2165,11 @@ const isSlotUnavailableForSelectedDate = (slot: BookingTimeSlot) => {
   return Boolean(availability && availability.availableStaff <= 0)
 }
 
+<<<<<<< HEAD
 const slotLabelWithAvailability = (slot: BookingTimeSlot) => {
+=======
+const slotLabelWithAvailability = (slot: (typeof BOOKING_TIME_SLOTS)[number]) => {
+>>>>>>> d29a02ae4748b93457e99dfed12b9325a249dcac
   if (isSlotPastForSelectedDate(slot)) {
     return slot.label
   }
