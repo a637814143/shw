@@ -2091,11 +2091,7 @@ const extractServiceHours = (value?: string | null) => {
     return null
   }
   const match = value.match(/([0-9]+(?:\.\d+)?)/)
-<<<<<<< HEAD
   const hours = match?.[1] ? Number.parseFloat(match[1]) : NaN
-=======
-  const hours = match ? Number.parseFloat(match[1]) : NaN
->>>>>>> d29a02ae4748b93457e99dfed12b9325a249dcac
   return Number.isFinite(hours) && hours > 0 ? hours : null
 }
 

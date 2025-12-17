@@ -186,3 +186,4 @@ ON DUPLICATE KEY UPDATE
   `usertype`='系统管理员',
   `display_name`='系统管理员',
   `avatar_base64`='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
+--+
