@@ -1449,7 +1449,7 @@ const clearUserReviewSelection = () => {
 const loadServices = async () => {
   try {
     const result = await fetchUserServices()
-    allServices.value = result
+    allServices.value = result.filter((item) => (item.status ?? 'PENDING').toUpperCase() === 'APPROVED')
     applyServiceFilter()
   } catch (error) {
     console.error(error)
