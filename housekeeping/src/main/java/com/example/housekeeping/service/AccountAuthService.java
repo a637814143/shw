@@ -22,7 +22,7 @@ import java.math.BigDecimal;
 @Service
 public class AccountAuthService {
 
-    private static final BigDecimal DEFAULT_BALANCE = new BigDecimal("1000.00");
+    private static final BigDecimal DEFAULT_BALANCE = BigDecimal.ZERO;
 
     @Autowired
     private UserAllRepository userAllRepository;
