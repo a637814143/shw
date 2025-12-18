@@ -155,7 +155,13 @@
                 <label for="service-image">服务封面</label>
                 <div class="image-upload">
                   <div class="image-preview" :style="serviceImageStyle">
-                    <span v-if="!serviceForm.imageBase64" class="image-placeholder">上传一张图片展示服务</span>
+                    <img
+                      v-if="serviceForm.imageBase64"
+                      :src="serviceForm.imageBase64"
+                      alt="服务封面预览"
+                      class="image-preview-img"
+                    />
+                    <span v-else class="image-placeholder">上传一张图片展示服务</span>
                   </div>
                   <div class="image-upload-actions">
                     <input
@@ -224,6 +230,12 @@
                   <td>
                     <div class="service-cell">
                       <div class="service-thumb" :style="serviceThumbStyle(item)">
+                        <img
+                          v-if="item.imageBase64"
+                          :src="item.imageBase64"
+                          alt="服务封面"
+                          class="service-thumb-img"
+                        />
                         <span v-if="!item.imageBase64" class="thumb-placeholder">无图</span>
                       </div>
                       <div>
@@ -952,7 +964,11 @@ const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((ite
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
 const serviceImageStyle = computed(() => {
   if (serviceForm.imageBase64) {
-    return { backgroundImage: `url(${serviceForm.imageBase64})` }
+    return {
+      backgroundImage: `url("${serviceForm.imageBase64}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
   }
   return {
     backgroundImage:
@@ -974,7 +990,11 @@ const serviceStatusText = (item: HousekeepServiceItem) => {
 const serviceStatusClass = (status?: string) => `status-${(status ?? 'PENDING').toLowerCase()}`
 const serviceThumbStyle = (item: HousekeepServiceItem) => {
   if (item.imageBase64) {
-    return { backgroundImage: `url(${item.imageBase64})` }
+    return {
+      backgroundImage: `url("${item.imageBase64}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
   }
   return {
     backgroundImage:
@@ -2666,16 +2686,18 @@ onUnmounted(() => {
   gap: 20px;
 }
 
+
 .image-upload {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
 }
 
 .image-preview {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border-radius: 14px;
+  width: 220px;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
   border: 1px dashed rgba(148, 163, 184, 0.6);
   background-position: center;
   background-size: cover;
@@ -2684,6 +2706,15 @@ onUnmounted(() => {
   place-items: center;
   color: #475569;
   font-weight: 600;
+  overflow: hidden;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.image-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .image-placeholder {
@@ -2695,6 +2726,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .file-input {
@@ -3009,6 +3041,13 @@ onUnmounted(() => {
   color: #475569;
   font-size: 12px;
   font-weight: 600;
+}
+
+.service-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .thumb-placeholder {

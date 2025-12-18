@@ -317,7 +317,13 @@
           <div class="service-grid">
             <article v-for="service in services" :key="service.id" class="service-card">
               <div class="service-cover" :style="serviceCoverStyle(service)">
-                <span v-if="!service.imageBase64" class="service-cover-placeholder">服务封面</span>
+                <img
+                  v-if="service.imageBase64"
+                  :src="service.imageBase64"
+                  alt="服务封面"
+                  class="service-cover-img"
+                />
+                <span v-else class="service-cover-placeholder">服务封面</span>
               </div>
               <button
                 type="button"
@@ -1336,7 +1342,11 @@ const handleProfileUpdated = (payload: AccountProfileItem) => {
 
 const serviceCoverStyle = (service: HousekeepServiceItem) => {
   if (service.imageBase64) {
-    return { backgroundImage: `url(${service.imageBase64})` }
+    return {
+      backgroundImage: `url("${service.imageBase64}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
   }
   return {
     backgroundImage:
@@ -2808,6 +2818,15 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.06));
+}
+
+.service-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  position: relative;
+  z-index: 1;
 }
 
 .service-cover-placeholder {
