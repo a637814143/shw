@@ -48,7 +48,7 @@ public class HousekeepService {
     private String description;
 
     @Lob
-    @Column(name = "image_base64")
+    @Column(name = "image_base64", columnDefinition = "LONGTEXT")
     private String imageBase64;
 
     @Enumerated(EnumType.STRING)
