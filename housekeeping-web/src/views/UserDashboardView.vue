@@ -328,10 +328,12 @@
               <button
                 type="button"
                 class="favorite-toggle"
-                :class="{ active: favoriteIdSet.has(service.id) }"
+                :class="{ active: isServiceFavorite(service.id) }"
+                :aria-pressed="isServiceFavorite(service.id)"
+                :disabled="favoriteLoadingIds.has(service.id) || favoritesLoading"
                 @click="toggleFavorite(service)"
               >
-                {{ favoriteIdSet.has(service.id) ? '♥' : '♡' }}
+                {{ isServiceFavorite(service.id) ? '❤️' : '🤍' }}
               </button>
               <h3 class="service-title">{{ service.name }}</h3>
               <p class="service-company">提供方：{{ service.companyName }}</p>
@@ -1156,7 +1158,17 @@ const avatarSrc = computed(
   () => account.value?.avatarBase64 || FALLBACK_AVATAR,
 )
 
+const favoriteOverrides = reactive<Record<number, boolean>>({})
+const favoriteLoadingIds = ref<Set<number>>(new Set())
+
 const favoriteIdSet = computed(() => new Set(favorites.value.map((item) => item.serviceId)))
+const isServiceFavorite = (serviceId: number) => {
+  const override = favoriteOverrides[serviceId]
+  if (override !== undefined) {
+    return override
+  }
+  return favoriteIdSet.value.has(serviceId)
+}
 const hasServiceFilter = computed(
   () => serviceSearch.value.trim().length > 0 || activeServiceCategoryId.value !== null,
 )
@@ -1909,19 +1921,32 @@ const handleConfirmOrder = async (order: ServiceOrderItem) => {
   }
 }
 
+const setFavoriteLoading = (serviceId: number, loading: boolean) => {
+  const next = new Set(favoriteLoadingIds.value)
+  if (loading) {
+    next.add(serviceId)
+  } else {
+    next.delete(serviceId)
+  }
+  favoriteLoadingIds.value = next
+}
+
 const toggleFavorite = async (service: HousekeepServiceItem) => {
+  const currentlyFavorite = isServiceFavorite(service.id)
+  favoriteOverrides[service.id] = !currentlyFavorite
+  setFavoriteLoading(service.id, true)
   try {
-    if (favoriteIdSet.value.has(service.id)) {
-      const target = favorites.value.find((item) => item.serviceId === service.id)
-      if (target) {
-        await removeUserFavorite(service.id)
-      }
+    if (currentlyFavorite) {
+      await removeUserFavorite(service.id)
     } else {
       await addUserFavorite(service.id)
     }
     await loadFavorites()
   } catch (error) {
-    console.error(error)
+    window.alert(error instanceof Error ? error.message : '收藏操作失败，请稍后再试。')
+  } finally {
+    delete favoriteOverrides[service.id]
+    setFavoriteLoading(service.id, false)
   }
 }
 
@@ -2841,18 +2866,29 @@ onUnmounted(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  background: rgba(248, 250, 255, 0.95);
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.32);
-  padding: 0.35rem 0.7rem;
-  color: var(--brand-text-muted);
+  border: 2px solid #ef4444;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  color: #ef4444;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  transition: all 0.2s ease;
 }
 
 .favorite-toggle.active {
-  background: rgba(251, 191, 36, 0.16);
-  border-color: rgba(234, 179, 8, 0.38);
-  color: #b45309;
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(239, 68, 68, 0.26);
+}
+
+.favorite-toggle:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .service-title {

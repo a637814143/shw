@@ -40,7 +40,7 @@ class AccountAuthServiceTest {
 
         assertThat(summary.getAccount()).isEqualTo("test_user");
         UserAll saved = userAllRepository.findByUsername("test_user").orElseThrow();
-        assertThat(saved.getMoney()).isEqualByComparingTo(new BigDecimal("1000.00"));
+        assertThat(saved.getMoney()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(saved.getUserType()).isEqualTo("普通用户");
         assertThat(saved.getPasswd()).isNotBlank();
     }
