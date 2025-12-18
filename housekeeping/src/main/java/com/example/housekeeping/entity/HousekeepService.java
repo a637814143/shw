@@ -47,6 +47,10 @@ public class HousekeepService {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Lob
+    @Column(name = "image_base64")
+    private String imageBase64;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private HousekeepServiceStatus status = HousekeepServiceStatus.PENDING;

@@ -21,11 +21,12 @@ public class HousekeepServiceResponse {
     private Long availableStaffCount;
     private String status;
     private String reviewNote;
+    private String imageBase64;
 
     public HousekeepServiceResponse(Long id, String name, String unit, BigDecimal price, String contact,
                                     String serviceTime, String description, Long companyId, String companyName,
                                     Long categoryId, String categoryName, Long availableStaffCount, String status,
-                                    String reviewNote) {
+                                    String reviewNote, String imageBase64) {
         this.id = id;
         this.name = name;
         this.unit = unit;
@@ -40,6 +41,7 @@ public class HousekeepServiceResponse {
         this.availableStaffCount = availableStaffCount;
         this.status = status;
         this.reviewNote = reviewNote;
+        this.imageBase64 = imageBase64;
     }
 
     public Long getId() {
@@ -96,5 +98,9 @@ public class HousekeepServiceResponse {
 
     public String getReviewNote() {
         return reviewNote;
+    }
+
+    public String getImageBase64() {
+        return imageBase64;
     }
 }
