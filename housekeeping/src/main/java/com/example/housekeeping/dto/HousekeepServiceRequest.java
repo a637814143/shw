@@ -36,6 +36,8 @@ public class HousekeepServiceRequest {
     @NotNull(message = "请选择服务分类")
     private Long categoryId;
 
+    private String imageBase64;
+
     public String getName() {
         return name;
     }
@@ -90,5 +92,13 @@ public class HousekeepServiceRequest {
 
     public void setCategoryId(Long categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public String getImageBase64() {
+        return imageBase64;
+    }
+
+    public void setImageBase64(String imageBase64) {
+        this.imageBase64 = imageBase64;
     }
 }

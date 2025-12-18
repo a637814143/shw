@@ -117,6 +117,7 @@ public class HousekeepServiceManager {
         service.setStatus(DEFAULT_STATUS);
         service.setReviewNote(null);
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setImageBase64(normalizeImage(request.getImageBase64()));
 
         return mapToResponse(housekeepServiceRepository.save(service));
     }
@@ -141,6 +142,7 @@ public class HousekeepServiceManager {
         service.setStatus(DEFAULT_STATUS);
         service.setReviewNote(null);
         service.setDescription(normalizeDescription(request.getDescription()));
+        service.setImageBase64(normalizeImage(request.getImageBase64()));
         return mapToResponse(housekeepServiceRepository.save(service));
     }
 
@@ -240,7 +242,8 @@ public class HousekeepServiceManager {
             category == null ? null : category.getName(),
             availableStaffForService(service),
             service.getStatus() == null ? null : service.getStatus().name(),
-            service.getReviewNote()
+            service.getReviewNote(),
+            service.getImageBase64()
         );
     }
 
@@ -273,6 +276,14 @@ public class HousekeepServiceManager {
             return null;
         }
         String trimmed = description.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeImage(String imageBase64) {
+        if (imageBase64 == null) {
+            return null;
+        }
+        String trimmed = imageBase64.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 

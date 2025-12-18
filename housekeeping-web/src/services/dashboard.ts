@@ -80,6 +80,7 @@ export interface HousekeepServiceItem {
   contact: string
   serviceTime: string
   description?: string | null
+  imageBase64?: string | null
   companyId: number
   companyName: string
   categoryId?: number | null
@@ -205,6 +206,7 @@ export interface CompanyServicePayload {
   serviceTime: string
   description?: string
   categoryId: number
+  imageBase64?: string | null
 }
 
 export interface RefundDecisionPayload {

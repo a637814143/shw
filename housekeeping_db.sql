@@ -49,6 +49,7 @@ CREATE TABLE `housekeep_service` (
   `price` decimal(12,2) NOT NULL COMMENT '服务价格',
   `contact` varchar(100) NOT NULL COMMENT '联系方式',
   `service_time` varchar(100) NOT NULL DEFAULT '2小时' COMMENT '服务时段或耗时',
+  `image_base64` longtext COMMENT '服务封面图片（Base64）',
   `status` varchar(32) NOT NULL DEFAULT 'PENDING' COMMENT '审核状态',
   `review_note` varchar(500) DEFAULT NULL COMMENT '审核说明',
   `description` varchar(500) DEFAULT NULL COMMENT '服务描述',
@@ -186,4 +187,3 @@ ON DUPLICATE KEY UPDATE
   `usertype`='系统管理员',
   `display_name`='系统管理员',
   `avatar_base64`='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
---+

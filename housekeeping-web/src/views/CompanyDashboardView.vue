@@ -151,6 +151,39 @@
                 <label for="service-description">服务简介</label>
                 <textarea id="service-description" v-model="serviceForm.description" rows="3"></textarea>
               </div>
+              <div class="form-field form-field-full">
+                <label for="service-image">服务封面</label>
+                <div class="image-upload">
+                  <div class="image-preview" :style="serviceImageStyle">
+                    <img
+                      v-if="serviceForm.imageBase64"
+                      :src="serviceForm.imageBase64"
+                      alt="服务封面预览"
+                      class="image-preview-img"
+                    />
+                    <span v-else class="image-placeholder">上传一张图片展示服务</span>
+                  </div>
+                  <div class="image-upload-actions">
+                    <input
+                      id="service-image"
+                      ref="serviceImageInput"
+                      type="file"
+                      accept="image/*"
+                      class="file-input"
+                      @change="handleServiceImageChange"
+                    />
+                    <button
+                      v-if="serviceForm.imageBase64"
+                      type="button"
+                      class="secondary-button"
+                      @click="clearServiceImage"
+                    >
+                      移除图片
+                    </button>
+                  </div>
+                  <p class="form-helper">支持 JPG/PNG，推荐 16:9 比例，单张不超过 2MB。</p>
+                </div>
+              </div>
               <div class="form-actions">
                 <button type="button" class="secondary-button" @click="closeServiceForm">取消</button>
                 <button type="submit" class="primary-button" :disabled="serviceSaving">
@@ -195,8 +228,21 @@
                     />
                   </td>
                   <td>
-                    <strong>{{ item.name }}</strong>
-                    <div class="order-subtext">单位：{{ item.unit }}</div>
+                    <div class="service-cell">
+                      <div class="service-thumb" :style="serviceThumbStyle(item)">
+                        <img
+                          v-if="item.imageBase64"
+                          :src="item.imageBase64"
+                          alt="服务封面"
+                          class="service-thumb-img"
+                        />
+                        <span v-if="!item.imageBase64" class="thumb-placeholder">无图</span>
+                      </div>
+                      <div>
+                        <strong>{{ item.name }}</strong>
+                        <div class="order-subtext">单位：{{ item.unit }}</div>
+                      </div>
+                    </div>
                   </td>
                   <td>{{ item.categoryName || '—' }}</td>
                   <td>¥{{ item.price.toFixed(2) }}</td>
@@ -882,7 +928,10 @@ const serviceForm = reactive<CompanyServicePayload>({
   serviceTime: '2小时',
   description: '',
   categoryId: 0,
+  imageBase64: null,
 })
+const serviceImageInput = ref<HTMLInputElement | null>(null)
+const SERVICE_IMAGE_MAX_SIZE = 2 * 1024 * 1024
 
 const staffList = ref<CompanyStaffItem[]>([])
 const staffSearch = ref('')
@@ -913,6 +962,19 @@ const modalAvailableStaff = computed(() => assignmentModalStaff.value.filter((it
 const modalAssignedStaff = computed(() => assignmentModalStaff.value.filter((item) => item.assigned))
 
 const serviceSubmitText = computed(() => (editingServiceId.value ? '保存修改' : '新增服务'))
+const serviceImageStyle = computed(() => {
+  if (serviceForm.imageBase64) {
+    return {
+      backgroundImage: `url("${serviceForm.imageBase64}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
+  }
+  return {
+    backgroundImage:
+      'linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(59, 130, 246, 0.08))',
+  }
+})
 
 const serviceStatusText = (item: HousekeepServiceItem) => {
   const status = (item.status ?? 'PENDING').toUpperCase()
@@ -926,6 +988,19 @@ const serviceStatusText = (item: HousekeepServiceItem) => {
 }
 
 const serviceStatusClass = (status?: string) => `status-${(status ?? 'PENDING').toLowerCase()}`
+const serviceThumbStyle = (item: HousekeepServiceItem) => {
+  if (item.imageBase64) {
+    return {
+      backgroundImage: `url("${item.imageBase64}")`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    }
+  }
+  return {
+    backgroundImage:
+      'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.12))',
+  }
+}
 
 const staffSubmitText = computed(() => (editingStaffId.value ? '保存人员' : '新增人员'))
 
@@ -1376,6 +1451,10 @@ const resetServiceForm = () => {
   serviceForm.serviceTime = '2小时'
   serviceForm.description = ''
   serviceForm.categoryId = serviceCategories.value[0]?.id ?? 0
+  serviceForm.imageBase64 = null
+  if (serviceImageInput.value) {
+    serviceImageInput.value.value = ''
+  }
   editingServiceId.value = null
 }
 
@@ -1388,6 +1467,7 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
     serviceForm.serviceTime = '2小时'
     serviceForm.description = item.description || ''
     serviceForm.categoryId = item.categoryId ?? serviceCategories.value[0]?.id ?? 0
+    serviceForm.imageBase64 = item.imageBase64 || null
     editingServiceId.value = item.id
   } else {
     resetServiceForm()
@@ -1398,6 +1478,38 @@ const openServiceForm = (item?: HousekeepServiceItem) => {
 const closeServiceForm = () => {
   serviceFormVisible.value = false
   resetServiceForm()
+}
+
+const clearServiceImage = () => {
+  serviceForm.imageBase64 = null
+  if (serviceImageInput.value) {
+    serviceImageInput.value.value = ''
+  }
+}
+
+const handleServiceImageChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    window.alert('请上传图片文件')
+    clearServiceImage()
+    return
+  }
+  if (file.size > SERVICE_IMAGE_MAX_SIZE) {
+    window.alert('图片大小不能超过 2MB')
+    clearServiceImage()
+    return
+  }
+  const reader = new FileReader()
+  reader.onload = () => {
+    serviceForm.imageBase64 = typeof reader.result === 'string' ? reader.result : null
+  }
+  reader.onerror = () => {
+    window.alert('图片读取失败，请重试')
+    clearServiceImage()
+  }
+  reader.readAsDataURL(file)
 }
 
 const submitServiceForm = async () => {
@@ -1423,6 +1535,7 @@ const submitServiceForm = async () => {
       serviceTime: serviceForm.serviceTime.trim(),
       description: serviceForm.description?.trim() || '',
       categoryId: serviceForm.categoryId,
+      imageBase64: serviceForm.imageBase64 || null,
     }
     if (editingServiceId.value) {
       await updateCompanyService(editingServiceId.value, payload)
@@ -2573,6 +2686,53 @@ onUnmounted(() => {
   gap: 20px;
 }
 
+
+.image-upload {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.image-preview {
+  width: 220px;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  border: 1px dashed rgba(148, 163, 184, 0.6);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  display: grid;
+  place-items: center;
+  color: #475569;
+  font-weight: 600;
+  overflow: hidden;
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
+}
+
+.image-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-placeholder {
+  font-size: 13px;
+  color: rgba(71, 85, 105, 0.8);
+}
+
+.image-upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.file-input {
+  font-size: 13px;
+}
+
 .service-card {
   border-radius: calc(var(--brand-radius) + 2px);
   padding: 20px;
@@ -2860,6 +3020,38 @@ onUnmounted(() => {
   vertical-align: top;
   color: var(--brand-text);
   text-align: left;
+}
+
+.service-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.service-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: grid;
+  place-items: center;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.service-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+.thumb-placeholder {
+  color: rgba(71, 85, 105, 0.75);
 }
 
 .data-table tbody tr:last-child td {
