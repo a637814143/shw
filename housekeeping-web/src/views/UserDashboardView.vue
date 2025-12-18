@@ -316,6 +316,9 @@
           </header>
           <div class="service-grid">
             <article v-for="service in services" :key="service.id" class="service-card">
+              <div class="service-cover" :style="serviceCoverStyle(service)">
+                <span v-if="!service.imageBase64" class="service-cover-placeholder">服务封面</span>
+              </div>
               <button
                 type="button"
                 class="favorite-toggle"
@@ -1329,6 +1332,16 @@ const loadAccount = async () => {
 
 const handleProfileUpdated = (payload: AccountProfileItem) => {
   account.value = payload
+}
+
+const serviceCoverStyle = (service: HousekeepServiceItem) => {
+  if (service.imageBase64) {
+    return { backgroundImage: `url(${service.imageBase64})` }
+  }
+  return {
+    backgroundImage:
+      'linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.12))',
+  }
 }
 
 const applyServiceFilter = () => {
@@ -2774,6 +2787,35 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.service-cover {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 1rem;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.service-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.06));
+}
+
+.service-cover-placeholder {
+  position: relative;
+  z-index: 1;
+  color: rgba(71, 85, 105, 0.9);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .favorite-toggle {
