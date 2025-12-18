@@ -325,17 +325,19 @@
                 />
                 <span v-else class="service-cover-placeholder">服务封面</span>
               </div>
-              <button
-                type="button"
-                class="favorite-toggle"
-                :class="{ active: isServiceFavorite(service.id) }"
-                :aria-pressed="isServiceFavorite(service.id)"
-                :disabled="favoriteLoadingIds.has(service.id) || favoritesLoading"
-                @click="toggleFavorite(service)"
-              >
-                {{ isServiceFavorite(service.id) ? '❤️' : '🤍' }}
-              </button>
-              <h3 class="service-title">{{ service.name }}</h3>
+              <div class="service-title-row">
+                <h3 class="service-title">{{ service.name }}</h3>
+                <button
+                  type="button"
+                  class="favorite-toggle"
+                  :class="{ active: isServiceFavorite(service.id) }"
+                  :aria-pressed="isServiceFavorite(service.id)"
+                  :disabled="favoriteLoadingIds.has(service.id) || favoritesLoading"
+                  @click="toggleFavorite(service)"
+                >
+                  {{ isServiceFavorite(service.id) ? '❤️' : '🤍' }}
+                </button>
+              </div>
               <p class="service-company">提供方：{{ service.companyName }}</p>
               <dl class="service-meta">
                 <div>
@@ -2862,21 +2864,26 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
+.service-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .favorite-toggle {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
+  margin-left: auto;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 999px;
   border: 2px solid #ef4444;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   color: #ef4444;
   box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
   transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
 .favorite-toggle.active {
