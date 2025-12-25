@@ -65,6 +65,13 @@ public final class ServiceTimeSlotHelper {
         return start.plus(slotDuration).plus(Duration.ofHours(SLOT_BUFFER_HOURS));
     }
 
+    public static Instant calculateSlotEnd(Instant start, SlotDefinition slot) {
+        if (start == null || slot == null) {
+            return null;
+        }
+        return start.plus(slot.getDuration());
+    }
+
     public static boolean overlaps(Instant aStart, SlotDefinition aSlot, Instant bStart, SlotDefinition bSlot) {
         if (aStart == null || bStart == null || aSlot == null || bSlot == null) {
             return false;

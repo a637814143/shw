@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -121,8 +122,9 @@ public class ServiceOrderService {
         UserAll user = accountLookupService.getCurrentAccount();
         ensureRole(user, AccountRole.USER);
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findByUserOrderByCreatedAtDesc(user)
-            .stream()
+        List<ServiceOrder> orders = serviceOrderRepository.findByUserOrderByCreatedAtDesc(user);
+        refreshAutoCompletedOrders(orders);
+        return orders.stream()
             .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .map(this::mapToResponse)
             .collect(Collectors.toList());
@@ -146,7 +148,9 @@ public class ServiceOrderService {
             }
         }
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findByServiceIn(services).stream()
+        List<ServiceOrder> orders = serviceOrderRepository.findByServiceIn(services);
+        refreshAutoCompletedOrders(orders);
+        return orders.stream()
             .filter(order -> order.getStatus() == ServiceOrderStatus.SCHEDULED
                 || order.getStatus() == ServiceOrderStatus.IN_PROGRESS
                 || order.getStatus() == ServiceOrderStatus.PENDING)
@@ -183,6 +187,7 @@ public class ServiceOrderService {
         UserAll actor = accountLookupService.getCurrentAccount();
         ServiceOrder order = serviceOrderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("订单不存在"));
+        refreshAutoCompletedOrders(List.of(order));
 
         boolean isAdmin = AccountRole.ADMIN.getLabel().equals(actor.getUserType());
         boolean isCompany = AccountRole.COMPANY.getLabel().equals(actor.getUserType());
@@ -198,6 +203,9 @@ public class ServiceOrderService {
         }
 
         ServiceOrderStatus desiredStatus = normalizeProgressStatus(request.getStatus());
+        if (desiredStatus == ServiceOrderStatus.COMPLETED && isCompany && !hasSlotEnded(order, Instant.now())) {
+            throw new RuntimeException("服务时间段尚未结束，暂不可完成");
+        }
         order.setStatus(desiredStatus);
         String note = normalizeMessage(request.getProgressNote());
         if (note == null) {
@@ -310,6 +318,7 @@ public class ServiceOrderService {
 
         ServiceOrder order = serviceOrderRepository.findById(orderId)
             .orElseThrow(() -> new RuntimeException("订单不存在"));
+        refreshAutoCompletedOrders(List.of(order));
 
         if (!order.getUser().getId().equals(user.getId())) {
             throw new RuntimeException("无权操作该订单");
@@ -501,7 +510,9 @@ public class ServiceOrderService {
         UserAll admin = accountLookupService.getCurrentAccount();
         ensureRole(admin, AccountRole.ADMIN);
         String normalizedKeyword = normalizeKeyword(keyword);
-        return serviceOrderRepository.findAll().stream()
+        List<ServiceOrder> orders = serviceOrderRepository.findAll();
+        refreshAutoCompletedOrders(orders);
+        return orders.stream()
             .filter(order -> matchesOrderKeyword(order, normalizedKeyword))
             .sorted(Comparator.comparing(ServiceOrder::getCreatedAt).reversed())
             .map(this::mapToResponse)
@@ -685,5 +696,49 @@ public class ServiceOrderService {
         permitted.forEach(this::releaseAssignedStaff);
         permitted.forEach(companyMessageRepository::deleteByOrder);
         serviceOrderRepository.deleteAll(permitted);
+    }
+
+    private void refreshAutoCompletedOrders(List<ServiceOrder> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
+        Instant now = Instant.now();
+        for (ServiceOrder order : orders) {
+            autoCompleteIfSlotEnded(order, now);
+        }
+    }
+
+    private boolean autoCompleteIfSlotEnded(ServiceOrder order, Instant reference) {
+        if (order == null || reference == null) {
+            return false;
+        }
+        if (!hasSlotEnded(order, reference)) {
+            return false;
+        }
+        ServiceOrderStatus status = order.getStatus();
+        if (status != ServiceOrderStatus.SCHEDULED
+            && status != ServiceOrderStatus.IN_PROGRESS
+            && status != ServiceOrderStatus.PENDING) {
+            return false;
+        }
+        String note = normalizeMessage(order.getProgressNote());
+        if (note == null) {
+            order.setProgressNote("服务已完成（系统自动更新）");
+        }
+        order.setStatus(ServiceOrderStatus.COMPLETED);
+        order.setUpdatedAt(reference);
+        releaseAssignedStaff(order);
+        serviceOrderRepository.save(order);
+        return true;
+    }
+
+    private boolean hasSlotEnded(ServiceOrder order, Instant reference) {
+        if (order == null || reference == null) {
+            return false;
+        }
+        return ServiceTimeSlotHelper.resolveByInstant(order.getScheduledAt(), ZoneId.systemDefault())
+            .map(slot -> ServiceTimeSlotHelper.calculateSlotEnd(order.getScheduledAt(), slot))
+            .map(end -> end != null && !reference.isBefore(end))
+            .orElse(false);
     }
 }
