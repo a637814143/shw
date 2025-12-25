@@ -609,7 +609,8 @@
                     <button
                       type="button"
                       class="link-button"
-                      :disabled="progressSaving[order.id] || appointmentsLoading"
+                      :disabled="progressSaving[order.id] || appointmentsLoading || !canCompleteCompanyOrder(order)"
+                      :title="canCompleteCompanyOrder(order) ? '' : '服务时间段结束后才能完成'"
                       @click="saveOrderProgress(order, 'COMPLETED')"
                     >
                       完成
@@ -2252,6 +2253,28 @@ const formatProgressText = (order: ServiceOrderItem): string => {
   return note && note.length ? note : '暂无进度'
 }
 
+const estimateSlotEnd = (order: ServiceOrderItem) => {
+  const start = new Date(order.scheduledAt)
+  if (Number.isNaN(start.getTime())) {
+    return null
+  }
+  const hours = extractServiceHours(order.serviceTime) ?? 2
+  if (!Number.isFinite(hours) || hours <= 0) {
+    return null
+  }
+  return new Date(start.getTime() + hours * 60 * 60 * 1000)
+}
+
+const hasSlotEnded = (order: ServiceOrderItem) => {
+  const end = estimateSlotEnd(order)
+  if (!end) {
+    return false
+  }
+  return Date.now() >= end.getTime()
+}
+
+const canCompleteCompanyOrder = (order: ServiceOrderItem) => hasSlotEnded(order)
+
 onMounted(async () => {
   await loadServiceCategories()
   await Promise.all([loadAccount(), loadServices(), loadStaff()])
@@ -3262,4 +3285,3 @@ onUnmounted(() => {
   }
 }
 </style>
-
