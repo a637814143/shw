@@ -3032,12 +3032,16 @@ onUnmounted(() => {
 
 .service-slots-cell {
   white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
 }
 
 .service-slots {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .service-cell {
