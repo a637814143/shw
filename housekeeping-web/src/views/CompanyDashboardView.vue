@@ -452,7 +452,9 @@
                   <td>{{ item.name }}</td>
                   <td>{{ item.contact }}</td>
                   <td>{{ item.categoryName || '—' }}</td>
-                  <td>{{ formatServiceSlots(item.serviceTimeSlots) }}</td>
+                  <td class="service-slots-cell">
+                    <span class="service-slots">{{ formatServiceSlots(item.serviceTimeSlots) }}</span>
+                  </td>
                   <td>
                     <span class="status-badge" :class="item.assigned ? 'status-assigned' : 'status-available'">
                       {{ item.assigned ? '已分配' : '未分配' }}
@@ -3026,6 +3028,20 @@ onUnmounted(() => {
   vertical-align: top;
   color: var(--brand-text);
   text-align: left;
+}
+
+.service-slots-cell {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.service-slots {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .service-cell {
