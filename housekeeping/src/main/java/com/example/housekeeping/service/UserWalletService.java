@@ -17,9 +17,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 
-/**
- * 用户钱包操作。
- */
 @Service
 public class UserWalletService {
 
@@ -93,5 +90,4 @@ public class UserWalletService {
         txn.setCreatedAt(Instant.now());
         accountTransactionRepository.save(txn);
     }
-
 }
