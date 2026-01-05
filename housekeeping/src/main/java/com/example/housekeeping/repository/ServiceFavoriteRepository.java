@@ -17,4 +17,6 @@ public interface ServiceFavoriteRepository extends JpaRepository<ServiceFavorite
     long countByService(HousekeepService service);
 
     Optional<ServiceFavorite> findByUserAndService(UserAll user, HousekeepService service);
+
+    void deleteByUser(UserAll user);
 }

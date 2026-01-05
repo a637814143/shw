@@ -24,4 +24,8 @@ public interface CompanyMessageRepository extends JpaRepository<CompanyMessage, 
     List<CompanyMessage> findByOrderAndRecipientAndReadAtIsNull(ServiceOrder order, UserAll recipient);
 
     void deleteByOrder(ServiceOrder order);
+
+    void deleteByOrderIn(List<ServiceOrder> orders);
+
+    void deleteBySenderOrRecipient(UserAll sender, UserAll recipient);
 }

@@ -16,4 +16,6 @@ public interface ServiceReviewRepository extends JpaRepository<ServiceReview, Lo
     List<ServiceReview> findByServiceInOrderByCreatedAtDesc(List<HousekeepService> services);
 
     List<ServiceReview> findByUserOrderByCreatedAtDesc(UserAll user);
+
+    void deleteByUser(UserAll user);
 }

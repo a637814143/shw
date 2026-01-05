@@ -19,5 +19,7 @@ public interface ServiceOrderRepository extends JpaRepository<ServiceOrder, Long
 
     List<ServiceOrder> findByServiceIn(List<HousekeepService> services);
 
+    List<ServiceOrder> findByHandledBy(UserAll handler);
+
     List<ServiceOrder> findByAssignedStaffIn(@Param("staff") List<com.example.housekeeping.entity.CompanyStaff> staff);
 }

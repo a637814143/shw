@@ -17,4 +17,6 @@ public interface AccountTransactionRepository extends JpaRepository<AccountTrans
     List<AccountTransaction> findTop50ByOrderByCreatedAtDesc();
 
     List<AccountTransaction> findByTypeAndCreatedAtBetween(AccountTransactionType type, Instant start, Instant end);
+
+    void deleteByUser(UserAll user);
 }
