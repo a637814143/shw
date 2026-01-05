@@ -9,6 +9,10 @@ import com.example.housekeeping.entity.UserAll;
 import com.example.housekeeping.enums.AccountRole;
 import com.example.housekeeping.enums.AccountTransactionType;
 import com.example.housekeeping.repository.AccountTransactionRepository;
+import com.example.housekeeping.repository.CompanyMessageRepository;
+import com.example.housekeeping.repository.ServiceFavoriteRepository;
+import com.example.housekeeping.repository.ServiceOrderRepository;
+import com.example.housekeeping.repository.ServiceReviewRepository;
 import com.example.housekeeping.repository.UserAllRepository;
 import com.example.housekeeping.util.LegacyPasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +43,18 @@ public class AdminAccountService {
 
     @Autowired
     private AccountTransactionRepository accountTransactionRepository;
+
+    @Autowired
+    private ServiceOrderRepository serviceOrderRepository;
+
+    @Autowired
+    private ServiceFavoriteRepository serviceFavoriteRepository;
+
+    @Autowired
+    private ServiceReviewRepository serviceReviewRepository;
+
+    @Autowired
+    private CompanyMessageRepository companyMessageRepository;
 
     @Transactional(readOnly = true)
     public List<UserAccountResponse> listUsers(String keyword) {
@@ -142,6 +158,7 @@ public class AdminAccountService {
         }
         UserAll target = userAllRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("账号不存在或已被删除"));
+        deleteAccountWithDependencies(target);
         userAllRepository.delete(target);
     }
 
@@ -166,6 +183,7 @@ public class AdminAccountService {
         if (accounts.size() != distinct.size()) {
             throw new RuntimeException("部分账号不存在或已被删除");
         }
+        accounts.forEach(this::deleteAccountWithDependencies);
         userAllRepository.deleteAll(accounts);
     }
 
@@ -192,5 +210,24 @@ public class AdminAccountService {
         }
         String trimmed = keyword.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void deleteAccountWithDependencies(UserAll target) {
+        List<com.example.housekeeping.entity.ServiceOrder> handledOrders = serviceOrderRepository.findByHandledBy(target);
+        if (!handledOrders.isEmpty()) {
+            handledOrders.forEach(order -> order.setHandledBy(null));
+            serviceOrderRepository.saveAll(handledOrders);
+        }
+
+        List<com.example.housekeeping.entity.ServiceOrder> orders = serviceOrderRepository.findByUserOrderByCreatedAtDesc(target);
+        if (!orders.isEmpty()) {
+            companyMessageRepository.deleteByOrderIn(orders);
+            serviceOrderRepository.deleteAll(orders);
+        }
+
+        companyMessageRepository.deleteBySenderOrRecipient(target, target);
+        serviceFavoriteRepository.deleteByUser(target);
+        serviceReviewRepository.deleteByUser(target);
+        accountTransactionRepository.deleteByUser(target);
     }
 }

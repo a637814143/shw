@@ -122,31 +122,36 @@
         <p v-if="servicesError" class="error-tip">{{ servicesError }}</p>
         <div v-else class="service-grid">
           <article v-for="service in filteredServices" :key="service.id" class="service-card">
-            <h3 class="service-title">{{ service.name }}</h3>
-            <p class="service-company">提供方：{{ service.companyName }}</p>
-            <dl class="service-meta">
-              <div>
-                <dt>计价单位</dt>
-                <dd>{{ service.unit }}</dd>
-              </div>
-              <div>
-                <dt>服务价格</dt>
-                <dd>¥{{ service.price.toFixed(2) }}</dd>
-              </div>
-              <div>
-                <dt>联系方式</dt>
-                <dd>{{ service.contact }}</dd>
-              </div>
-              <div>
-                <dt>服务时长</dt>
-                <dd>{{ service.serviceTime }}</dd>
-              </div>
-            </dl>
-            <p v-if="service.description" class="service-desc">{{ service.description }}</p>
-            <footer class="service-card-footer">
-              <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
-              <p class="service-note">请登录后预约服务。</p>
-            </footer>
+            <div v-if="service.imageBase64" class="service-thumb">
+              <img :src="service.imageBase64" :alt="`${service.name} 封面图`" loading="lazy" />
+            </div>
+            <div class="service-card-body">
+              <h3 class="service-title">{{ service.name }}</h3>
+              <p class="service-company">提供方：{{ service.companyName }}</p>
+              <dl class="service-meta">
+                <div>
+                  <dt>计价单位</dt>
+                  <dd>{{ service.unit }}</dd>
+                </div>
+                <div>
+                  <dt>服务价格</dt>
+                  <dd>¥{{ service.price.toFixed(2) }}</dd>
+                </div>
+                <div>
+                  <dt>联系方式</dt>
+                  <dd>{{ service.contact }}</dd>
+                </div>
+                <div>
+                  <dt>服务时长</dt>
+                  <dd>{{ service.serviceTime }}</dd>
+                </div>
+              </dl>
+              <p v-if="service.description" class="service-desc">{{ service.description }}</p>
+              <footer class="service-card-footer">
+                <span v-if="service.categoryName" class="service-category-chip">{{ service.categoryName }}</span>
+                <p class="service-note">请登录后预约服务。</p>
+              </footer>
+            </div>
           </article>
           <p v-if="!filteredServices.length && !servicesLoading" class="empty-tip">
             {{ serviceSearch ? '未找到匹配的服务，请尝试调整搜索词。' : '暂无家政服务，稍后再来看看。' }}
@@ -737,14 +742,35 @@ onMounted(async () => {
 }
 
 .service-card {
-  padding: 20px;
+  padding: 0;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: #f8fafc;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.08);
+}
+
+.service-thumb {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
+  min-height: 160px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(14, 165, 233, 0.08));
+}
+
+.service-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.service-card-body {
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.08);
 }
 
 .service-title {
