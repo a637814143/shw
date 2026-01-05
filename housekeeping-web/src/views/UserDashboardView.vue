@@ -2670,12 +2670,18 @@ onUnmounted(() => {
 
 .discover-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1080px) {
+  .discover-grid {
+    grid-template-columns: repeat(3, minmax(280px, 1fr));
+  }
 }
 
 .carousel {
-  grid-column: span 2;
   display: flex;
   flex-direction: column;
   gap: 1rem;
