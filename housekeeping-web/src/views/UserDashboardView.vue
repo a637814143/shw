@@ -2671,13 +2671,23 @@ onUnmounted(() => {
 .discover-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  align-items: start;
+  align-items: stretch;
   gap: 1.25rem;
 }
 
 @media (min-width: 1080px) {
   .discover-grid {
-    grid-template-columns: repeat(3, minmax(280px, 1fr));
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-auto-flow: column;
+  }
+  .carousel {
+    grid-column: 1 / 2;
+  }
+  .tips {
+    grid-column: 2 / 3;
+  }
+  .announcements {
+    grid-column: 3 / 4;
   }
 }
 
