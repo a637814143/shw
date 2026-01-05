@@ -570,11 +570,11 @@
                     <div v-if="order.assignedWorker" class="order-subtext">
                       指派人员：{{ order.assignedWorker }}<span v-if="order.workerContact">（{{ order.workerContact }}）</span>
                     </div>
-                    <div v-if="order.specialRequest" class="order-subtext highlight">
-                      用户需求：{{ order.specialRequest }}
-                    </div>
-                  </td>
-                  <td>{{ formatOrderServiceWindow(order) }}</td>
+                <div v-if="order.specialRequest" class="order-subtext highlight">
+                  用户需求：{{ order.specialRequest }}
+                </div>
+              </td>
+              <td>{{ formatOrderServiceWindow(order) }}</td>
                   <td>{{ order.categoryName || '—' }}</td>
                   <td>{{ formatDateTime(order.createdAt) }}</td>
                   <td>{{ order.username }}</td>
@@ -592,29 +592,34 @@
                       {{ formatProgressText(order) }}
                     </div>
                   </td>
-                  <td>
-                    <button type="button" class="secondary-button" @click="openAssignmentModal(order)">
-                      指派人员
-                    </button>
-                  </td>
-                  <td class="table-actions actions-inline">
-                    <button
-                      type="button"
-                      class="link-button"
-                      :disabled="progressSaving[order.id] || appointmentsLoading"
-                      @click="saveOrderProgress(order, 'SCHEDULED')"
-                    >
-                      重置
-                    </button>
-                    <button
-                      type="button"
-                      class="link-button"
-                      :disabled="progressSaving[order.id] || appointmentsLoading"
-                      @click="saveOrderProgress(order, 'COMPLETED')"
-                    >
-                      完成
-                    </button>
-                    <button
+              <td>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="appointmentsLoading || !canEditCompanyOrder(order)"
+                  @click="openAssignmentModal(order)"
+                >
+                  指派人员
+                </button>
+              </td>
+              <td class="table-actions actions-inline">
+                <button
+                  type="button"
+                  class="link-button"
+                  :disabled="progressSaving[order.id] || appointmentsLoading || !canEditCompanyOrder(order)"
+                  @click="saveOrderProgress(order, 'SCHEDULED')"
+                >
+                  重置
+                </button>
+                <button
+                  type="button"
+                  class="link-button"
+                  :disabled="progressSaving[order.id] || appointmentsLoading || !canEditCompanyOrder(order)"
+                  @click="saveOrderProgress(order, 'COMPLETED')"
+                >
+                  完成
+                </button>
+                <button
                       type="button"
                       class="link-button danger"
                       :disabled="appointmentsLoading || !canDeleteCompanyOrder(order)"
@@ -1300,6 +1305,7 @@ const matchesOrderSearch = (order: ServiceOrderItem, keyword: string) => {
 }
 
 const canDeleteCompanyOrder = (order: ServiceOrderItem) => order.status === 'COMPLETED'
+const canEditCompanyOrder = (order: ServiceOrderItem) => order.status !== 'COMPLETED'
 
 const matchesReviewSearch = (review: ServiceReviewItem, keyword: string) => {
   if (!keyword) {
@@ -3262,4 +3268,3 @@ onUnmounted(() => {
   }
 }
 </style>
-
