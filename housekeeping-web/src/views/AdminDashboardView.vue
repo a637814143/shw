@@ -15,7 +15,7 @@
     <section class="stats-grid" aria-label="平台概览">
       <article class="stat-card accent">
         <p class="stat-label">平台注册用户</p>
-        <p class="stat-value">{{ adminStats.totalUsers }}</p>
+        <p class="stat-value">{{ adminStats.totalAccounts }}</p>
         <p class="stat-helper">普通用户 + 家政公司 + 管理员</p>
       </article>
       <article class="stat-card primary">
@@ -26,7 +26,7 @@
       <article class="stat-card glass">
         <p class="stat-label">累计充值</p>
         <p class="stat-value">¥{{ adminStats.totalRecharge.toFixed(2) }}</p>
-        <p class="stat-helper">提现 {{ adminStats.totalWithdraw.toFixed(2) }}</p>
+        <p class="stat-helper">家政公司 {{ adminStats.totalCompanies }}</p>
       </article>
       <article class="stat-card warning">
         <p class="stat-label">待审退款</p>
@@ -150,7 +150,7 @@
               <ul class="stat-lines">
                 <li><span>管理员数量</span><strong>{{ adminStats.totalAdmins }}</strong></li>
                 <li><span>普通用户</span><strong>{{ normalUserCount }}</strong></li>
-                <li><span>累计提现</span><strong>¥{{ adminStats.totalWithdraw.toFixed(2) }}</strong></li>
+                <li><span>家政公司</span><strong>{{ adminStats.totalCompanies }}</strong></li>
               </ul>
             </article>
           </div>
@@ -1632,19 +1632,21 @@ const hasAnnouncementFilter = computed(() => announcementSearch.value.trim().len
 
 const adminStats = computed(() => {
   const base = overview.value
+  const totalUsers = Number(base?.totalUsers ?? 0)
+  const totalCompanies = Number(base?.totalCompanies ?? 0)
+  const totalAdmins = Number(base?.totalAdmins ?? 0)
   return {
-    totalUsers: base?.totalUsers ?? 0,
-    totalCompanies: base?.totalCompanies ?? 0,
-    totalAdmins: base?.totalAdmins ?? 0,
+    totalUsers,
+    totalCompanies,
+    totalAdmins,
+    totalAccounts: totalUsers + totalCompanies + totalAdmins,
     totalRecharge: Number(base?.totalRecharge ?? 0),
     totalWithdraw: Number(base?.totalWithdraw ?? 0),
     pendingRefunds: pendingRefundCount.value,
   }
 })
 
-const normalUserCount = computed(
-  () => Math.max(0, adminStats.value.totalUsers - adminStats.value.totalCompanies - adminStats.value.totalAdmins),
-)
+const normalUserCount = computed(() => adminStats.value.totalUsers)
 
 const weeklySeries = computed(() => overview.value?.weeklyRecharge ?? [])
 const maxWeeklyAmount = computed(() => {
